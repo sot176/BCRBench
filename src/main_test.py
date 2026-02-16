@@ -34,27 +34,6 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def custom_collate(batch):
-    """
-    Collate function to handle variable-length prior images.
-    Keeps lists of prior images and time gaps as lists instead of stacking them.
-    """
-    batch_dict = {}
-
-    for key in batch[0]:
-        values = [sample[key] for sample in batch]
-
-        # Keep variable-length lists as-is
-        if key in ['previous_image_cc', 'previous_image_mlo', 'time_gap']:
-            batch_dict[key] = values  # list of lists
-        else:
-            # Only stack if the elements are tensors
-            if isinstance(values[0], torch.Tensor):
-                batch_dict[key] = torch.stack(values, dim=0)
-            else:
-                batch_dict[key] = values  # fallback for non-tensors
-    return batch_dict
-
 
 
 def main():
