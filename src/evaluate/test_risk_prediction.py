@@ -59,7 +59,7 @@ def test_risk(
        if args.dataset == "CSAW"
         else cfg["paths"]["embed_path_saved_reg_model"]
      )
-    
+
     if accelerator.is_main_process:
         print("Path reg model:", path_saved_reg_model)
 

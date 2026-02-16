@@ -7,6 +7,7 @@ from models import MammoRegNet, LongitudinalMultiViewRiskModel
 from utils import create_logger, bootstrap_auc, bootstrap_c_index
 from train_utils import train_one_epoch, evaluate, get_model_size, get_param_groups, linear_warmup, load_checkpoint, \
     save_checkpoint
+from config.config import cfg
 
 
 def train_val(args, train_loader, valid_loader, path_loggger, path_model, accelerator: Accelerator):
@@ -16,7 +17,10 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
         logger.info(f"Number Training Epochs: {args.num_epochs}")
 
     # --- Model and Optimizer Setup ---
-    path_saved_reg_model = ("PATH/TO/MammoRegNet")
+    path_saved_reg_model = (cfg["paths"]["csaw_path_saved_reg_model"]
+                            if args.dataset == "CSAW"
+                            else cfg["paths"]["embed_path_saved_reg_model"]
+                            )
     if accelerator.is_main_process: print("Path reg model:", path_saved_reg_model)
 
     checkpoint = torch.load(path_saved_reg_model, map_location="cpu", weights_only=True)
