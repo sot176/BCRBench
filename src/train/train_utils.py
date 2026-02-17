@@ -1,5 +1,4 @@
 import torch
-from accelerate import Accelerator
 from utils import (
     concordance_index_ipcw,
     get_censoring_dist,
