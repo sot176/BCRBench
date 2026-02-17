@@ -74,7 +74,6 @@ def test_risk(
         mammo_reg_net=model_reg,
         max_followup=5,
         finetune_all=args.finetune_all,
-        cfg=cfg
     )
     checkpoint_risk = torch.load(path_model, map_location="cpu")
     model_risk.load_state_dict({k.replace("module.", ""): v for k, v in checkpoint_risk.items()})

@@ -38,7 +38,6 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
         mammo_reg_net=model_reg,
         max_followup=5,
         finetune_all=args.finetune_all,
-        cfg=cfg
     )
     get_model_size(model_risk, accelerator)
 
