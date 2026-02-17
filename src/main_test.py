@@ -30,7 +30,8 @@ def parse_arguments():
     parser.add_argument("--shuffle", default=False, type=bool)  # Corrected spelling
     parser.add_argument("--pin_memory", default=True, type=bool)
     parser.add_argument("--seed", default=2023, type=int)
-
+    parser.add_argument("--model", type=str, required=True,
+                        help="Model name (mirai, ImgFeatAlign, VMRA-MaR, OA-BreaCR, LMV-Net, etc.)")
     return parser.parse_args()
 
 

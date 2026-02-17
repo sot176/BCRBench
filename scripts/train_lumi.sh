@@ -14,7 +14,7 @@
 
 
 # Directories for data and output
-export WORKING_DIR=/scratch/project_465002309/thrunsol/Longitudinal_Multi_View_Risk_Prediction/src
+export WORKING_DIR=/scratch/project_465002309/thrunsol/BreastCancerRiskBenchmark/src
 export TORCH_HOME=/scratch/${SLURM_JOB_ACCOUNT}/thrunsol/torch-cache
 export HF_HOME=/flash/${SLURM_JOB_ACCOUNT}/thrunsol/hf-cache
 mkdir -p $TORCH_HOME $HF_HOME
