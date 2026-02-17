@@ -58,10 +58,6 @@ accelerate launch  main_train.py \
             --num_epochs 30 \
             --patience 15 \
             --dataset "EMBED" \
-            --use_multiple_prior_img \
-            --num_latents 256 \
-            --perceiver_depth 2 \
-            --dropout_perceiver 0.3 \
             --finetune_all \
             --seed 2023
 
