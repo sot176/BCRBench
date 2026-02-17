@@ -4,6 +4,7 @@ from accelerate import Accelerator
 import json
 import numpy as np
 import os
+from models.model_factory import get_model
 
 from utils import (
     create_logger,
@@ -68,7 +69,13 @@ def test_risk(
     model_reg.load_state_dict({k.replace("module.", ""): v for k, v in checkpoint_reg.items()})
 
     # Load risk model
-    model_risk = LongitudinalMultiViewRiskModel(mammo_reg_net=model_reg, max_followup=5)
+    model_risk = get_model(
+        args.model,
+        mammo_reg_net=model_reg,
+        max_followup=5,
+        finetune_all=args.finetune_all,
+        cfg=cfg
+    )
     checkpoint_risk = torch.load(path_model, map_location="cpu")
     model_risk.load_state_dict({k.replace("module.", ""): v for k, v in checkpoint_risk.items()})
     model_risk.eval()
