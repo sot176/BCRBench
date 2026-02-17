@@ -3,7 +3,7 @@ import torch
 import wandb
 from accelerate import Accelerator
 
-from models import MammoRegNet, LongitudinalMultiViewRiskModel
+from models import MammoRegNet
 from utils import create_logger, bootstrap_auc, bootstrap_c_index
 
 from models.model_factory import get_model
