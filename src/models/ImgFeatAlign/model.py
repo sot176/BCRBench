@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import sys
 from config.config import cfg
-from mirai_localized_dif_head import extract_mirai_backbone
-from model_utils import SpatialTransformerBlock, RiskModelWithAttention
+from asymmetry_model import extract_mirai_backbone
+from .model_utils import SpatialTransformerBlock, RiskModelWithAttention
 
 
 class ImgFeatAlign(nn.Module):
