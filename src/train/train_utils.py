@@ -1,8 +1,11 @@
 import torch
 from accelerate import Accelerator
-from c_index import concordance_index_ipcw, get_censoring_dist
-from utils import get_risk_loss_BCE, compute_auc_x_year_auc
-
+from utils import (
+    concordance_index_ipcw,
+    get_censoring_dist,
+    get_risk_loss_BCE,
+    compute_auc_x_year_auc,
+)
 
 def train_one_epoch(args, model_risk, train_loader, optimizer, accelerator,  warmup_scheduler, global_step, warmup_steps):
     """

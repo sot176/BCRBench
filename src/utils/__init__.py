@@ -11,4 +11,4 @@ from .utils import (
     bootstrap_auc_by_cancer_type,
 )
 
-from .c_index import get_censoring_dist
+from .c_index import concordance_index_ipcw, get_censoring_dist
