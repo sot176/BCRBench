@@ -5,6 +5,8 @@ from accelerate import Accelerator
 
 from models import MammoRegNet, LongitudinalMultiViewRiskModel
 from utils import create_logger, bootstrap_auc, bootstrap_c_index
+
+from models.model_factory import get_model
 from train_utils import train_one_epoch, evaluate, get_model_size, get_param_groups, linear_warmup, load_checkpoint, \
     save_checkpoint
 from config.config import cfg
@@ -30,7 +32,14 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
     model_reg.eval()
 
 
-    model_risk = LongitudinalMultiViewRiskModel( mammo_reg_net=model_reg, max_followup=5, finetune_all = args.finetune_all)
+    #model_risk = LongitudinalMultiViewRiskModel( mammo_reg_net=model_reg, max_followup=5, finetune_all = args.finetune_all)
+    model_risk = get_model(
+        args.model,
+        mammo_reg_net=model_reg,
+        max_followup=5,
+        finetune_all=args.finetune_all,
+        cfg=cfg
+    )
     get_model_size(model_risk, accelerator)
 
 

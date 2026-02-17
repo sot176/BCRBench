@@ -73,7 +73,8 @@ def parse_arguments():
     parser.add_argument("--num_epochs", default=100, type=int)
     parser.add_argument("--seed", default=2023, type=int)
     parser.add_argument("--weight_decay", default=1e-5, type=float)
-
+    parser.add_argument("--model", type=str, required=True,
+                        help="Model name (mirai, ImgFeatAlign, VMRA-MaR, OA-BreaCR, LMV-Net, etc.)")
 
     args = parser.parse_args()
 

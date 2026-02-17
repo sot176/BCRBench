@@ -16,6 +16,7 @@ accelerate launch  main_train.py \
             --batch_size 4 \
             --augmentations "True" \
             --num_workers 7 \
+            --model "LMV-Net" \
             --learning_rate 5e-5 \
             --weight_decay 1e-4 \
             --lr_decay 0.5 \

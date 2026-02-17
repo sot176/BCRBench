@@ -112,7 +112,7 @@ class LongitudinalFeatureProcessor(nn.Module):
         }
 
 
-class LongitudinalMultiViewRiskModel(nn.Module):
+class LMVNet(nn.Module):
     def __init__(self, mammo_reg_net: nn.Module, max_followup: int = 5,
                  num_attn_blocks: int = 1, feature_dim: int = 1536,  finetune_all: bool = False):
         super().__init__()
