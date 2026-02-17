@@ -1,1 +1,1 @@
-from .mammoregnet import MammoRegNet
+from .model import MammoRegNet
