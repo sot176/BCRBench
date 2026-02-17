@@ -22,20 +22,16 @@ def train_one_epoch(args, model_risk, train_loader, optimizer, accelerator,  war
         outputs = model_risk(batch["current_image_cc"], batch["previous_image_cc"],batch["current_image_mlo"], batch["previous_image_mlo"],
                              batch["time_gap"])
 
-        if args.use_only_multiview_pred:
-            risk_multi = outputs["risk_multi"]
-            risk_loss_multi = get_risk_loss_BCE(risk_multi, batch["target"], batch["y_mask"])
-            risk_loss = risk_loss_multi
-        else:
-            risk_multi = outputs["risk_multi"]
-            risk_cc = outputs["risk_cc"]
-            risk_mlo = outputs["risk_mlo"]
 
-            risk_loss_multi = get_risk_loss_BCE(risk_multi, batch["target"], batch["y_mask"])
-            risk_loss_cc = get_risk_loss_BCE(risk_cc, batch["target"], batch["y_mask"])
-            risk_loss_mlo = get_risk_loss_BCE(risk_mlo, batch["target"], batch["y_mask"])
+        risk_multi = outputs["risk_multi"]
+        risk_cc = outputs["risk_cc"]
+        risk_mlo = outputs["risk_mlo"]
 
-            risk_loss = risk_loss_multi + risk_loss_cc + risk_loss_mlo
+        risk_loss_multi = get_risk_loss_BCE(risk_multi, batch["target"], batch["y_mask"])
+        risk_loss_cc = get_risk_loss_BCE(risk_cc, batch["target"], batch["y_mask"])
+        risk_loss_mlo = get_risk_loss_BCE(risk_mlo, batch["target"], batch["y_mask"])
+
+        risk_loss = risk_loss_multi + risk_loss_cc + risk_loss_mlo
 
         running_risk_loss += risk_loss.item()
 
@@ -83,20 +79,16 @@ def evaluate(args, model_risk, valid_loader, accelerator):
             outputs_val = model_risk(batch_val["current_image_cc"], batch_val["previous_image_cc"], batch_val["current_image_mlo"],
                                  batch_val["previous_image_mlo"],
                                  batch_val["time_gap"])
-            if args.use_only_multiview_pred:
-                risk_pred_val = outputs_val["risk_multi"]
-                risk_loss_multi = get_risk_loss_BCE(risk_pred_val, batch_val["target"], batch_val["y_mask"])
-                risk_loss_val = risk_loss_multi
-            else:
-                risk_pred_val = outputs_val["risk_multi"]
-                risk_cc = outputs_val["risk_cc"]
-                risk_mlo = outputs_val["risk_mlo"]
 
-                risk_loss_multi = get_risk_loss_BCE(risk_pred_val, batch_val["target"], batch_val["y_mask"])
-                risk_loss_cc = get_risk_loss_BCE(risk_cc, batch_val["target"], batch_val["y_mask"])
-                risk_loss_mlo = get_risk_loss_BCE(risk_mlo, batch_val["target"], batch_val["y_mask"])
+            risk_pred_val = outputs_val["risk_multi"]
+            risk_cc = outputs_val["risk_cc"]
+            risk_mlo = outputs_val["risk_mlo"]
 
-                risk_loss_val = risk_loss_multi + risk_loss_cc + risk_loss_mlo
+            risk_loss_multi = get_risk_loss_BCE(risk_pred_val, batch_val["target"], batch_val["y_mask"])
+            risk_loss_cc = get_risk_loss_BCE(risk_cc, batch_val["target"], batch_val["y_mask"])
+            risk_loss_mlo = get_risk_loss_BCE(risk_mlo, batch_val["target"], batch_val["y_mask"])
+
+            risk_loss_val = risk_loss_multi + risk_loss_cc + risk_loss_mlo
             running_risk_loss += risk_loss_val.item()
 
             val_preds.append(accelerator.gather(torch.sigmoid(risk_pred_val).detach()))
