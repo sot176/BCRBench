@@ -8,7 +8,7 @@ from sklearn.utils import resample
 import numpy as np
 import torch
 
-from c_index import concordance_index_ipcw
+from .c_index import concordance_index_ipcw
 
 
 
