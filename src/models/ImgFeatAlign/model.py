@@ -11,7 +11,7 @@ class ImgFeatAlign(nn.Module):
     """
     Combines downsampled deformation field applied to feature maps for risk prediction.
     """
-    def __init__(self):
+    def __init__(self, mammo_reg_net: nn.Module):
         super().__init__()
         sys.path.append(cfg["paths"]["asymMirai_master_onconet"])
         self.encoder = extract_mirai_backbone(
@@ -21,7 +21,11 @@ class ImgFeatAlign(nn.Module):
         self.risk_prediction_model = RiskModelWithAttention()
         self.feat_transformer = SpatialTransformerBlock(mode='bilinear')
 
-    def forward(self, img_cur, img_pri, warped_pri_img, deformation_field, time_gap):
+        self.mammo_reg_net = mammo_reg_net
+        self.mammo_reg_net.requires_grad_(False)
+        self.mammo_reg_net.eval()
+
+    def forward(self, img_cur, img_pri, time_gap):
         """
         Args:
             img_cur (Tensor): Current image (B, 1, H, W)
@@ -36,31 +40,39 @@ class ImgFeatAlign(nn.Module):
         img_cur = img_cur.repeat(1, 3, 1, 1)
         img_pri = img_pri.repeat(1, 3, 1, 1)
 
-        fcur = self.encoder(img_cur)
-        fpri = self.encoder(img_pri)
+        f_cur = self.encoder(img_cur)
+        f_pri = self.encoder(img_pri)
 
-        # Resize deformation field to match feature map resolution
+        # --- Step 2: Temporal Feature Alignment ---
+        # Get deformation field from the registration network using original images
+        registration_outputs = self.mammo_reg_net(img_cur, img_pri)  # MammoRegNet may take B,1,H,W
+        deformation_field = registration_outputs[1]
+        # Downsample deformation field to match the feature map's resolution
         deformation_field_downsampled = F.interpolate(
-            deformation_field.detach().cpu(),
-            size=(fcur.shape[2], fcur.shape[3]),
+            deformation_field.detach(),  # Detach to prevent gradients from flowing into RegNet
+            size=(f_cur.shape[2], f_cur.shape[3]),
             mode='bilinear',
             align_corners=True
-        ).to(fpri.device)
+        )
 
-        scaling_factor_y = fcur.shape[2] / img_cur.shape[2]
-        scaling_factor_x = fcur.shape[3] / img_cur.shape[3]
+        # Rescale the displacement values in the deformation field
+        scaling_factor_y = f_cur.shape[2] / img_cur.shape[2]
+        scaling_factor_x = f_cur.shape[3] / img_cur.shape[3]
 
-        deformation_field_downsampled[:, 0, :, :] *= scaling_factor_x  # x-direction
-        deformation_field_downsampled[:, 1, :, :] *= scaling_factor_y  # y-direction
+        deformation_field_downsampled[:, 0, :, :] *= scaling_factor_x  # x-displacements
+        deformation_field_downsampled[:, 1, :, :] *= scaling_factor_y  # y-displacements
 
-        fpri_aligned = self.feat_transformer(fpri, deformation_field_downsampled)
-        fdiff = torch.abs(fcur - fpri_aligned)
+        # Apply the alignment to the prior feature map
+        f_pri_aligned = self.feat_transformer(f_pri, deformation_field_downsampled)
+
+        # --- Step 3: Temporal Subtraction ---
+        f_diff = torch.abs(f_cur - f_pri_aligned)
 
         return {
-            'risk_prediction': self.risk_prediction_model(fcur, fpri, fpri_aligned, fdiff, time_gap),
+            'risk_prediction': self.risk_prediction_model(f_cur, f_pri, f_pri_aligned, f_diff, time_gap),
             'deformation_field': deformation_field,
-            'aligned_prior_feature': fpri_aligned,
-            'prior_feature_before_alignment': fpri,
-            'current_feature': fcur,
-            'diff_feature': fdiff,
+            'aligned_prior_feature': f_pri_aligned,
+            'prior_feature_before_alignment': f_pri,
+            'current_feature': f_cur,
+            'diff_feature': f_diff,
         }

@@ -131,20 +131,18 @@ class RiskModelWithAttention(nn.Module):
         B, C, H, W = f_dif.shape
 
         # Time-aware encoding of difference map
-        #flattened_feats = f_dif.flatten(start_dim=2).permute(2, 0, 1)  # [N, B, C]
-        #fdif_with_time = self.positional_encoding(flattened_feats, time_gap)
-        #fdif_with_time = fdif_with_time.permute(1, 2, 0).view(B, C, H, W)
+        flattened_feats = f_dif.flatten(start_dim=2).permute(2, 0, 1)  # [N, B, C]
+        fdif_with_time = self.positional_encoding(flattened_feats, time_gap)
+        fdif_with_time = fdif_with_time.permute(1, 2, 0).view(B, C, H, W)
 
         # Global average pooling
         f_cur_pooled = F.adaptive_avg_pool2d(f_cur, (1, 1)).view(B, C)
         f_pri_pooled = F.adaptive_avg_pool2d(f_pri, (1, 1)).view(B, C)
         f_pri_aligned_pooled = F.adaptive_avg_pool2d(f_pri_aligned, (1, 1)).view(B, C)
-        #fdif_pooled = F.adaptive_avg_pool2d(fdif_with_time, (1, 1)).view(B, C)
+        fdif_pooled = F.adaptive_avg_pool2d(fdif_with_time, (1, 1)).view(B, C)
 
         # Temporal attention
-        stacked = torch.stack([f_pri_aligned_pooled, f_cur_pooled], dim=1)  # [B, 3, C]
-
-        #stacked = torch.stack([f_pri_aligned_pooled, fdif_pooled, f_cur_pooled], dim=1)  # [B, 3, C]
+        stacked = torch.stack([f_pri_aligned_pooled, fdif_pooled, f_cur_pooled], dim=1)  # [B, 3, C]
         attended = self.attention_layer(stacked.permute(1, 0, 2))  # [3, B, C]
         attended = attended.permute(1, 0, 2).mean(dim=1)  # [B, C]
         fused_feat = self.feature_projection(attended)
