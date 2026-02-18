@@ -78,12 +78,13 @@ def parse_arguments():
 
     args = parser.parse_args()
 
-    args.results_dir = args.path_out_dir + '_' \
-                  + str(args.learning_rate) + '_lr_' \
-                       + str(args.weight_decay) + '_wd_' \
-                       + str(args.num_epochs) + '_epochs_' \
-                  + str(args.batch_size) + '_bs_' \
-                  + datetime.now().strftime("%Y-%m-%d-%H-%M") + '/'
+    args.results_dir = (args.path_out_dir + '_'
+                        + '_Model_' + str(args.model)
+                        + '_lr_' + str(args.learning_rate)
+                        + '_wd_' + str(args.weight_decay)
+                        + '_epochs_' + str(args.num_epochs)
+                        + '_bs_' + str(args.batch_size)
+                        + datetime.now().strftime("%Y-%m-%d-%H-%M") + '/')
 
     return args
 
