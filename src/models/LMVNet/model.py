@@ -104,7 +104,7 @@ class LongitudinalFeatureProcessor(nn.Module):
         """
         Main forward pass to process both CC and MLO views.
         """
-        
+
         img_cur_cc = batch["current_image_cc"]
         img_pri_cc =  batch["previous_image_cc"]
         img_cur_mlo = batch["current_image_mlo"]
