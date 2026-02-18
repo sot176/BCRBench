@@ -52,7 +52,7 @@ accelerate launch  main_train.py \
             --num_workers 7 \
             --learning_rate 5e-5 \
             --weight_decay 1e-4 \
-            --model "LMV-Net" \
+            --model "ImgFeatAlign" \
             --lr_decay 0.3 \
             --patience_lr_scheduler 3 \
             --num_epochs 30 \
