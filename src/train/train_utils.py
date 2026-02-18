@@ -20,9 +20,6 @@ def train_one_epoch(args, model_risk, train_loader, optimizer, accelerator,  war
     for batch in train_loader:
 
         outputs = model_risk(batch)
-        #outputs = model_risk(batch["current_image_cc"], batch["previous_image_cc"], batch["current_image_mlo"],
-        #                     batch["previous_image_mlo"],
-        #                     batch["time_gap"])
 
         risk_multi = outputs["risk_multi"]
         risk_cc = outputs["risk_cc"]
@@ -77,9 +74,7 @@ def evaluate(args, model_risk, valid_loader, accelerator):
 
     with torch.no_grad():
         for batch_val in valid_loader:
-            outputs_val = model_risk(batch_val["current_image_cc"], batch_val["previous_image_cc"], batch_val["current_image_mlo"],
-                                 batch_val["previous_image_mlo"],
-                                 batch_val["time_gap"])
+            outputs_val = model_risk(batch_val)
 
             risk_pred_val = outputs_val["risk_multi"]
             risk_cc = outputs_val["risk_cc"]
