@@ -1,10 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import math
 
 
 class ContinuousPosEncoding(nn.Module):
-    def __init__(self, dim, drop=0.1, maxtime=5, num_steps=100):
+    def __init__(self, dim, drop=0.1, maxtime=5, num_steps=240):
         """
         Continuous sinusoidal positional encoding with linear interpolation over time.
 
