@@ -19,9 +19,10 @@ def train_one_epoch(args, model_risk, train_loader, optimizer, accelerator,  war
 
     for batch in train_loader:
 
-        outputs = model_risk(batch["current_image_cc"], batch["previous_image_cc"],batch["current_image_mlo"], batch["previous_image_mlo"],
-                             batch["time_gap"])
-
+        outputs = model_risk(batch)
+        #outputs = model_risk(batch["current_image_cc"], batch["previous_image_cc"], batch["current_image_mlo"],
+        #                     batch["previous_image_mlo"],
+        #                     batch["time_gap"])
 
         risk_multi = outputs["risk_multi"]
         risk_cc = outputs["risk_cc"]

@@ -25,7 +25,7 @@ class ImgFeatAlign(nn.Module):
         self.mammo_reg_net.requires_grad_(False)
         self.mammo_reg_net.eval()
 
-    def forward(self, img_cur, img_pri, time_gap):
+    def forward(self, batch):
         """
         Args:
             img_cur (Tensor): Current image (B, 1, H, W)
@@ -37,6 +37,10 @@ class ImgFeatAlign(nn.Module):
         Returns:
             dict: Risk prediction and related intermediate features
         """
+        img_cur = batch["current_image"]
+        img_pri = batch["previous_image"]
+        time_gap = batch["time_gap"]
+
         img_cur = img_cur.repeat(1, 3, 1, 1)
         img_pri = img_pri.repeat(1, 3, 1, 1)
 

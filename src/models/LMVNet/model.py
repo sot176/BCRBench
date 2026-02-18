@@ -58,6 +58,7 @@ class LongitudinalFeatureProcessor(nn.Module):
             f_long (Tensor): The concatenated longitudinal feature tensor.
         """
         # Ensure images have 3 channels for pre-trained encoders
+
         img_cur_3c = img_cur.repeat(1, 3, 1, 1)
         img_pri_3c = img_pri.repeat(1, 3, 1, 1)
 
@@ -99,10 +100,16 @@ class LongitudinalFeatureProcessor(nn.Module):
         f_long = torch.cat([f_cur, f_pri, f_diff], dim=1)  # [B, 1536, H, W]
         return f_long
 
-    def forward(self, img_cur_cc, img_pri_cc, img_cur_mlo, img_pri_mlo, time_gap):
+    def forward(self, batch):
         """
         Main forward pass to process both CC and MLO views.
         """
+        
+        img_cur_cc = batch["current_image_cc"]
+        img_pri_cc =  batch["previous_image_cc"]
+        img_cur_mlo = batch["current_image_mlo"]
+        img_pri_mlo = batch["previous_image_mlo"]
+        time_gap = batch["time_gap"]
         f_cc_long = self._process_view(img_cur_cc, img_pri_cc, time_gap)
         f_mlo_long = self._process_view(img_cur_mlo, img_pri_mlo, time_gap)
 
