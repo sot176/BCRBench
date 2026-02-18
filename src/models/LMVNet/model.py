@@ -100,16 +100,11 @@ class LongitudinalFeatureProcessor(nn.Module):
         f_long = torch.cat([f_cur, f_pri, f_diff], dim=1)  # [B, 1536, H, W]
         return f_long
 
-    def forward(self, batch):
+    def forward(self, img_cur_cc, img_pri_cc, img_cur_mlo, img_pri_mlo, time_gap):
         """
         Main forward pass to process both CC and MLO views.
         """
 
-        img_cur_cc = batch["current_image_cc"]
-        img_pri_cc =  batch["previous_image_cc"]
-        img_cur_mlo = batch["current_image_mlo"]
-        img_pri_mlo = batch["previous_image_mlo"]
-        time_gap = batch["time_gap"]
         f_cc_long = self._process_view(img_cur_cc, img_pri_cc, time_gap)
         f_mlo_long = self._process_view(img_cur_mlo, img_pri_mlo, time_gap)
 
@@ -141,7 +136,14 @@ class LMVNet(nn.Module):
         # Separate cumulative probability layers
         self.cumulative_risk = CumulativeProbabilityLayer(num_features=feature_dim, max_followup=max_followup)
 
-    def forward(self, img_cur_cc, img_pri_cc, img_cur_mlo, img_pri_mlo, time_gap):
+    def forward(self, batch):
+
+        img_cur_cc = batch["current_image_cc"]
+        img_pri_cc = batch["previous_image_cc"]
+        img_cur_mlo = batch["current_image_mlo"]
+        img_pri_mlo = batch["previous_image_mlo"]
+        time_gap = batch["time_gap"]
+
         # Step 1: Longitudinal features
         longitudinal_output = self.longitudinal_feat_processor(
             img_cur_cc, img_pri_cc, img_cur_mlo, img_pri_mlo, time_gap
