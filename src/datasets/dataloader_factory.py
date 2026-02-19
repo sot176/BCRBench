@@ -1,17 +1,17 @@
 from torch.utils.data import DataLoader
-from datasets import (
-    BreastCancerRiskDatasetCSAWCC_Mirai,
-    BreastCancerRiskDatasetCSAWCC_ImgFeatAlign,
-    BreastCancerRiskDatasetCSAWCC_LMVNet,
-    BreastCancerRiskDatasetCSAWCC_VMRA,
-    BreastCancerRiskDatasetCSAWCC_OABreaCR,
-    BreastCancerRiskDatasetEMBED_Mirai,
-    BreastCancerRiskDatasetEMBED_ImgFeatAlign,
-    BreastCancerRiskDatasetEMBED_LMVNet,
-    BreastCancerRiskDatasetEMBED_VMRA,
-    BreastCancerRiskDatasetEMBED_OABreaCR
-)
+# CSAW
+from .CSAW.BreastCancerRiskDatasetCSAWCC_Mirai import BreastCancerRiskDatasetCSAWCC_Mirai
+from .CSAW.BreastCancerRiskDatasetCSAWCC_ImgFeatAlign import BreastCancerRiskDatasetCSAWCC_ImgFeatAlign
+from .CSAW.BreastCancerRiskDatasetCSAWCC_LMVNet import BreastCancerRiskDatasetCSAWCC_LMVNet
+from .CSAW.BreastCancerRiskDatasetCSAWCC_VMRA import BreastCancerRiskDatasetCSAWCC_VMRA
+from .CSAW.BreastCancerRiskDatasetCSAWCC_OABreaCR import BreastCancerRiskDatasetCSAWCC_OABreaCR
 
+# EMBED
+from .EMBED.BreastCancerRiskDatasetEMBED_Mirai import BreastCancerRiskDatasetEMBED_Mirai
+from .EMBED.BreastCancerRiskDatasetEMBED_ImgFeatAlign import BreastCancerRiskDatasetEMBED_ImgFeatAlign
+from .EMBED.BreastCancerRiskDatasetEMBED_LMVNet import BreastCancerRiskDatasetEMBED_LMVNet
+from .EMBED.BreastCancerRiskDatasetEMBED_VMRA import BreastCancerRiskDatasetEMBED_VMRA
+from .EMBED.BreastCancerRiskDatasetEMBED_OABreaCR import BreastCancerRiskDatasetEMBED_OABreaCR
 
 def get_dataset_and_loader(dataset_name: str, model_name: str, split: str,
                            csv_file: str, data_root: str,
