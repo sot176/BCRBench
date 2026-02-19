@@ -21,7 +21,9 @@ def train_one_epoch(args, model_risk, train_loader, optimizer, accelerator,  war
 
         outputs = model_risk(batch)
 
-        risk_heads = model_risk.get_risk_heads(outputs, batch)
+        base_model = accelerator.unwrap_model(model_risk)
+
+        risk_heads = base_model.get_risk_heads(outputs, batch)
 
         risk_loss = sum(
             get_risk_loss_BCE(logits, target, mask)
@@ -39,7 +41,7 @@ def train_one_epoch(args, model_risk, train_loader, optimizer, accelerator,  war
             warmup_scheduler.step()
         global_step += 1
 
-        primary_logits = model_risk.get_primary_risk_head(outputs)
+        primary_logits = base_model.get_primary_risk_head(outputs)
 
         all_preds.append(
             accelerator.gather(torch.sigmoid(primary_logits).detach())
@@ -77,7 +79,9 @@ def evaluate(args, model_risk, valid_loader, accelerator):
         for batch_val in valid_loader:
             outputs_val = model_risk(batch_val)
 
-            risk_heads_val = model_risk.get_risk_heads(outputs_val, batch_val)
+            base_model = accelerator.unwrap_model(model_risk)
+
+            risk_heads_val = base_model.get_risk_heads(outputs_val, batch_val)
 
             risk_loss_val = sum(
                 get_risk_loss_BCE(logits, target, mask)
@@ -85,7 +89,7 @@ def evaluate(args, model_risk, valid_loader, accelerator):
             )
             running_risk_loss += risk_loss_val.item()
 
-            primary_logits = model_risk.get_primary_risk_head(outputs_val)
+            primary_logits = base_model.get_primary_risk_head(outputs_val)
 
             val_preds.append(
                 accelerator.gather(torch.sigmoid(primary_logits).detach())
