@@ -41,11 +41,12 @@ class ImgFeatAlign(nn.Module):
         img_pri = batch["previous_image"]
         time_gap = batch["time_gap"]
 
-        img_cur = img_cur.repeat(1, 3, 1, 1)
-        img_pri = img_pri.repeat(1, 3, 1, 1)
+        img_cur_3c = img_cur.repeat(1, 3, 1, 1)
+        img_pri_3c = img_pri.repeat(1, 3, 1, 1)
 
-        f_cur = self.encoder(img_cur)
-        f_pri = self.encoder(img_pri)
+        # --- Step 1: Feature extraction ---
+        f_cur = self.encoder(img_cur_3c)
+        f_pri = self.encoder(img_pri_3c)
 
         # --- Step 2: Temporal Feature Alignment ---
         # Get deformation field from the registration network using original images
