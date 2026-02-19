@@ -4,14 +4,12 @@ from .CSAW.BreastCancerRiskDatasetCSAWCC_Mirai import BreastCancerRiskDatasetCSA
 from .CSAW.BreastCancerRiskDatasetCSAWCC_ImgFeatAlign import BreastCancerRiskDatasetCSAWCC_ImgFeatAlign
 from .CSAW.BreastCancerRiskDatasetCSAWCC_LMVNet import BreastCancerRiskDatasetCSAWCC_LMVNet
 from .CSAW.BreastCancerRiskDatasetCSAWCC_VMRA import BreastCancerRiskDatasetCSAWCC_VMRA
-from .CSAW.BreastCancerRiskDatasetCSAWCC_OABreaCR import BreastCancerRiskDatasetCSAWCC_OABreaCR
 
 # EMBED
 from .EMBED.BreastCancerRiskDatasetEMBED_Mirai import BreastCancerRiskDatasetEMBED_Mirai
 from .EMBED.BreastCancerRiskDatasetEMBED_ImgFeatAlign import BreastCancerRiskDatasetEMBED_ImgFeatAlign
 from .EMBED.BreastCancerRiskDatasetEMBED_LMVNet import BreastCancerRiskDatasetEMBED_LMVNet
 from .EMBED.BreastCancerRiskDatasetEMBED_VMRA import BreastCancerRiskDatasetEMBED_VMRA
-from .EMBED.BreastCancerRiskDatasetEMBED_OABreaCR import BreastCancerRiskDatasetEMBED_OABreaCR
 
 def get_dataset_and_loader(dataset_name: str, model_name: str, split: str,
                            csv_file: str, data_root: str,
@@ -35,7 +33,7 @@ def get_dataset_and_loader(dataset_name: str, model_name: str, split: str,
         elif model_name == "VMRA-MaR":
             dataset_class = BreastCancerRiskDatasetCSAWCC_VMRA
         elif model_name == "OA-BreaCR":
-            dataset_class = BreastCancerRiskDatasetCSAWCC_OABreaCR
+            dataset_class = BreastCancerRiskDatasetCSAWCC_ImgFeatAlign
 
     elif dataset_name == "EMBED":
         print(f"Using EMBED dataset for {split} split with model {model_name}")
@@ -48,7 +46,7 @@ def get_dataset_and_loader(dataset_name: str, model_name: str, split: str,
         elif model_name == "VMRA-MaR":
             dataset_class = BreastCancerRiskDatasetEMBED_VMRA
         elif model_name == "OA-BreaCR":
-            dataset_class = BreastCancerRiskDatasetEMBED_OABreaCR
+            dataset_class = BreastCancerRiskDatasetEMBED_ImgFeatAlign
 
     else:
         raise ValueError(f"Unknown dataset: {dataset_name}")
