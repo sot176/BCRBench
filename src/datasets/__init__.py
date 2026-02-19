@@ -1,5 +1,4 @@
 from .dataloader_factory import get_dataset_and_loader
-# datasets/__init__.py
 
 # CSAW datasets
 from .CSAW import BreastCancerRiskDatasetCSAWCC_LMVNet
