@@ -21,29 +21,30 @@ def train_one_epoch(args, model_risk, train_loader, optimizer, accelerator,  war
 
         outputs = model_risk(batch)
 
-        risk_multi = outputs["risk_multi"]
-        risk_cc = outputs["risk_cc"]
-        risk_mlo = outputs["risk_mlo"]
+        risk_heads = model_risk.get_risk_heads(outputs, batch)
 
-        risk_loss_multi = get_risk_loss_BCE(risk_multi, batch["target"], batch["y_mask"])
-        risk_loss_cc = get_risk_loss_BCE(risk_cc, batch["target"], batch["y_mask"])
-        risk_loss_mlo = get_risk_loss_BCE(risk_mlo, batch["target"], batch["y_mask"])
-
-        risk_loss = risk_loss_multi + risk_loss_cc + risk_loss_mlo
+        risk_loss = sum(
+            get_risk_loss_BCE(logits, target, mask)
+            for logits, target, mask in risk_heads.values()
+        )
 
         running_risk_loss += risk_loss.item()
-
         optimizer.zero_grad()
         accelerator.backward(risk_loss)
         optimizer.step()
+
 
         # Update warm-up scheduler
         if global_step < warmup_steps:
             warmup_scheduler.step()
         global_step += 1
 
+        primary_logits = model_risk.get_primary_risk_head(outputs)
+
+        all_preds.append(
+            accelerator.gather(torch.sigmoid(primary_logits).detach())
+        )
         # Gather results for metric calculation
-        all_preds.append(accelerator.gather(torch.sigmoid(risk_multi).detach()))
         all_times.append(accelerator.gather(batch["event_times"]))
         all_events.append(accelerator.gather(batch["event_observed"]))
 
@@ -76,18 +77,19 @@ def evaluate(args, model_risk, valid_loader, accelerator):
         for batch_val in valid_loader:
             outputs_val = model_risk(batch_val)
 
-            risk_pred_val = outputs_val["risk_multi"]
-            risk_cc = outputs_val["risk_cc"]
-            risk_mlo = outputs_val["risk_mlo"]
+            risk_heads_val = model_risk.get_risk_heads(outputs_val, batch_val)
 
-            risk_loss_multi = get_risk_loss_BCE(risk_pred_val, batch_val["target"], batch_val["y_mask"])
-            risk_loss_cc = get_risk_loss_BCE(risk_cc, batch_val["target"], batch_val["y_mask"])
-            risk_loss_mlo = get_risk_loss_BCE(risk_mlo, batch_val["target"], batch_val["y_mask"])
-
-            risk_loss_val = risk_loss_multi + risk_loss_cc + risk_loss_mlo
+            risk_loss_val = sum(
+                get_risk_loss_BCE(logits, target, mask)
+                for logits, target, mask in risk_heads_val.values()
+            )
             running_risk_loss += risk_loss_val.item()
 
-            val_preds.append(accelerator.gather(torch.sigmoid(risk_pred_val).detach()))
+            primary_logits = model_risk.get_primary_risk_head(outputs_val)
+
+            val_preds.append(
+                accelerator.gather(torch.sigmoid(primary_logits).detach())
+            )
             val_times.append(accelerator.gather(batch_val["event_times"]))
             val_events.append(accelerator.gather(batch_val["event_observed"]))
 

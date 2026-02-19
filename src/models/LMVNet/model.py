@@ -172,3 +172,22 @@ class LMVNet(nn.Module):
 
         return {'risk_multi': risk_multi, 'risk_cc': risk_cc, 'risk_mlo': risk_mlo}
 
+    def get_risk_heads(self, outputs, batch):
+        """
+        Returns a dictionary of:
+        {
+            head_name: (logits, target, mask)
+        }
+        """
+
+        target = batch["target"]
+        mask = batch["y_mask"]
+
+        return {
+            "multi": (outputs["risk_multi"], target, mask),
+            "cc": (outputs["risk_cc"], target, mask),
+            "mlo": (outputs["risk_mlo"], target, mask),
+        }
+
+    def get_primary_risk_head(self, outputs):
+        return outputs["risk_multi"]

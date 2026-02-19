@@ -81,3 +81,27 @@ class ImgFeatAlign(nn.Module):
             'current_feature': f_cur,
             'diff_feature': f_diff,
         }
+
+    def get_risk_heads(self, outputs, batch):
+        risk_pred = outputs["risk_prediction"]
+
+        return {
+            "fused": (
+                risk_pred["pred_fused"],
+                batch["target"],
+                batch["y_mask"],
+            ),
+            "cur": (
+                risk_pred["pred_cur"],
+                batch["target"],
+                batch["y_mask"],
+            ),
+            "pri": (
+                risk_pred["pred_pri"],
+                batch["target_prior"],
+                batch["y_mask_prior"],
+            ),
+        }
+
+    def get_primary_risk_head(self, outputs):
+        return outputs["risk_prediction"]["pred_fused"]
