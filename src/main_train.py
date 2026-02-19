@@ -2,7 +2,6 @@ import argparse
 import os
 import random
 import torch
-from torch.utils.data import DataLoader
 import logging
 import time
 import kornia.augmentation as K_A
@@ -14,10 +13,8 @@ from torch.serialization import SourceChangeWarning
 warnings.filterwarnings("ignore", category=SourceChangeWarning)
 
 from accelerate import Accelerator
-
 from train import train_val
-
-# to get rid of warning on the slurm output.
+from datasets import get_dataset_and_loader
 
 # function to log the details
 def setup_logging(path_logger, is_main_process):
