@@ -217,7 +217,6 @@ class BreastCancerRiskDatasetEMBED_ImgFeatAlign(Dataset):
         density = matching_row["density"].values[0]
         density = self.map_density(density)
         cancer_type =  self.map_cancer_type(matching_row["path_severity"].values[0])
-        race = str(matching_row["RACE_DESC"].values[0])
 
         if time_to_cancer == 0:
             time_to_cancer = 1
@@ -285,7 +284,6 @@ class BreastCancerRiskDatasetEMBED_ImgFeatAlign(Dataset):
             'target_prior': target_prior,
             'density': density,
             'cancer_type': cancer_type,
-            'race': race,
 
         }
         return data
