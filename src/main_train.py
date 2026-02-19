@@ -15,8 +15,6 @@ warnings.filterwarnings("ignore", category=SourceChangeWarning)
 
 from accelerate import Accelerator
 
-from dataloaders import BreastCancerRiskDataset, BreastCancerRiskDatasetCSAWCC
-
 from train import train_val
 
 # to get rid of warning on the slurm output.
@@ -119,37 +117,30 @@ def main():
         train_transform = None
 
 
-    if args.dataset == "CSAW":
-        print("Use CSAW-CC dataset")
-        train_dataset = BreastCancerRiskDatasetCSAWCC(
-            args.csv_file, args.data_root, "train", transforms=train_transform
-        )
-        validation_dataset = BreastCancerRiskDatasetCSAWCC(
-            args.csv_file, args.data_root, "val", transforms=None
-        )
-    else:
-        print("Use EMBED dataset")
-        train_dataset = BreastCancerRiskDataset(
-            args.csv_file, args.data_root, "train", transforms=train_transform
-        )
-        validation_dataset = BreastCancerRiskDataset(
-            args.csv_file, args.data_root, "val", transforms=None
-        )
 
-    train_loader = DataLoader(
-        train_dataset,
+    train_loader = get_dataset_and_loader(
+        dataset_name=args.dataset,
+        model_name=args.model,
+        split="train",
+        csv_file=args.csv_file,
+        data_root=args.data_root,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         shuffle=args.schuffle,
-        pin_memory=args.pin_memory
+        pin_memory=args.pin_memory,
+        transforms=train_transform
     )
-
-    validation_loader = DataLoader(
-        validation_dataset,
+    validation_loader = get_dataset_and_loader(
+        dataset_name=args.dataset,
+        model_name=args.model,
+        split="val",
+        csv_file=args.csv_file,
+        data_root=args.data_root,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        shuffle=False,
-        pin_memory=args.pin_memory
+        shuffle=args.schuffle,
+        pin_memory=args.pin_memory,
+        transforms=train_transform
     )
 
     # Setup the path to save the model and the logger.

@@ -14,7 +14,7 @@ def _build_model(model_class, **kwargs):
 
 def get_model(model_name: str, **kwargs):
 
-    if model_name == "mirai":
+    if model_name == "Mirai":
         from models.Mirai.model import MiraiModel
         return _build_model(MiraiModel, **kwargs)
 

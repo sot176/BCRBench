@@ -21,7 +21,7 @@ def imgunit16(img):
     # mammogram_uint8_by_function = mammogram_uint8_by_function
     return mammogram_scaled
 
-class BreastCancerRiskDatasetCSAWCC(Dataset):
+class BreastCancerRiskDatasetCSAWCC_LMVNet(Dataset):
     def __init__(self, csv_file, image_dir, mode, transforms=None, n_years=5):
         self.data = pd.read_csv(csv_file, low_memory=False)
         self.csv_data = self.data.set_index('file_name').to_dict(orient='index')

@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import DataLoader
 from accelerate import Accelerator
 
-from dataloaders import BreastCancerRiskDatasetCSAWCC, BreastCancerRiskDataset
+from datasets import BreastCancerRiskDatasetCSAWCC, BreastCancerRiskDataset
 from evaluate import test_risk
 
 

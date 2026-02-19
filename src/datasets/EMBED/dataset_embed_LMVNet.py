@@ -27,7 +27,7 @@ def extract_date_from_filename(filename):
         return None  # Return None if filename format is unexpected
 
 
-class BreastCancerRiskDataset(Dataset):
+class BreastCancerRiskDatasetEMBED_LMVNet(Dataset):
     def __init__(self, csv_file, image_dir, mode, transforms=None, n_years=5):
         """
         Args:
