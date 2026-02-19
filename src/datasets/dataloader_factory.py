@@ -1,15 +1,15 @@
 from torch.utils.data import DataLoader
 # CSAW
-from .CSAW.BreastCancerRiskDatasetCSAWCC_Mirai import BreastCancerRiskDatasetCSAWCC_Mirai
-from .CSAW.BreastCancerRiskDatasetCSAWCC_ImgFeatAlign import BreastCancerRiskDatasetCSAWCC_ImgFeatAlign
-from .CSAW.BreastCancerRiskDatasetCSAWCC_LMVNet import BreastCancerRiskDatasetCSAWCC_LMVNet
-from .CSAW.BreastCancerRiskDatasetCSAWCC_VMRA import BreastCancerRiskDatasetCSAWCC_VMRA
+from .CSAW.dataset_csaw_Mirai import BreastCancerRiskDatasetCSAWCC_Mirai
+from .CSAW.dataset_csaw_ImgFeatAlign import BreastCancerRiskDatasetCSAWCC_ImgFeatAlign
+from .CSAW.dataset_csaw_LMVNet import BreastCancerRiskDatasetCSAWCC_LMVNet
+from .CSAW.dataset_csaw_VMRA import BreastCancerRiskDatasetCSAWCC_VMRA
 
 # EMBED
-from .EMBED.BreastCancerRiskDatasetEMBED_Mirai import BreastCancerRiskDatasetEMBED_Mirai
-from .EMBED.BreastCancerRiskDatasetEMBED_ImgFeatAlign import BreastCancerRiskDatasetEMBED_ImgFeatAlign
-from .EMBED.BreastCancerRiskDatasetEMBED_LMVNet import BreastCancerRiskDatasetEMBED_LMVNet
-from .EMBED.BreastCancerRiskDatasetEMBED_VMRA import BreastCancerRiskDatasetEMBED_VMRA
+from .EMBED.dataset_embed_Mirai import BreastCancerRiskDatasetEMBED_Mirai
+from .EMBED.dataset_embed_ImgFeatAlign import BreastCancerRiskDatasetEMBED_ImgFeatAlign
+from .EMBED.dataset_embed_LMVNet import BreastCancerRiskDatasetEMBED_LMVNet
+from .EMBED.dataset_embed_VMRA import BreastCancerRiskDatasetEMBED_VMRA
 
 def get_dataset_and_loader(dataset_name: str, model_name: str, split: str,
                            csv_file: str, data_root: str,
