@@ -32,7 +32,6 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
     model_reg.eval()
 
 
-    #model_risk = LongitudinalMultiViewRiskModel( mammo_reg_net=model_reg, max_followup=5, finetune_all = args.finetune_all)
     model_risk = get_model(
         args.model,
         mammo_reg_net=model_reg,
@@ -40,7 +39,12 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
         finetune_all=args.finetune_all,
     )
     get_model_size(model_risk, accelerator)
+    total_params = sum(p.numel() for p in model_risk.parameters())
+    trainable_params = sum(p.numel() for p in model_risk.parameters() if p.requires_grad)
 
+    print(f"Total parameters:     {total_params:,}")
+    print(f"Trainable parameters: {trainable_params:,}")
+    print(f"Total params (M):            {total_params / 1e6:.2f} M")
 
     param_groups = get_param_groups(model_risk, base_lr=args.learning_rate, finetune_lr_scale=0.1)
 
