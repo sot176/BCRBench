@@ -20,7 +20,6 @@ from utils import (
 )
 from config.config import cfg
 from models.model_factory import get_model
-from models.MammoRegNet import MammoRegNet
 
 
 def to_json_safe(obj):
@@ -54,31 +53,26 @@ def test_risk(
 
     # 2. Model Loading (always on CPU first)
     # Load registration model
-    path_saved_reg_model = ( cfg["paths"]["csaw_path_saved_reg_model"]
-       if args.dataset == "CSAW"
-        else cfg["paths"]["embed_path_saved_reg_model"]
-     )
+    # --- Model and Optimizer Setup ---
+    path_saved_reg_model = (cfg["paths"]["csaw_path_saved_reg_model"]
+                            if args.dataset == "CSAW"
+                            else cfg["paths"]["embed_path_saved_reg_model"]
+                            )
+    if accelerator.is_main_process: print("Path reg model:", path_saved_reg_model)
 
-    if accelerator.is_main_process:
-        print("Path reg model:", path_saved_reg_model)
-
-    checkpoint_reg = torch.load(path_saved_reg_model, map_location="cpu", weights_only=True)
-    model_reg = MammoRegNet()
-    model_reg.load_state_dict({k.replace("module.", ""): v for k, v in checkpoint_reg.items()})
-
-    # Load risk model
     model_risk = get_model(
         args.model,
-        mammo_reg_net=model_reg,
+        path_saved_reg_model=path_saved_reg_model,
         max_followup=5,
         finetune_all=args.finetune_all,
     )
+
     checkpoint_risk = torch.load(path_model, map_location="cpu")
     model_risk.load_state_dict({k.replace("module.", ""): v for k, v in checkpoint_risk.items()})
     model_risk.eval()
 
     # 3. Prepare models and dataloader with Accelerator
-    model_risk, model_reg, test_loader = accelerator.prepare(model_risk, model_reg, test_loader)
+    model_risk, model_reg, test_loader = accelerator.prepare(model_risk, test_loader)
 
     # 4. Evaluation Loop
     if accelerator.is_main_process:

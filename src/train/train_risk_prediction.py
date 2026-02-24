@@ -3,9 +3,7 @@ import torch
 import wandb
 from accelerate import Accelerator
 
-from models.MammoRegNet import MammoRegNet
 from utils import create_logger, bootstrap_auc, bootstrap_c_index
-
 from models.model_factory import get_model
 from .train_utils import train_one_epoch, evaluate, get_model_size, get_param_groups, linear_warmup, load_checkpoint, \
     save_checkpoint
@@ -25,19 +23,13 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
                             )
     if accelerator.is_main_process: print("Path reg model:", path_saved_reg_model)
 
-    checkpoint = torch.load(path_saved_reg_model, map_location="cpu", weights_only=True)
-    new_checkpoint = {k.replace("module.", ""): v for k, v in checkpoint.items()}
-
-    model_reg = MammoRegNet()
-    model_reg.load_state_dict(new_checkpoint)
-    model_reg.eval()
-
     model_risk = get_model(
         args.model,
-        mammo_reg_net=model_reg,
+        path_saved_reg_model=path_saved_reg_model,
         max_followup=5,
         finetune_all=args.finetune_all,
     )
+
     get_model_size(model_risk, accelerator)
     total_params = sum(p.numel() for p in model_risk.parameters())
     trainable_params = sum(p.numel() for p in model_risk.parameters() if p.requires_grad)
@@ -76,7 +68,7 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
 
     # --- Prepare with Accelerator ---
     model_risk, model_reg, optimizer, train_loader, valid_loader, scheduler, warmup_scheduler  = accelerator.prepare(
-        model_risk, model_reg, optimizer, train_loader, valid_loader, scheduler, warmup_scheduler
+        model_risk, optimizer, train_loader, valid_loader, scheduler, warmup_scheduler
     )
 
     # --- WandB Initialization ---
