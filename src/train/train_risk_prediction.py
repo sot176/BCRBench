@@ -42,17 +42,6 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
 
     optimizer = torch.optim.AdamW(param_groups, weight_decay=args.weight_decay)
 
-    #  Debug print here
-    name_lookup = {p: n for n, p in model_risk.named_parameters()}
-    for i, group in enumerate(optimizer.param_groups):
-        lr = group['lr']
-        print(f"\nParam group {i}: learning rate = {lr}")
-        for j, p in enumerate(group['params']):
-            print(f"  {j}: {name_lookup[p]} | shape={tuple(p.shape)}")
-            if j >= 4:
-                print("  ...")
-                break
-
     warmup_steps = args.warmup_steps #5000  # Number of warm-up steps
     warmup_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
                                                          lr_lambda=lambda step: linear_warmup(step, warmup_steps))
@@ -73,7 +62,7 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
 
     # --- WandB Initialization ---
     if accelerator.is_main_process:
-        wandb.init(project="LMV_Risk_Prediction", config={
+        wandb.init(project="Breast_Cacner_Risk_Prediction", config={
             "Optimizer": "AdamW", "architecture": "TemporalMultiViewRiskPrediction", "dataset": args.dataset,
             "epochs": args.num_epochs, "learning_rate": args.learning_rate, "Weight_decay": args.weight_decay,
         })

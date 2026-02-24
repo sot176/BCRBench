@@ -80,7 +80,6 @@ def test_risk(
 
     all_preds, all_times, all_events, all_densities, all_cancers = [], [], [], [], []
 
-    model_reg.eval()
     model_risk.eval()
 
     with torch.no_grad():
