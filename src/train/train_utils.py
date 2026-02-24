@@ -43,6 +43,8 @@ def train_one_epoch(model_risk, train_loader, optimizer, accelerator,  warmup_sc
 
         primary_logits = base_model.get_primary_risk_head(outputs)
         print("primary_logits", primary_logits)
+        print("after sigmoid", torch.sigmoid(primary_logits))
+
         all_preds.append(
             accelerator.gather(torch.sigmoid(primary_logits).detach())
         )
