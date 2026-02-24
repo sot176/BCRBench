@@ -6,7 +6,7 @@ import sys
 from config.config import cfg
 from asymmetry_model import extract_mirai_backbone
 from .model_utils import  RiskModelWithAttention
-from models.common_parts.model_utils import SpatialTransformerBlock
+from models.common_parts import SpatialTransformerBlock
 
 
 class ImgFeatAlign(nn.Module):

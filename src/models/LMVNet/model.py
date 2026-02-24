@@ -6,7 +6,7 @@ import sys
 from config.config import cfg
 from asymmetry_model import extract_mirai_backbone
 from .model_utils import CrossAttentionBlock
-from models.common_parts.model_utils  import ContinuousPosEncoding, SpatialTransformerBlock, CumulativeProbabilityLayer
+from models.common_parts  import ContinuousPosEncoding, SpatialTransformerBlock, CumulativeProbabilityLayer
 
 class LongitudinalFeatureProcessor(nn.Module):
     """
