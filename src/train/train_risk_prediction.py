@@ -67,7 +67,7 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
             print(f"Scheduler configured: {type(scheduler).__name__}")
 
     # --- Prepare with Accelerator ---
-    model_risk, model_reg, optimizer, train_loader, valid_loader, scheduler, warmup_scheduler  = accelerator.prepare(
+    model_risk, optimizer, train_loader, valid_loader, scheduler, warmup_scheduler  = accelerator.prepare(
         model_risk, optimizer, train_loader, valid_loader, scheduler, warmup_scheduler
     )
 

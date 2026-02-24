@@ -72,7 +72,7 @@ def test_risk(
     model_risk.eval()
 
     # 3. Prepare models and dataloader with Accelerator
-    model_risk, model_reg, test_loader = accelerator.prepare(model_risk, test_loader)
+    model_risk, test_loader = accelerator.prepare(model_risk, test_loader)
 
     # 4. Evaluation Loop
     if accelerator.is_main_process:
