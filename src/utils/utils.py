@@ -313,11 +313,12 @@ def compute_auc_x_year_auc(probs, censor_times, golds):
 
         try:
             auc = metrics.roc_auc_score(golds_for_eval, probs_for_eval, average="samples")
+            print("try statemtnt auc", auc)
         except Exception as e:
             warnings.warn(f"Failed to calculate AUC because {e}")
             auc = float("nan")
         aucs_per_year[followup] = auc
-
+    print("final AUC", aucs_per_year)
     return aucs_per_year
 
 
