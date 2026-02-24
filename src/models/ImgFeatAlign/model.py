@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import sys
 
-from ..config.config import cfg
+from ...config import cfg
 from ...asymmetry_model import extract_mirai_backbone
 from .model_utils import  RiskModelWithAttention
 from ..common_parts import SpatialTransformerBlock
