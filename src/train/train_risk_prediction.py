@@ -5,7 +5,7 @@ from accelerate import Accelerator
 
 from utils import create_logger, bootstrap_auc, bootstrap_c_index
 from models.model_factory import get_model
-from .train_utils import train_one_epoch, evaluate, get_model_size, get_param_groups, linear_warmup, load_checkpoint, \
+from .train_utils import train_one_epoch, evaluate, get_param_groups, linear_warmup, load_checkpoint, \
     save_checkpoint
 from config.config import cfg
 
