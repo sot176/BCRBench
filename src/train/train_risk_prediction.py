@@ -30,7 +30,6 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
         finetune_all=args.finetune_all,
     )
 
-    get_model_size(model_risk, accelerator)
     total_params = sum(p.numel() for p in model_risk.parameters())
     trainable_params = sum(p.numel() for p in model_risk.parameters() if p.requires_grad)
 
