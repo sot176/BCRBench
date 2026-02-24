@@ -27,10 +27,10 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
 
     checkpoint = torch.load(path_saved_reg_model, map_location="cpu", weights_only=True)
     new_checkpoint = {k.replace("module.", ""): v for k, v in checkpoint.items()}
+
     model_reg = MammoRegNet()
     model_reg.load_state_dict(new_checkpoint)
     model_reg.eval()
-
 
     model_risk = get_model(
         args.model,
@@ -123,10 +123,10 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
 
     for epoch in range(start_epoch, args.num_epochs):
         # --- Training ---
-        avg_train_loss, train_c_index, auc_results_train = train_one_epoch(args, model_risk, train_loader, optimizer, accelerator,  warmup_scheduler, global_step, warmup_steps)
+        avg_train_loss, train_c_index, auc_results_train = train_one_epoch(model_risk, train_loader, optimizer, accelerator,  warmup_scheduler, global_step, warmup_steps)
 
         # --- Validation ---
-        val_risk_loss, val_c_index, auc_results = evaluate(args, model_risk, valid_loader, accelerator)
+        val_risk_loss, val_c_index, auc_results = evaluate(model_risk, valid_loader, accelerator)
 
         # --- Logging, Checkpointing, and Early Stopping (on main process) ---
         if accelerator.is_main_process:

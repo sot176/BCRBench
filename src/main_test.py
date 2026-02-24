@@ -5,8 +5,8 @@ import torch
 from torch.utils.data import DataLoader
 from accelerate import Accelerator
 
-from datasets import BreastCancerRiskDatasetCSAWCC, BreastCancerRiskDataset
 from evaluate import test_risk
+from datasets import get_dataset_and_loader
 
 
 def parse_arguments():
@@ -36,7 +36,6 @@ def parse_arguments():
 
 
 
-
 def main():
     args = parse_arguments()
     accelerator = Accelerator()
@@ -47,25 +46,17 @@ def main():
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed_all(args.seed)
 
-
-    if args.dataset == "CSAW":
-        print("Use CSAW-CC dataset")
-        test_dataset = BreastCancerRiskDatasetCSAWCC(
-            args.csv_file, args.data_root, "test", transforms=None
-        )
-    else:
-        print("Use EMBED dataset")
-        test_dataset  = BreastCancerRiskDataset(
-            args.csv_file, args.data_root, "test", transforms=None
-        )
-
-
-    test_loader = DataLoader(
-        test_dataset,
+    test_loader = get_dataset_and_loader(
+        dataset_name=args.dataset,
+        model_name=args.model,
+        split="test",
+        csv_file=args.csv_file,
+        data_root=args.data_root,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        shuffle=args.shuffle,
-        pin_memory=args.pin_memory
+        shuffle=args.schuffle,
+        pin_memory=args.pin_memory,
+        transforms=None
     )
 
     # --- Model Path Logic ---

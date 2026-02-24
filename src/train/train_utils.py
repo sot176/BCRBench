@@ -6,7 +6,7 @@ from utils import (
     compute_auc_x_year_auc,
 )
 
-def train_one_epoch(args, model_risk, train_loader, optimizer, accelerator,  warmup_scheduler, global_step, warmup_steps):
+def train_one_epoch(model_risk, train_loader, optimizer, accelerator,  warmup_scheduler, global_step, warmup_steps):
     """
     Handles the training logic for a single epoch.
 
@@ -64,7 +64,7 @@ def train_one_epoch(args, model_risk, train_loader, optimizer, accelerator,  war
     return avg_risk_loss, c_index, auc_results
 
 
-def evaluate(args, model_risk, valid_loader, accelerator):
+def evaluate(model_risk, valid_loader, accelerator):
     """
     Handles the evaluation logic for a single epoch.
 

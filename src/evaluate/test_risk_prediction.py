@@ -4,7 +4,6 @@ from accelerate import Accelerator
 import json
 import numpy as np
 import os
-from models.model_factory import get_model
 
 from utils import (
     create_logger,
@@ -20,9 +19,8 @@ from utils import (
     get_censoring_dist,
 )
 from config.config import cfg
-
-
-from models import MammoRegNet, LongitudinalMultiViewRiskModel
+from models.model_factory import get_model
+from models.MammoRegNet import MammoRegNet
 
 
 def to_json_safe(obj):
@@ -94,15 +92,15 @@ def test_risk(
     with torch.no_grad():
         progress_bar = tqdm(test_loader, desc="Testing", disable=not accelerator.is_main_process)
         for batch in progress_bar:
-            # Risk model forward
-            outputs = model_risk(batch["current_image_cc"], batch["previous_image_cc"], batch["current_image_mlo"],
-                                 batch["previous_image_mlo"],
-                                 batch["time_gap"])
 
-            risk = outputs["risk_multi"]
+            # Risk model forward
+            outputs = model_risk(batch)
+
+            base_model = accelerator.unwrap_model(model_risk)
+            primary_logits = base_model.get_primary_risk_head(outputs)
 
             # Gather results from all processes
-            gathered_preds = accelerator.gather((torch.sigmoid(risk).detach()))
+            gathered_preds = accelerator.gather((torch.sigmoid(primary_logits).detach()))
             gathered_times = accelerator.gather(batch["event_times"])
             gathered_events = accelerator.gather(batch["event_observed"])
             gathered_densities = accelerator.gather(batch["density"])
