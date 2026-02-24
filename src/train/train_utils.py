@@ -24,7 +24,7 @@ def train_one_epoch(model_risk, train_loader, optimizer, accelerator,  warmup_sc
         base_model = accelerator.unwrap_model(model_risk)
 
         risk_heads = base_model.get_risk_heads(outputs, batch)
-
+        print("risk heads", risk_heads)
         risk_loss = sum(
             get_risk_loss_BCE(logits, target, mask)
             for logits, target, mask in risk_heads.values()
@@ -42,7 +42,7 @@ def train_one_epoch(model_risk, train_loader, optimizer, accelerator,  warmup_sc
         global_step += 1
 
         primary_logits = base_model.get_primary_risk_head(outputs)
-
+        print("primary_logits", primary_logits)
         all_preds.append(
             accelerator.gather(torch.sigmoid(primary_logits).detach())
         )
