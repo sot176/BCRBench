@@ -109,70 +109,67 @@ def test_risk(
     if accelerator.is_main_process:
         print("[INFO] Aggregating results and calculating metrics...")
 
-        # Only main process aggregates and computes metrics
-        if accelerator.is_main_process:
-            print("[INFO] Aggregating results and calculating metrics...")
 
-            # Concatenate all gathered results
-            predictions = torch.cat(all_preds).numpy()
-            event_times = torch.cat(all_times).numpy().astype(int)
-            event_observed = torch.cat(all_events).numpy()
-            density_categories = torch.cat(all_densities).numpy()
-            cancer_categories = torch.cat(all_cancers).numpy()
+        # Concatenate all gathered results
+        predictions = torch.cat(all_preds).numpy()
+        event_times = torch.cat(all_times).numpy().astype(int)
+        event_observed = torch.cat(all_events).numpy()
+        density_categories = torch.cat(all_densities).numpy()
+        cancer_categories = torch.cat(all_cancers).numpy()
 
-            # Compute censoring distribution
-            censoring_dist = get_censoring_dist(event_times, event_observed)
+        # Compute censoring distribution
+        censoring_dist = get_censoring_dist(event_times, event_observed)
 
-            # Save predictions and labels
-            save_model_results_to_file(predictions, event_times, event_observed, density_categories, censoring_dist,cancer_categories,
-                                       args.path_test_folder)
+        # Save predictions and labels
+        save_model_results_to_file(predictions, event_times, event_observed, density_categories, censoring_dist,cancer_categories,
+                                   args.path_test_folder)
 
-            print("[INFO] Calculating metrics...")
+        print("[INFO] Calculating metrics...")
 
-            # C-index
-            mean_c_index, c_index_ci, c_index_scores = bootstrap_c_index(event_times, predictions, event_observed, censoring_dist)
-            path = os.path.join(args.path_test_folder, "cindex_scores.npy")
-            np.save(path, c_index_scores)
+        # C-index
+        mean_c_index, c_index_ci, c_index_scores = bootstrap_c_index(event_times, predictions, event_observed, censoring_dist)
+        path = os.path.join(args.path_test_folder, "cindex_scores.npy")
+        np.save(path, c_index_scores)
 
-            # Yearly AUC
-            auc_summary, auc_arrays = bootstrap_auc(event_times, predictions, event_observed)
-            np.savez(os.path.join(args.path_test_folder, "auc_scores.npz"), **auc_arrays)
+        # Yearly AUC
+        auc_summary, auc_arrays = bootstrap_auc(event_times, predictions, event_observed)
+        np.savez(os.path.join(args.path_test_folder, "auc_scores.npz"), **auc_arrays)
 
-            auc_by_density = bootstrap_auc_by_density(event_times, predictions, event_observed, density_categories)
-            c_index_by_density, c_index_scores_density = bootstrap_c_index_by_density(
-                event_times, predictions, event_observed, density_categories, censoring_dist, save_json_path=args.path_test_folder
-            )
-            path = os.path.join(args.path_test_folder, "cindex_scores_density.npy")
-            np.save(path, c_index_scores_density)
+        auc_by_density = bootstrap_auc_by_density(event_times, predictions, event_observed, density_categories)
+        c_index_by_density, c_index_scores_density = bootstrap_c_index_by_density(
+            event_times, predictions, event_observed, density_categories, censoring_dist, save_json_path=args.path_test_folder
+        )
+        path = os.path.join(args.path_test_folder, "cindex_scores_density.npy")
+        np.save(path, c_index_scores_density)
 
-            auc_by_cancer_types = bootstrap_auc_by_cancer_type(event_times, predictions, event_observed, cancer_categories)
-            c_index_by_cancer_types = bootstrap_c_index_by_cancer_type(
-                event_times, predictions, event_observed, cancer_categories, censoring_dist,
-                save_json_path=args.path_test_folder
-            )
+        auc_by_cancer_types = bootstrap_auc_by_cancer_type(event_times, predictions, event_observed, cancer_categories)
+        c_index_by_cancer_types = bootstrap_c_index_by_cancer_type(
+            event_times, predictions, event_observed, cancer_categories, censoring_dist,
+            save_json_path=args.path_test_folder
+        )
 
-            auc_formatted = {
-                f"{year}": {"Mean": mean_auc, "95% CI": ci}
-                for year, (mean_auc, ci) in auc_summary.items()
-            }
+        auc_formatted = {
+            f"{year}": {"Mean": mean_auc, "95% CI": ci}
+            for year, (mean_auc, ci) in auc_summary.items()
+        }
 
-            results = {
-                "C-index": {"Mean": mean_c_index, "95% CI": c_index_ci},
-                "Yearly AUCs": auc_formatted,
-                "AUC by density categories": auc_by_density,
-                "C index by density categories": c_index_by_density,
-                "AUC by cancer categories": auc_by_cancer_types,
-                "C index by cancer categories": c_index_by_cancer_types,
-            }
+        results = {
+            "C-index": {"Mean": mean_c_index, "95% CI": c_index_ci},
+            "Yearly AUCs": auc_formatted,
+            "AUC by density categories": auc_by_density,
+            "C index by density categories": c_index_by_density,
+            "AUC by cancer categories": auc_by_cancer_types,
+            "C index by cancer categories": c_index_by_cancer_types,
+        }
 
-            # Pretty print to console
-            print("Final Test Results:")
-            results_safe = to_json_safe(results)
-            print(json.dumps(results_safe, indent=2))
-            logger.info(f"Final Test Results: {results}")
+        # Pretty print to console
+        print("Final Test Results:")
+        results_safe = to_json_safe(results)
+        print(json.dumps(results_safe, indent=2))
+        logger.info(f"Final Test Results: {results}")
 
-            # Save to JSON file
-            with open("results.json", "w") as f:
-                json.dump(results, f, indent=2, default=str)
+        # Save to JSON file
+        with open("results.json", "w") as f:
+            json.dump(results, f, indent=2, default=str)
 
-        return None
+    return None

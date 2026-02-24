@@ -34,9 +34,10 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
     total_params = sum(p.numel() for p in model_risk.parameters())
     trainable_params = sum(p.numel() for p in model_risk.parameters() if p.requires_grad)
 
-    print(f"Total parameters:     {total_params:,}")
-    print(f"Trainable parameters: {trainable_params:,}")
-    print(f"Total params (M):            {total_params / 1e6:.2f} M")
+    if accelerator.is_main_process:
+        print(f"Total parameters:     {total_params:,}")
+        print(f"Trainable parameters: {trainable_params:,}")
+        print(f"Total params (M):            {total_params / 1e6:.2f} M")
 
     param_groups = get_param_groups(model_risk, base_lr=args.learning_rate, finetune_lr_scale=0.1)
 
