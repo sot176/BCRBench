@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ..common_parts import ContinuousPosEncoding, CumulativeProbabilityLayer
+from models.common_parts.model_utils import ContinuousPosEncoding, CumulativeProbabilityLayer
 
 
 class TemporalAttentionLayer(nn.Module):
