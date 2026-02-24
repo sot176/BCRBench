@@ -20,6 +20,8 @@ class ImgFeatAlign(nn.Module):
             cfg["paths"]["mirai_path"]
         )
         self.encoder.requires_grad = False
+        self.encoder.eval()
+
         self.risk_prediction_model = RiskModelWithAttention()
         self.feat_transformer = SpatialTransformerBlock(mode='bilinear')
 
