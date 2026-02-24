@@ -34,7 +34,7 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
     trainable_params = sum(p.numel() for p in model_risk.parameters() if p.requires_grad)
 
     if accelerator.is_main_process:
-        print("Risk prediciton model", model_risk)
+        print("Risk prediction model", model_risk)
         print(f"Total parameters:     {total_params:,}")
         print(f"Trainable parameters: {trainable_params:,}")
         print(f"Total params (M):            {total_params / 1e6:.2f} M")
