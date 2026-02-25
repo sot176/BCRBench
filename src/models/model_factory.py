@@ -47,7 +47,7 @@ def get_model(model_name: str, path_saved_reg_model=None, **kwargs):
         return _build_model(LMVNet, mammo_reg_net=mammo_reg_net, **kwargs)
 
     elif model_name == "VMRA-MaR":
-        from models.VMRAMaR.model import VMRAMaR
+        from models.VMRAMAR.model import VMRAMaR
         return _build_model(VMRAMaR, **kwargs)
 
     elif model_name == "OA-BreaCR":
