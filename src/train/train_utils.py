@@ -2,7 +2,7 @@ import torch
 from utils import (
     concordance_index_ipcw,
     get_censoring_dist,
-    compute_auc_x_year_auc,
+    compute_auc_x_year_auc, loss_factory
 )
 
 def train_one_epoch(args,model_risk, train_loader, optimizer, accelerator,  warmup_scheduler, global_step, warmup_steps):
