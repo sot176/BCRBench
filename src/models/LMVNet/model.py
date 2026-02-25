@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 from .model_utils import CrossAttentionBlock, LongitudinalFeatureProcessor
 from models.common_parts  import  CumulativeProbabilityLayer
-
+from utils import get_risk_loss_BCE
 
 class LMVNet(nn.Module):
     def __init__(self, mammo_reg_net: nn.Module, max_followup: int = 5,
@@ -83,3 +83,11 @@ class LMVNet(nn.Module):
 
     def get_primary_risk_head(self, outputs):
         return outputs["risk_multi"]
+    
+    def compute_total_loss(self, outputs, batch):
+        risk_heads = self.get_risk_heads(outputs, batch)
+
+        return sum(
+            get_risk_loss_BCE(logits, target, mask)
+            for logits, target, mask in risk_heads.values()
+        )

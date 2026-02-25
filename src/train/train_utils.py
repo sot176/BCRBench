@@ -2,7 +2,6 @@ import torch
 from utils import (
     concordance_index_ipcw,
     get_censoring_dist,
-    get_risk_loss_BCE,
     compute_auc_x_year_auc,
 )
 
@@ -23,11 +22,7 @@ def train_one_epoch(model_risk, train_loader, optimizer, accelerator,  warmup_sc
 
         base_model = accelerator.unwrap_model(model_risk)
 
-        risk_heads = base_model.get_risk_heads(outputs, batch)
-        risk_loss = sum(
-            get_risk_loss_BCE(logits, target, mask)
-            for logits, target, mask in risk_heads.values()
-        )
+        risk_loss = base_model.compute_total_loss(outputs, batch)
 
         running_risk_loss += risk_loss.item()
         optimizer.zero_grad()
@@ -81,12 +76,8 @@ def evaluate(model_risk, valid_loader, accelerator):
 
             base_model = accelerator.unwrap_model(model_risk)
 
-            risk_heads_val = base_model.get_risk_heads(outputs_val, batch_val)
+            risk_loss_val = base_model.compute_total_loss(outputs_val, batch_val)
 
-            risk_loss_val = sum(
-                get_risk_loss_BCE(logits, target, mask)
-                for logits, target, mask in risk_heads_val.values()
-            )
             running_risk_loss += risk_loss_val.item()
 
             primary_logits = base_model.get_primary_risk_head(outputs_val)
@@ -99,7 +90,7 @@ def evaluate(model_risk, valid_loader, accelerator):
 
     avg_risk_loss = running_risk_loss / len(valid_loader)
     c_index, auc_results = 0, {}
-    
+
     # Calculate metrics on the main process
     if accelerator.is_main_process:
         predictions_val = torch.cat(val_preds).cpu().numpy()

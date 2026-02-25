@@ -7,6 +7,7 @@ from config.config import cfg
 from asymmetry_model import extract_mirai_backbone
 from .model_utils import  RiskModelWithAttention
 from models.common_parts import SpatialTransformerBlock
+from utils import get_risk_loss_BCE
 
 
 class ImgFeatAlign(nn.Module):
@@ -109,3 +110,11 @@ class ImgFeatAlign(nn.Module):
 
     def get_primary_risk_head(self, outputs):
         return outputs["risk_prediction"]["pred_fused"]
+    
+    def compute_total_loss(self, outputs, batch):
+        risk_heads = self.get_risk_heads(outputs, batch)
+
+        return sum(
+            get_risk_loss_BCE(logits, target, mask)
+            for logits, target, mask in risk_heads.values()
+        )
