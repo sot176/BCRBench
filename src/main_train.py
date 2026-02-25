@@ -39,10 +39,6 @@ def setup_logging(path_logger, is_main_process):
     return logger
 
 
-import argparse
-from datetime import datetime
-import sys
-
 def parse_arguments():
     parser = argparse.ArgumentParser()
     
