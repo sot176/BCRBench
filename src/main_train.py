@@ -39,22 +39,27 @@ def setup_logging(path_logger, is_main_process):
     return logger
 
 
+import argparse
+from datetime import datetime
+import sys
+
 def parse_arguments():
     parser = argparse.ArgumentParser()
+    
+    # -------------------
+    # Common arguments for all models
+    # -------------------
     parser.add_argument("--csv_file", type=str, required=True)
     parser.add_argument("--data_root", type=str, required=True)
     parser.add_argument("--path_out_dir", type=str, required=True)
     parser.add_argument("--resume_from", type=str)
-    parser.add_argument( "--wandb_id", type=str, default=None, help="WandB run ID to resume logging"
-    )
+    parser.add_argument("--wandb_id", type=str, default=None)
     parser.add_argument("--id_training", type=int, required=True)
     parser.add_argument("--augmentations", type=str, required=True)
     parser.add_argument("--use_scheduler", type=str, required=True)
     parser.add_argument("--optimizer", type=str)
     parser.add_argument("--warmup_steps", default=5000, type=int)
-    parser.add_argument("--finetune_all", action="store_true", help="Whether to finetune the whole encoder")
-
-
+    parser.add_argument("--finetune_all", action="store_true")
     parser.add_argument("--patience_lr_scheduler", default=5, type=int)
     parser.add_argument("--patience", default=15, type=int)
     parser.add_argument("--batch_size", default=12, type=int)
@@ -62,7 +67,6 @@ def parse_arguments():
     parser.add_argument("--schuffle", default=True, type=bool)
     parser.add_argument("--pin_memory", default=True, type=bool)
     parser.add_argument("--dataset", type=str)
-
     parser.add_argument("--lr_decay", default=0.5, type=float)
     parser.add_argument("--learning_rate", default=1e-4, type=float)
     parser.add_argument("--num_epochs", default=100, type=int)
@@ -71,15 +75,41 @@ def parse_arguments():
     parser.add_argument("--model", type=str, required=True,
                         help="Model name (mirai, ImgFeatAlign, VMRA-MaR, OA-BreaCR, LMV-Net, etc.)")
 
+    # -------------------
+    # Parse first to check the model
+    # -------------------
+    temp_args, _ = parser.parse_known_args()  # Only parse known args for now
+
+    # -------------------
+    # OA-BreaCR-specific arguments
+    # -------------------
+    if temp_args.model == "OA-BreaCR":
+        parser.add_argument('--num_output_neurons', type=int, default=6,
+                            help='Number of output neurons, should be max_followup+1')
+        parser.add_argument('--start_label', type=int, default=0,
+                            help='Start label for ordinal learning')
+        parser.add_argument('--max-t', type=int, default=50,
+                            help='Number of samples during stochastic sampling')
+        parser.add_argument('--no-sto', action='store_true',
+                            help='Disable stochastic sampling')
+        parser.add_argument('--distance', type=str, default='JDistance',
+                            help='Distance metric between two Gaussian distributions')
+        parser.add_argument('--alpha-coeff', type=float, default=1e-5)
+        parser.add_argument('--beta-coeff', type=float, default=1e-4)
+        parser.add_argument('--margin', type=float, default=2)
+        parser.add_argument('--use_poe', action='store_true',
+                            help='Enable POE functionality')
+
+    # -------------------
+    # Parse final args including OA-BreaCR args if any
+    # -------------------
     args = parser.parse_args()
 
-    args.results_dir = (args.path_out_dir + '_'
-                        + '_Model_' + str(args.model)
-                        + '_lr_' + str(args.learning_rate)
-                        + '_wd_' + str(args.weight_decay)
-                        + '_epochs_' + str(args.num_epochs)
-                        + '_bs_' + str(args.batch_size)
-                        + datetime.now().strftime("%Y-%m-%d-%H-%M") + '/')
+    # Add a results dir for logging/output
+    args.results_dir = (
+        f"{args.path_out_dir}_Model_{args.model}_lr_{args.learning_rate}_wd_{args.weight_decay}"
+        f"_epochs_{args.num_epochs}_bs_{args.batch_size}_{datetime.now().strftime('%Y-%m-%d-%H-%M')}/"
+    )
 
     return args
 

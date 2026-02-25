@@ -3,14 +3,15 @@ from models.MammoRegNet import MammoRegNet
 import torch
 
 
-def _build_model(model_class, **kwargs):
+def _build_model(model_class, args=None, **kwargs):
     sig = inspect.signature(model_class.__init__)
     valid_params = sig.parameters.keys()
 
-    filtered_kwargs = {
-        k: v for k, v in kwargs.items()
-        if k in valid_params
-    }
+    filtered_kwargs = {k: v for k, v in kwargs.items() if k in valid_params}
+
+    # If the model explicitly requires 'args' and we have it, pass it
+    if 'args' in valid_params and args is not None:
+        filtered_kwargs['args'] = args
 
     return model_class(**filtered_kwargs)
 
@@ -25,8 +26,7 @@ def build_mammo_reg_net(path_saved_reg_model):
 
     return model_reg
 
-def get_model(model_name: str, path_saved_reg_model=None, **kwargs):
-
+def get_model(model_name: str, args=None, path_saved_reg_model=None, **kwargs):
     mammo_reg_net = None
 
     if model_name in {"ImgFeatAlign", "LMV-Net"}:
@@ -36,7 +36,7 @@ def get_model(model_name: str, path_saved_reg_model=None, **kwargs):
 
     if model_name == "Mirai":
         from models.Mirai.model import MiraiModel
-        return _build_model(MiraiModel, **kwargs)
+        return _build_model(MiraiModel, args=args, **kwargs)
 
     elif model_name == "ImgFeatAlign":
         from models.ImgFeatAlign.model import ImgFeatAlign
@@ -48,11 +48,11 @@ def get_model(model_name: str, path_saved_reg_model=None, **kwargs):
 
     elif model_name == "VMRA-MaR":
         from models.VMRAMAR.model import VMRAMaR
-        return _build_model(VMRAMaR, **kwargs)
+        return _build_model(VMRAMaR, args=args, **kwargs)
 
     elif model_name == "OA-BreaCR":
         from models.OABreaCR.model import OA_BreaCR
-        return _build_model(OA_BreaCR, **kwargs)
+        return _build_model(OA_BreaCR, args=args, **kwargs)
 
     else:
         raise ValueError(f"Unknown model: {model_name}")
