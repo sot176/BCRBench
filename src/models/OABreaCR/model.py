@@ -6,6 +6,8 @@ import torchvision.models as models
 
 from models.common_parts  import ContinuousPosEncoding, SpatialTransformerBlock
 from .model_utils import Simple_AttentionPool, POELatent, Feedforward, BaselineModel
+from utils import get_risk_loss_BCE
+from utils import MeanVarianceLoss, ProbOrdiLoss
 
 
 class OA_BreaCR(nn.Module):
@@ -49,6 +51,9 @@ class OA_BreaCR(nn.Module):
             nn.Linear(num_feat, args.num_output_neurons),
         )  # output layer
 
+        # Instantiate MV and POE losses once
+        self.MV_loss = MeanVarianceLoss()
+        self.POE_loss = ProbOrdiLoss()
     def forward(self, target_x, prior_x=None, time=None, **kwargs):
 
         mask = kwargs['mask'] if 'mask' in kwargs else None
@@ -77,6 +82,7 @@ class OA_BreaCR(nn.Module):
         x_prior_x_ = torch.cat([attention_map_x, attention_map_prior_x], dim=1)
         flow_field = self.flew(x_prior_x_)
         target_x_source_ = self.reg_transformer(attention_map_prior_x, flow_field)
+        loss = self.compute_reg_loss(attention_map_x, target_x_source_)
         moved_prior_x = self.reg_transformer(prior_x, flow_field)  # aligned prior feature
         difference = torch.abs(x - moved_prior_x)  # difference feature
         hidden_difference = self.pooling(difference)
@@ -111,7 +117,12 @@ class OA_BreaCR(nn.Module):
             'emb_final': emb,
             'log_var_final': log_var,
             'flow_field': flow_field,
+            'loss': loss,
         }
+    
+    def compute_reg_loss(self, x, target_x_source):
+        loss_t1 = torch.mean((x - target_x_source) ** 2)
+        return loss_t1 * 1e-2
 
     def get_risk_heads(self, outputs, batch):
         """
@@ -147,3 +158,43 @@ class OA_BreaCR(nn.Module):
         Returns the main prediction head used for evaluation.
         """
         return outputs["final"]
+    
+    def compute_total_loss(self, outputs, batch):
+        total_loss = 0.0
+
+        # --- optional extra loss ---
+        if outputs.get('loss') is not None:
+            total_loss += outputs['loss']
+
+        # --- 1️⃣ BCE loss for all heads ---
+        risk_heads = self.get_risk_heads(outputs, batch)
+        for head_name, (logits, target, mask) in risk_heads.items():
+            weight = 1.0 if head_name == 'final' else 0.2
+            if logits is not None:
+                total_loss += weight * get_risk_loss_BCE(logits, target, mask)
+
+        # --- 2️⃣ MV loss for main/final head ---
+        total_loss += 0.2* self.MV_loss(
+            self.get_primary_risk_head(outputs),
+            batch['years_to_cancer'],
+            batch['years_to_last_followup'],
+            weights=getattr(self.args, 'time_to_events_weights', None)
+        )
+
+        # --- 3️⃣ POE loss for main/final head ---
+        aux = self.get_auxiliary_outputs(outputs)
+        emb, log_var = aux['emb'], aux['log_var']
+        if emb is not None:
+            _, _, _, loss_POE = self.POE_loss(
+                self.get_primary_risk_head(outputs),
+                emb,
+                log_var,
+                batch['years_to_cancer'],
+                batch['years_to_last_followup'],
+                None,
+                use_sto=self.args.use_sto,
+                weights=getattr(self.args, 'time_to_events_weights', None)
+            )
+            total_loss += 0.2* loss_POE
+
+        return total_loss

@@ -1,5 +1,5 @@
 from .logging_utils import create_logger, save_model_results_to_file
-from .losses import get_risk_loss_BCE
+from .losses import get_risk_loss_BCE, MeanVarianceLoss, ProbOrdiLoss
 from .utils import (
     compute_auc_x_year_auc,
     bootstrap_c_index,
