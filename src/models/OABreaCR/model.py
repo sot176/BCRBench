@@ -113,4 +113,37 @@ class OA_BreaCR(nn.Module):
             'flow_field': flow_field,
         }
 
+    def get_risk_heads(self, outputs, batch):
+        """
+        Returns dictionary:
+        {
+            head_name: (logits, target, mask)
+        }
+        """
 
+        target = batch["target"]
+        mask = batch["y_mask"]
+        target_prior = batch["target_prior"]
+        mask_prior = batch["y_mask_prior"]
+        return {
+            "final": (outputs["final"], target, mask),
+            "current": (outputs["current"], target, mask),
+            "prior": (outputs["prior"], target_prior, mask_prior),
+        }
+        
+
+    def get_auxiliary_outputs(self, outputs):
+        """
+        Returns auxiliary outputs for additional losses
+        (e.g., KL divergence if using POE).
+        """
+        return {
+            "emb": outputs["emb_final"],
+            "log_var": outputs["log_var_final"],
+        }
+
+    def get_primary_risk_head(self, outputs):
+        """
+        Returns the main prediction head used for evaluation.
+        """
+        return outputs["final"]
