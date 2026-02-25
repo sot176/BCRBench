@@ -167,7 +167,7 @@ class OA_BreaCR(nn.Module):
             heads['final'] = (outputs['final'], y_true, y_mask)
 
         # Current head
-        if 'current' in outputs and outputs['current'] is not None
+        if 'current' in outputs and outputs['current'] is not None:
             heads['current'] = (outputs['current'], y_true, y_mask)
 
         # Prior head
