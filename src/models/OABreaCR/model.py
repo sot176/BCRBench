@@ -48,9 +48,6 @@ class OA_BreaCR(nn.Module):
             nn.Linear(num_feat, args.num_output_neurons),
         )  # output layer
 
-        # Instantiate MV and POE losses once
-        self.MV_loss = MeanVarianceLoss()
-        self.POE_loss = ProbOrdiLoss()
 
     def forward(self, batch, **kwargs):
 
