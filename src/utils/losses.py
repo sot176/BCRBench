@@ -2,6 +2,8 @@ import torch.nn.functional as F
 import torch
 import torch.nn as nn
 
+from OA_BreaCR_new.losses.mean_variance_loss import MeanVarianceLoss
+
 
 
 def loss_factory(model_name, args):
@@ -10,42 +12,71 @@ def loss_factory(model_name, args):
     """
     if model_name == "OA-BreaCR":
         def oa_breacr_loss(outputs, batch):
+            device = next(iter(outputs.values())).device  # pick device from any output tensor
             total_loss = 0.0
-            device = next(outputs["risk_prediction"]["pred_fused"].parameters()).device
+            max_followup = args.num_output_neurons
+            MV_loss = MeanVarianceLoss()
+            POE_loss = ProbOrdiLoss()
 
-            # Optional extra loss
+            # --- optional extra loss from network ---
             if outputs.get('loss') is not None:
                 total_loss += outputs['loss'].to(device)
 
-            # BCE for all heads
-            risk_heads = outputs["risk_prediction"]
-            for head_name, (logits, target, mask) in risk_heads.items():
-                if logits is None:
-                    continue
-                logits, target, mask = logits.to(device), target.to(device), mask.to(device)
-                weight = 1.0 if head_name in ["pred_fused", "final", "fused"] else 0.2
-                total_loss += weight * get_risk_loss_BCE(logits, target, mask)
+            # --- compute targets & masks ---
+            def compute_target_mask(years_to_cancer, years_last_followup):
+                B = years_to_cancer.shape[0]
+                y_true = torch.zeros(B, max_followup, device=device)
+                y_mask = torch.ones(B, max_followup, device=device)
+                years_to_cancer = years_to_cancer.clamp(0, max_followup-1)
+                years_last_followup = years_last_followup.clamp(0, max_followup-1)
+                for i in range(B):
+                    y_true[i, :years_to_cancer[i]+1] = 1
+                    if years_to_cancer[i] == max_followup-1 and years_last_followup[i] < max_followup-1:
+                        y_mask[i, years_last_followup[i]+1:] = 0
+                return y_true, y_mask
 
-            # MV loss on main/final head
-            if hasattr(args, "MV_loss"):
-                total_loss += 0.2 * args.MV_loss(
-                    outputs["risk_prediction"]["pred_fused"],
+            y_true_final, y_mask_final = compute_target_mask(batch['years_to_cancer'], batch['years_to_last_followup'])
+            y_true_prior, y_mask_prior = compute_target_mask(batch['years_to_cancer_prior'], batch['years_to_last_followup_prior'])
+
+            # --- BCE for all heads ---
+            risk_pred = outputs["risk_prediction"]
+            for head_name, logits in risk_pred.items():
+
+                if head_name in ["pred_fused", "final", "fused"]:
+                    y_true, y_mask = y_true_final, y_mask_final
+                    weight = 1.0
+                elif head_name in ["pred_pri", "prior"]:
+                    y_true, y_mask = y_true_prior, y_mask_prior
+                    weight = 0.2
+                else:  # current/difference
+                    y_true, y_mask = y_true_final, y_mask_final
+                    weight = 0.2
+
+                if y_mask.sum() == 0:  # avoid NaNs
+                    continue
+
+                total_loss += weight * get_risk_loss_BCE(logits.to(device), y_true.to(device), y_mask.to(device))
+
+            # --- MV loss for main/final head ---
+            if MV_loss is not None:
+                total_loss += 0.2 * MV_loss(
+                    risk_pred['pred_fused'].to(device),
                     batch['years_to_cancer'].to(device),
                     batch['years_to_last_followup'].to(device),
-                    weights=getattr(args, 'time_to_events_weights', None)
+                    weights=None
                 )
 
-            # POE loss if embeddings exist
-            if outputs.get("emb_final") is not None and hasattr(args, "POE_loss"):
-                _, _, _, loss_POE = args.POE_loss(
-                    outputs["risk_prediction"]["pred_fused"],
-                    outputs["emb_final"].to(device),
-                    outputs["log_var_final"].to(device),
+            # --- POE loss ---
+            if POE_loss is not None and outputs.get('emb_final') is not None:
+                _, _, _, loss_POE = POE_loss(
+                    risk_pred['pred_fused'].to(device),
+                    outputs['emb_final'].to(device),
+                    outputs['log_var_final'].to(device),
                     batch['years_to_cancer'].to(device),
                     batch['years_to_last_followup'].to(device),
                     None,
-                    use_sto=getattr(args, "use_sto", False),
-                    weights=getattr(args, 'time_to_events_weights', None)
+                    use_sto=args.use_sto,
+                    weights=None
                 )
                 total_loss += 0.2 * loss_POE
 

@@ -197,42 +197,4 @@ class OA_BreaCR(nn.Module):
         """
         return outputs["final"]
     
-    def compute_total_loss(self, outputs, batch):
-        total_loss = 0.0
-
-        # --- optional extra loss ---
-        if outputs.get('loss') is not None:
-            total_loss += outputs['loss']
-
-        # --- 1️⃣ BCE loss for all heads ---
-        risk_heads = self.get_risk_heads(outputs, batch)
-        for head_name, (logits, target, mask) in risk_heads.items():
-            weight = 1.0 if head_name == 'final' else 0.2
-            if logits is not None:
-                total_loss += weight * get_risk_loss_BCE(logits, target, mask)
-
-        # --- 2️⃣ MV loss for main/final head ---
-        total_loss += 0.2* self.MV_loss(
-            self.get_primary_risk_head(outputs),
-            batch['years_to_cancer'],
-            batch['years_to_last_followup'],
-            weights=getattr(self.args, 'time_to_events_weights', None)
-        )
-
-        # --- 3️⃣ POE loss for main/final head ---
-        aux = self.get_auxiliary_outputs(outputs)
-        emb, log_var = aux['emb'], aux['log_var']
-        if emb is not None:
-            _, _, _, loss_POE = self.POE_loss(
-                self.get_primary_risk_head(outputs),
-                emb,
-                log_var,
-                batch['years_to_cancer'],
-                batch['years_to_last_followup'],
-                None,
-                use_sto=self.args.use_sto,
-                weights=getattr(self.args, 'time_to_events_weights', None)
-            )
-            total_loss += 0.2* loss_POE
-
-        return total_loss
+    
