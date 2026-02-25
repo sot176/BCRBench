@@ -80,6 +80,9 @@ def parse_arguments():
     # OA-BreaCR-specific arguments
     # -------------------
     if temp_args.model == "OA-BreaCR":
+        parser.add_argument('-a', '--arch', default='resnet18',
+                    help='resnet18, resnet50, densenet121, densenet169, vgg16, vgg19,'
+                            'convnext_tiny, convnext_small, vit_b_16, regnet_x_8gf')
         parser.add_argument('--num_output_neurons', type=int, default=6,
                             help='Number of output neurons, should be max_followup+1')
         parser.add_argument('--start_label', type=int, default=0,
