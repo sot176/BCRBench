@@ -9,14 +9,13 @@ def loss_factory(args):
     """
     if args.model == "OA-BreaCR":
         def oa_breacr_loss(outputs, batch, model_risk):
-            device = next(val for val in outputs['final'].values() if isinstance(val, torch.Tensor)).device
             total_loss = 0.0
             MV_loss = MeanVarianceLoss()
             POE_loss = ProbOrdiLoss()
 
             # --- optional extra loss from network ---
             if outputs.get('loss') is not None:
-                total_loss += outputs['loss'].to(device)
+                total_loss += outputs['loss'] 
 
             # --- BCE for all heads ---
             risk_heads = model_risk.get_risk_heads(outputs, batch)
@@ -24,29 +23,29 @@ def loss_factory(args):
                 weight = 1.0 if head_name == 'final' else 0.2
                 if logits is not None:
                     total_loss += weight * get_risk_loss_BCE(
-                    logits.to(device), target.to(device), mask.to(device)
+                    logits , target , mask
                 )
                     total_loss += weight * get_risk_loss_BCE(
-                    logits.to(device), target.to(device), mask.to(device)
+                    logits , target , mask
                 )
 
             # --- MV loss for main/final head ---
             if MV_loss is not None:
                 total_loss += 0.2 * MV_loss(
-                    model_risk.get_primary_risk_head(outputs).to(device),
-                    batch['years_to_cancer'].to(device),
-                    batch['years_to_last_followup'].to(device),
+                    model_risk.get_primary_risk_head(outputs),
+                    batch['years_to_cancer'],
+                    batch['years_to_last_followup'],
                     weights=None
                 )
 
             # --- POE loss ---
             if POE_loss is not None and outputs.get('emb_final') is not None:
                 _, _, _, loss_POE = POE_loss(
-                    model_risk.get_primary_risk_head(outputs).to(device),
-                    outputs['emb_final'].to(device),
-                    outputs['log_var_final'].to(device),
-                    batch['years_to_cancer'].to(device),
-                    batch['years_to_last_followup'].to(device),
+                    model_risk.get_primary_risk_head(outputs),
+                    outputs['emb_final'],
+                    outputs['log_var_final'],
+                    batch['years_to_cancer'],
+                    batch['years_to_last_followup'],
                     None,
                     use_sto=args.use_sto,
                     weights=None
@@ -60,14 +59,13 @@ def loss_factory(args):
     else:
         # Default BCE-only models
         def default_loss(outputs, batch, model_risk):
-            device = next(iter(outputs.values())).device
             risk_heads = model_risk.get_risk_heads(outputs, batch)  # Use helper
             total_loss = 0.0
             for head_name, (logits, target, mask) in risk_heads.items():
                 if logits is None:
                     continue
                 total_loss += get_risk_loss_BCE(
-                    logits.to(device), target.to(device), mask.to(device)
+                    logits , target , mask
                 )
             return total_loss
         return default_loss
