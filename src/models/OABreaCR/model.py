@@ -174,7 +174,7 @@ class OA_BreaCR(nn.Module):
         # Prior head
         if 'prior' in outputs and outputs['prior'] is not None:
             y_true, y_mask = self.compute_risk_target_and_mask(
-                batch['prior_years_to_cancer'], batch['prior_years_to_last_followup'], max_followup
+                batch['years_to_cancer_prior'], batch['years_to_last_followup_prior'], max_followup
             )
             heads['prior'] = (outputs['prior'], y_true, y_mask)
 

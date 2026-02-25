@@ -113,7 +113,10 @@ class ImgFeatAlign(nn.Module):
     
     def compute_total_loss(self, outputs, batch):
         risk_heads = self.get_risk_heads(outputs, batch)
-
+        print("loss", sum(
+            get_risk_loss_BCE(logits, target, mask)
+            for logits, target, mask in risk_heads.values()
+        ))
         return sum(
             get_risk_loss_BCE(logits, target, mask)
             for logits, target, mask in risk_heads.values()
