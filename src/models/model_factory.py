@@ -51,8 +51,8 @@ def get_model(model_name: str, path_saved_reg_model=None, **kwargs):
         return _build_model(VMRAMaR, **kwargs)
 
     elif model_name == "OA-BreaCR":
-        from models.OABreaCR.model import OABreaCR
-        return _build_model(OABreaCR, **kwargs)
+        from models.OABreaCR.model import OA_BreaCR
+        return _build_model(OA_BreaCR, **kwargs)
 
     else:
         raise ValueError(f"Unknown model: {model_name}")

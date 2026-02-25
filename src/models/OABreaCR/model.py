@@ -8,9 +8,9 @@ from models.common_parts  import ContinuousPosEncoding, SpatialTransformerBlock
 from .model_utils import Simple_AttentionPool, POELatent, Feedforward, BaselineModel
 
 
-class OA_BreaCR_FeatAlign(nn.Module):
+class OA_BreaCR(nn.Module):
     def __init__(self,  args):
-        super(OA_BreaCR_FeatAlign, self).__init__()
+        super(OA_BreaCR, self).__init__()
         # create model
         model = BaselineModel(arch=args.arch)  # Encoder
         num_feat = model.get_num_feat()
@@ -77,7 +77,6 @@ class OA_BreaCR_FeatAlign(nn.Module):
         x_prior_x_ = torch.cat([attention_map_x, attention_map_prior_x], dim=1)
         flow_field = self.flew(x_prior_x_)
         target_x_source_ = self.reg_transformer(attention_map_prior_x, flow_field)
-        loss = self.compute_reg_loss(attention_map_x, target_x_source_)
         moved_prior_x = self.reg_transformer(prior_x, flow_field)  # aligned prior feature
         difference = torch.abs(x - moved_prior_x)  # difference feature
         hidden_difference = self.pooling(difference)
@@ -111,7 +110,6 @@ class OA_BreaCR_FeatAlign(nn.Module):
             'difference': logit_difference,
             'emb_final': emb,
             'log_var_final': log_var,
-            'loss': loss,
             'flow_field': flow_field,
         }
 

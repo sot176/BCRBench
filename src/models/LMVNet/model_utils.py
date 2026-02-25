@@ -1,5 +1,116 @@
 import torch
 import torch.nn as nn
+import sys
+
+from config.config import cfg
+from asymmetry_model import extract_mirai_backbone
+from models.common_parts  import ContinuousPosEncoding, SpatialTransformerBlock
+
+
+class LongitudinalFeatureProcessor(nn.Module):
+    """
+    Implements Steps 1-4 of the longitudinal risk prediction pipeline.
+    This module extracts, aligns, subtracts, and concatenates features from
+    current and prior mammogram views.
+    """
+
+    def __init__(self, mammo_reg_net: nn.Module,  finetune_all: bool = False):
+        super().__init__()
+        sys.path.append(cfg["paths"]["asymMirai_master_onconet"])
+        self.encoder = extract_mirai_backbone(
+            cfg["paths"]["mirai_path"]
+        )
+        self.mammo_reg_net = mammo_reg_net
+
+        # The block responsible for applying the deformation field to feature maps
+        self.feat_transformer = SpatialTransformerBlock(mode='bilinear')
+
+        self.positional_encoding = ContinuousPosEncoding(dim=512)
+
+        # It's good practice to freeze models that are not being trained
+        self.encoder.requires_grad_(False)
+        self.mammo_reg_net.requires_grad_(False)
+        self.encoder.eval()
+        self.mammo_reg_net.eval()
+
+        # Unfreeze if finetuning is enabled
+        if finetune_all:
+            print("Finetuning all layers of the encoder")
+            for param in self.encoder.parameters():
+                param.requires_grad = True
+            self.encoder.train()
+
+        else:
+            for param in self.encoder.parameters():
+                param.requires_grad = False
+            self.encoder.eval()
+
+    def _process_view(self, img_cur: torch.Tensor, img_pri: torch.Tensor, time_gap):
+        """
+        Helper function to run the feature processing pipeline on a single view (CC or MLO).
+
+        Args:
+            img_cur (Tensor): Current image (B, 1, H, W).
+            img_pri (Tensor): Prior image (B, 1, H, W).
+
+        Returns:
+            f_long (Tensor): The concatenated longitudinal feature tensor.
+        """
+        # Ensure images have 3 channels for pre-trained encoders
+
+        img_cur_3c = img_cur.repeat(1, 3, 1, 1)
+        img_pri_3c = img_pri.repeat(1, 3, 1, 1)
+
+        # --- Step 1: Feature extraction ---
+        f_cur = self.encoder(img_cur_3c)
+        f_pri = self.encoder(img_pri_3c)
+
+        # --- Step 2: Temporal Feature Alignment ---
+        # Get deformation field from the registration network using original images
+        registration_outputs = self.mammo_reg_net(img_cur, img_pri)  # MammoRegNet may take B,1,H,W
+        deformation_field = registration_outputs[1]
+        # Downsample deformation field to match the feature map's resolution
+        deformation_field_downsampled = F.interpolate(
+            deformation_field.detach(),  # Detach to prevent gradients from flowing into RegNet
+            size=(f_cur.shape[2], f_cur.shape[3]),
+            mode='bilinear',
+            align_corners=True
+        )
+
+        # Rescale the displacement values in the deformation field
+        scaling_factor_y = f_cur.shape[2] / img_cur.shape[2]
+        scaling_factor_x = f_cur.shape[3] / img_cur.shape[3]
+
+        deformation_field_downsampled[:, 0, :, :] *= scaling_factor_x  # x-displacements
+        deformation_field_downsampled[:, 1, :, :] *= scaling_factor_y  # y-displacements
+
+        # Apply the alignment to the prior feature map
+        f_pri_aligned = self.feat_transformer(f_pri, deformation_field_downsampled)
+
+        # --- Step 3: Temporal Subtraction ---
+        f_diff = torch.abs(f_cur - f_pri_aligned)
+        B, C, H, W = f_diff.shape
+        # Apply positional encoding to the difference map
+        flattened_feats = f_diff.flatten(start_dim=2).permute(2, 0, 1)  # [N, B, C]
+        fdif_with_time = self.positional_encoding(flattened_feats, time_gap)
+        f_diff = fdif_with_time.permute(1, 2, 0).view(B, C, H, W)
+
+        # --- Step 4: Concatenation ---
+        f_long = torch.cat([f_cur, f_pri, f_diff], dim=1)  # [B, 1536, H, W]
+        return f_long
+
+    def forward(self, img_cur_cc, img_pri_cc, img_cur_mlo, img_pri_mlo, time_gap):
+        """
+        Main forward pass to process both CC and MLO views.
+        """
+
+        f_cc_long = self._process_view(img_cur_cc, img_pri_cc, time_gap)
+        f_mlo_long = self._process_view(img_cur_mlo, img_pri_mlo, time_gap)
+
+        return {
+            'f_cc_long': f_cc_long,
+            'f_mlo_long': f_mlo_long
+        }
 
 
 class DropPath(nn.Module):
