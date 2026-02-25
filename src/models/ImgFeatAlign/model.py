@@ -19,7 +19,7 @@ class ImgFeatAlign(nn.Module):
         self.encoder = extract_mirai_backbone(
             cfg["paths"]["mirai_path"]
         )
-        self.encoder.requires_grad = False
+        self.encoder.requires_grad_(False)
         self.encoder.eval()
 
         self.risk_prediction_model = RiskModelWithAttention()
