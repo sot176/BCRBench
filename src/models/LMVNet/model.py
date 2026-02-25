@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from .model_utils import CrossAttentionBlock, LongitudinalFeatureProcessor
 from models.common_parts  import  CumulativeProbabilityLayer
 from utils import get_risk_loss_BCE
+
 
 class LMVNet(nn.Module):
     def __init__(self, mammo_reg_net: nn.Module, max_followup: int = 5,
