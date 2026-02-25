@@ -3,6 +3,72 @@ import torch
 import torch.nn as nn
 
 
+
+def loss_factory(model_name, args):
+    """
+    Returns a loss function for a given model.
+    """
+    if model_name == "OA-BreaCR":
+        def oa_breacr_loss(outputs, batch):
+            total_loss = 0.0
+            device = next(outputs["risk_prediction"]["pred_fused"].parameters()).device
+
+            # Optional extra loss
+            if outputs.get('loss') is not None:
+                total_loss += outputs['loss'].to(device)
+
+            # BCE for all heads
+            risk_heads = outputs["risk_prediction"]
+            for head_name, (logits, target, mask) in risk_heads.items():
+                if logits is None:
+                    continue
+                logits, target, mask = logits.to(device), target.to(device), mask.to(device)
+                weight = 1.0 if head_name in ["pred_fused", "final", "fused"] else 0.2
+                total_loss += weight * get_risk_loss_BCE(logits, target, mask)
+
+            # MV loss on main/final head
+            if hasattr(args, "MV_loss"):
+                total_loss += 0.2 * args.MV_loss(
+                    outputs["risk_prediction"]["pred_fused"],
+                    batch['years_to_cancer'].to(device),
+                    batch['years_to_last_followup'].to(device),
+                    weights=getattr(args, 'time_to_events_weights', None)
+                )
+
+            # POE loss if embeddings exist
+            if outputs.get("emb_final") is not None and hasattr(args, "POE_loss"):
+                _, _, _, loss_POE = args.POE_loss(
+                    outputs["risk_prediction"]["pred_fused"],
+                    outputs["emb_final"].to(device),
+                    outputs["log_var_final"].to(device),
+                    batch['years_to_cancer'].to(device),
+                    batch['years_to_last_followup'].to(device),
+                    None,
+                    use_sto=getattr(args, "use_sto", False),
+                    weights=getattr(args, 'time_to_events_weights', None)
+                )
+                total_loss += 0.2 * loss_POE
+
+            return total_loss
+
+        return oa_breacr_loss
+
+    else:
+        # Default BCE-only models
+        def default_loss(outputs, batch):
+            device = next(outputs["risk_prediction"]["pred_fused"].parameters()).device
+            risk_heads = outputs["risk_prediction"]
+            total_loss = 0.0
+            for head_name, (logits, target, mask) in risk_heads.items():
+                if logits is None:
+                    continue
+                logits, target, mask = logits.to(device), target.to(device), mask.to(device)
+                total_loss += get_risk_loss_BCE(logits, target, mask)
+            return total_loss
+
+        return default_loss
+
+
 #########################################################################
 # ------------------ Risk loss ----------------------
 #########################################################################

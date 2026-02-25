@@ -5,7 +5,7 @@ from utils import (
     compute_auc_x_year_auc,
 )
 
-def train_one_epoch(model_risk, train_loader, optimizer, accelerator,  warmup_scheduler, global_step, warmup_steps):
+def train_one_epoch(args,model_risk, train_loader, optimizer, accelerator,  warmup_scheduler, global_step, warmup_steps):
     """
     Handles the training logic for a single epoch.
 
@@ -15,14 +15,14 @@ def train_one_epoch(model_risk, train_loader, optimizer, accelerator,  warmup_sc
     model_risk.train()
     running_risk_loss = 0.0
     all_preds, all_times, all_events = [], [], []
+    loss_fn = loss_factory(args.model, args)
 
     for batch in train_loader:
 
         outputs = model_risk(batch)
 
         base_model = accelerator.unwrap_model(model_risk)
-
-        risk_loss = base_model.compute_total_loss(outputs, batch)
+        risk_loss = loss_fn(outputs, batch)
 
         running_risk_loss += risk_loss.item()
         optimizer.zero_grad()
@@ -59,7 +59,7 @@ def train_one_epoch(model_risk, train_loader, optimizer, accelerator,  warmup_sc
     return avg_risk_loss, c_index, auc_results
 
 
-def evaluate(model_risk, valid_loader, accelerator):
+def evaluate(args, model_risk, valid_loader, accelerator):
     """
     Handles the evaluation logic for a single epoch.
 
@@ -69,6 +69,7 @@ def evaluate(model_risk, valid_loader, accelerator):
     model_risk.eval()
     running_risk_loss = 0.0
     val_preds, val_times, val_events = [], [], []
+    loss_fn = loss_factory(args.model, args)
 
     with torch.no_grad():
         for batch_val in valid_loader:
@@ -76,7 +77,7 @@ def evaluate(model_risk, valid_loader, accelerator):
 
             base_model = accelerator.unwrap_model(model_risk)
 
-            risk_loss_val = base_model.compute_total_loss(outputs_val, batch_val)
+            risk_loss_val = loss_fn(outputs_val, batch_val)
 
             running_risk_loss += risk_loss_val.item()
 

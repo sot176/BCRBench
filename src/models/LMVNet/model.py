@@ -84,10 +84,3 @@ class LMVNet(nn.Module):
     def get_primary_risk_head(self, outputs):
         return outputs["risk_multi"]
     
-    def compute_total_loss(self, outputs, batch):
-        risk_heads = self.get_risk_heads(outputs, batch)
-
-        return sum(
-            get_risk_loss_BCE(logits, target, mask)
-            for logits, target, mask in risk_heads.values()
-        )
