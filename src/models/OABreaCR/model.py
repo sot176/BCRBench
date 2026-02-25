@@ -54,10 +54,15 @@ class OA_BreaCR(nn.Module):
         # Instantiate MV and POE losses once
         self.MV_loss = MeanVarianceLoss()
         self.POE_loss = ProbOrdiLoss()
-    def forward(self, target_x, prior_x=None, time=None, **kwargs):
 
-        mask = kwargs['mask'] if 'mask' in kwargs else None
-        prior_mask = kwargs['prior_mask'] if 'prior_mask' in kwargs else None
+    def forward(self, batch):
+
+        target_x = batch["current_image"]
+        prior_x = batch["previous_image"]
+        time = batch["time_gap"]
+
+        mask =  None
+        prior_mask =  None
 
         if mask is None:
             x = torch.cat([target_x, target_x, target_x], dim=1)
