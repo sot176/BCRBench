@@ -24,7 +24,6 @@ def train_one_epoch(model_risk, train_loader, optimizer, accelerator,  warmup_sc
         base_model = accelerator.unwrap_model(model_risk)
 
         risk_heads = base_model.get_risk_heads(outputs, batch)
-        print("risk heads", risk_heads)
         risk_loss = sum(
             get_risk_loss_BCE(logits, target, mask)
             for logits, target, mask in risk_heads.values()
@@ -42,9 +41,7 @@ def train_one_epoch(model_risk, train_loader, optimizer, accelerator,  warmup_sc
         global_step += 1
 
         primary_logits = base_model.get_primary_risk_head(outputs)
-        print("primary_logits", primary_logits)
-        print("after sigmoid", torch.sigmoid(primary_logits))
-
+       
         all_preds.append(
             accelerator.gather(torch.sigmoid(primary_logits).detach())
         )
@@ -54,6 +51,7 @@ def train_one_epoch(model_risk, train_loader, optimizer, accelerator,  warmup_sc
 
     avg_risk_loss = running_risk_loss / len(train_loader)
     c_index, auc_results = 0, {}
+
     # Calculate metrics on the main process
     if accelerator.is_main_process:
         preds = torch.cat(all_preds).cpu().numpy()
@@ -101,6 +99,7 @@ def evaluate(model_risk, valid_loader, accelerator):
 
     avg_risk_loss = running_risk_loss / len(valid_loader)
     c_index, auc_results = 0, {}
+    
     # Calculate metrics on the main process
     if accelerator.is_main_process:
         predictions_val = torch.cat(val_preds).cpu().numpy()
