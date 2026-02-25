@@ -156,33 +156,26 @@ class OA_BreaCR(nn.Module):
     def get_risk_heads(self, outputs, batch):
         max_followup = 6
         heads = {}
-
-        # Final/main head
-        if 'final' in outputs and outputs['final'] is not None:
-            y_true, y_mask = self.compute_risk_target_and_mask(
+        y_true, y_mask = self.compute_risk_target_and_mask(
                 batch['years_to_cancer'], batch['years_to_last_followup'], max_followup
             )
+        y_true_prior, y_mask_prior = self.compute_risk_target_and_mask(
+                batch['years_to_cancer_prior'], batch['years_to_last_followup_prior'], max_followup
+            )
+        # Final/main head
+        if 'final' in outputs and outputs['final'] is not None:
             heads['final'] = (outputs['final'], y_true, y_mask)
 
         # Current head
-        if 'current' in outputs and outputs['current'] is not None:
-            y_true, y_mask = self.compute_risk_target_and_mask(
-                batch['years_to_cancer'], batch['years_to_last_followup'], max_followup
-            )
+        if 'current' in outputs and outputs['current'] is not None
             heads['current'] = (outputs['current'], y_true, y_mask)
 
         # Prior head
         if 'prior' in outputs and outputs['prior'] is not None:
-            y_true, y_mask = self.compute_risk_target_and_mask(
-                batch['years_to_cancer_prior'], batch['years_to_last_followup_prior'], max_followup
-            )
-            heads['prior'] = (outputs['prior'], y_true, y_mask)
+            heads['prior'] = (outputs['prior'], y_true_prior, y_mask_prior)
 
         # Difference head
         if 'difference' in outputs and outputs['difference'] is not None:
-            y_true, y_mask = self.compute_risk_target_and_mask(
-                batch['years_to_cancer'], batch['years_to_last_followup'], max_followup
-            )
             heads['difference'] = (outputs['difference'], y_true, y_mask)
 
         return heads
