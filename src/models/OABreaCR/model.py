@@ -52,7 +52,7 @@ class OA_BreaCR(nn.Module):
         self.MV_loss = MeanVarianceLoss()
         self.POE_loss = ProbOrdiLoss()
 
-    def forward(self, batch):
+    def forward(self, batch, **kwargs):
 
         target_x = batch["current_image"]
         prior_x = batch["previous_image"]
@@ -126,23 +126,66 @@ class OA_BreaCR(nn.Module):
         loss_t1 = torch.mean((x - target_x_source) ** 2)
         return loss_t1 * 1e-2
 
-    def get_risk_heads(self, outputs, batch):
+    def compute_risk_target_and_mask(years_to_cancer, years_last_followup, max_followup):
         """
-        Returns dictionary:
-        {
-            head_name: (logits, target, mask)
-        }
-        """
+        Converts scalar event times into cumulative binary target and mask.
 
-        target = batch["target"]
-        mask = batch["y_mask"]
-        target_prior = batch["target_prior"]
-        mask_prior = batch["y_mask_prior"]
-        return {
-            "final": (outputs["final"], target, mask),
-            "current": (outputs["current"], target, mask),
-            "prior": (outputs["prior"], target_prior, mask_prior),
-        }
+        Args:
+            years_to_cancer: Tensor [B]
+            years_last_followup: Tensor [B]
+            max_followup: int, max years
+
+        Returns:
+            y_true: [B, max_followup], 1 if event happened by year t
+            y_mask: [B, max_followup], 1 if year t is observed, else 0
+        """
+        B = years_to_cancer.shape[0]
+        y_true = torch.zeros(B, max_followup, device=years_to_cancer.device)
+        y_mask = torch.ones(B, max_followup, device=years_to_cancer.device)
+
+        years_to_cancer = years_to_cancer.clamp(0, max_followup-1)
+        years_last_followup = years_last_followup.clamp(0, max_followup-1)
+
+        for i in range(B):
+            y_true[i, :years_to_cancer[i]+1] = 1
+            if years_to_cancer[i] == max_followup-1 and years_last_followup[i] < max_followup-1:
+                y_mask[i, years_last_followup[i]+1:] = 0
+
+        return y_true, y_mask
+
+    def get_risk_heads(self, outputs, batch):
+        max_followup = 6
+        heads = {}
+
+        # Final/main head
+        if 'final' in outputs and outputs['final'] is not None:
+            y_true, y_mask = self.compute_risk_target_and_mask(
+                batch['years_to_cancer'], batch['years_to_last_followup'], max_followup
+            )
+            heads['final'] = (outputs['final'], y_true, y_mask)
+
+        # Current head
+        if 'current' in outputs and outputs['current'] is not None:
+            y_true, y_mask = self.compute_risk_target_and_mask(
+                batch['years_to_cancer'], batch['years_to_last_followup'], max_followup
+            )
+            heads['current'] = (outputs['current'], y_true, y_mask)
+
+        # Prior head
+        if 'prior' in outputs and outputs['prior'] is not None:
+            y_true, y_mask = self.compute_risk_target_and_mask(
+                batch['prior_years_to_cancer'], batch['prior_years_to_last_followup'], max_followup
+            )
+            heads['prior'] = (outputs['prior'], y_true, y_mask)
+
+        # Difference head
+        if 'difference' in outputs and outputs['difference'] is not None:
+            y_true, y_mask = self.compute_risk_target_and_mask(
+                batch['years_to_cancer'], batch['years_to_last_followup'], max_followup
+            )
+            heads['difference'] = (outputs['difference'], y_true, y_mask)
+
+        return heads
         
 
     def get_auxiliary_outputs(self, outputs):
