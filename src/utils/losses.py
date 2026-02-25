@@ -28,18 +28,36 @@ def loss_factory(args):
                     total_loss += weight * get_risk_loss_BCE(
                     logits , target , mask
                 )
+            
 
             # --- MV loss for main/final head ---
-            if MV_loss is not None:
-                total_loss += 0.2 * MV_loss(
-                    model_risk.get_primary_risk_head(outputs),
-                    batch['years_to_cancer'],
-                    batch['years_to_last_followup'],
-                    weights=None
+            risk = model_risk.get_primary_risk_head(outputs)
+            risk_label = batch['years_to_cancer']
+            years_last_followup = batch['years_to_last_followup']
+            # ---- STO case ----
+            if getattr(args, "use_sto", False) and risk.dim() == 3:
+                sample_size, batch_size, out_dim = risk.shape
+
+                loss_MV = MV_loss(
+                    risk.view(-1, out_dim),
+                    risk_label.repeat(sample_size),
+                    years_last_followup.repeat(sample_size),
+                    weights=getattr(args, "time_to_events_weights", None)
                 )
 
+            # ---- Normal case ----
+            else:
+                loss_MV = MV_loss(
+                    risk,
+                    risk_label,
+                    years_last_followup,
+                    weights=getattr(args, "time_to_events_weights", None)
+                )
+
+            total_loss += 0.2 * loss_MV
+
             # --- POE loss ---
-            if POE_loss is not None and outputs.get('emb_final') is not None:
+            if outputs.get('emb_final') is not None:
                 _, _, _, loss_POE = POE_loss(
                     model_risk.get_primary_risk_head(outputs),
                     outputs['emb_final'],
