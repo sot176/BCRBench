@@ -33,8 +33,7 @@ class OA_BreaCR(nn.Module):
         else:
             self.POE = False
 
-        shape = [int(args.img_size[0] / 32), int(args.img_size[1] / 32)]
-        self.reg_transformer = SpatialTransformerBlock(shape)
+        self.reg_transformer = SpatialTransformerBlock(mode='bilinear')
         self.flew = Feedforward(inplace=2, outplace=2)
         self.pos_encoding = ContinuousPosEncoding(dim=num_feat, drop=0.2)
         self.mlp = nn.Sequential(
