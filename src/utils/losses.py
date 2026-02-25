@@ -84,16 +84,16 @@ def loss_factory(model_name, args):
     else:
         # Default BCE-only models
         def default_loss(outputs, batch):
-            device = next(outputs["risk_prediction"]["pred_fused"].parameters()).device
-            risk_heads = outputs["risk_prediction"]
+            device = next(iter(outputs.values())).device
+            risk_heads = args.get_risk_heads(outputs, batch)  # Use helper
             total_loss = 0.0
             for head_name, (logits, target, mask) in risk_heads.items():
                 if logits is None:
                     continue
-                logits, target, mask = logits.to(device), target.to(device), mask.to(device)
-                total_loss += get_risk_loss_BCE(logits, target, mask)
+                total_loss += get_risk_loss_BCE(
+                    logits.to(device), target.to(device), mask.to(device)
+                )
             return total_loss
-
         return default_loss
 
 
