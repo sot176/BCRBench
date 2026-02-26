@@ -9,76 +9,82 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
     """
     if args.model == "OA-BreaCR":
         def oa_breacr_loss(outputs, batch, model_risk):
+            """
+            Compute OA-BreaCR total loss following GitHub https://github.com/xinwangxinwang/OA-BreaCR.git:
+            - BCE for all heads
+            - MV for all heads
+            - POE only for final head
+            """
+
             total_loss = 0.0
 
             # --- optional extra loss from network ---
             if outputs.get('loss') is not None:
-                total_loss += outputs['loss'] 
-                print("L2 loss: %.4f" % outputs['loss'].item())
-            # --- BCE for all heads ---
+                total_loss += outputs['loss']
+
+            # --- BCE and MV for all heads ---
             risk_heads = model_risk.get_risk_heads(outputs, batch)
             for head_name, (logits, target, mask) in risk_heads.items():
+                if logits is None:
+                    continue
+
+                # Set weights
                 weight = 1.0 if head_name == 'final' else 0.2
 
-                # Check if stochastic (POE) samples exist
+                # Check for stochastic (POE) logits
                 is_sto = logits.dim() == 3
-                if is_sto and logits is not None:
+                if is_sto:
                     sample_size, batch_size, out_dim = logits.shape
                     logits_flat = logits.view(-1, out_dim)
-                    target_flat = target.unsqueeze(0).repeat(sample_size, 1, 1).view(-1, out_dim)  # same shape
+                    target_flat = target.unsqueeze(0).repeat(sample_size, 1, 1).view(-1, out_dim)
                     mask_flat = mask.unsqueeze(0).repeat(sample_size, 1, 1).view(-1, out_dim) if mask is not None else None
                 else:
                     logits_flat, target_flat, mask_flat = logits, target, mask
 
+                # BCE loss
                 total_loss += weight * get_risk_loss_BCE(logits_flat, target_flat, mask_flat)
-                        
-            # --- MV loss for main/final head ---
-            risk = model_risk.get_primary_risk_head(outputs)
-            risk_label = batch['years_to_cancer']
-            years_last_followup = batch['years_to_last_followup']
-            # ---- STO case ----
-            if getattr(args, "use_sto", False) and risk.dim() == 3:
-                sample_size, batch_size, out_dim = risk.shape
 
-                loss_MV = criterion_MV(
-                    risk.view(-1, out_dim),
-                    risk_label.repeat(sample_size),
-                    years_last_followup.repeat(sample_size),
-                    weights=getattr(args, "time_to_events_weights", None)
-                )
+                # MV loss
+                if is_sto:
+                    sample_size, batch_size, out_dim = logits.shape
+                    loss_MV = criterion_MV(
+                        logits.view(-1, out_dim),
+                        target.repeat(sample_size),
+                        mask.repeat(sample_size) if mask is not None else None,
+                        weights=getattr(args, "time_to_events_weights", None)
+                    )
+                else:
+                    loss_MV = criterion_MV(
+                        logits,
+                        target,
+                        mask,
+                        weights=getattr(args, "time_to_events_weights", None)
+                    )
+                total_loss += weight * loss_MV
 
-            # ---- Normal case ----
-            else:
-                loss_MV = criterion_MV(
-                    risk,
-                    risk_label,
-                    years_last_followup,
-                    weights=getattr(args, "time_to_events_weights", None)
-                )
-
-            total_loss += 0.2 * loss_MV
-
-            # --- POE loss ---
+            # --- POE loss only for final head ---
             if outputs.get('emb_final') is not None:
+                risk_final = model_risk.get_primary_risk_head(outputs)
                 _, _, _, loss_POE = criterion_POE(
-                    model_risk.get_primary_risk_head(outputs),
+                    risk_final,
                     outputs['emb_final'],
                     outputs['log_var_final'],
                     batch['years_to_cancer'],
                     batch['years_to_last_followup'],
-                    None,
-                    use_sto=args.use_sto,
+                    mh_target=None,
+                    use_sto=getattr(args, "use_sto", True),
                     weights=None
                 )
-                total_loss += 0.2 * loss_POE
-            print("loss MV: %.4f, loss_POE: %.4f" % (loss_MV.item(), loss_POE.item()))
+                total_loss += 1.0 * loss_POE
+            else:
+                loss_POE = torch.tensor(0.0, device=next(model_risk.parameters()).device)
 
             return total_loss
 
         return oa_breacr_loss
 
     else:
-        # Default BCE-only models
+        # Default BCE-only models for e.g. Mirai, ImgFeatAlign, LMV-Net, VMRA-MaR, etc.
         def default_loss(outputs, batch, model_risk):
             risk_heads = model_risk.get_risk_heads(outputs, batch)  # Use helper
             total_loss = 0.0
