@@ -1,4 +1,5 @@
 import argparse
+from html import parser
 import os
 import random
 import torch
@@ -100,6 +101,8 @@ def parse_arguments():
         parser.add_argument('--margin', type=float, default=2)
         parser.add_argument('--use_poe', action='store_true', default=True,
                             help='Enable POE functionality')
+        parser.add_argument('--use_sto', action='store_true', default=True,
+                            help='Enable stochastic sampling in POE')
 
     # -------------------
     # Parse final args including OA-BreaCR args if any
