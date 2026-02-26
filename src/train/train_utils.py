@@ -28,7 +28,7 @@ def train_one_epoch(args,model_risk, train_loader, optimizer, accelerator,  warm
 
     criterion_MV = MeanVarianceLoss(
         cumpet_ce_loss=False,
-        start_age=args.start_label
+        start_label=args.start_label
     ).cuda()
 
     # --- Create loss function passing criteria ---

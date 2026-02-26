@@ -196,7 +196,7 @@ class OA_BreaCR(nn.Module):
         """
         risk = outputs["final"]
         if risk.dim()==3:
-            risk = risk.mean(dim=1)   
+            risk = risk.mean(dim=0)    # average over stochastic dimension
         return risk
     
     
