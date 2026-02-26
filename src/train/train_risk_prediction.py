@@ -16,13 +16,15 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
     if accelerator.is_main_process:
         logger.info(f"Number Training Epochs: {args.num_epochs}")
 
-    # --- Model and Optimizer Setup ---
+    # load registration model MammoRegNet for ImgFeatAlign and LMV-Net
     path_saved_reg_model = (cfg["paths"]["csaw_path_saved_reg_model"]
                             if args.dataset == "CSAW"
                             else cfg["paths"]["embed_path_saved_reg_model"]
                             )
     if accelerator.is_main_process: print("Path reg model:", path_saved_reg_model)
-
+    
+    # --- Model, Optimizer, and Scheduler Setup ---
+    # load the risk prediction model (e.g. OA-BreaCR, Mirai, ImgFeatAlign, LMV-Net, VMRA-MaR, etc.)
     model_risk = get_model(
         args.model,
         args=args,
@@ -40,6 +42,7 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
         print(f"Trainable parameters: {trainable_params:,}")
         print(f"Total params (M):            {total_params / 1e6:.2f} M")
 
+    # Set up optimizer with parameter groups for differential learning rates (lower LR for pretrained encoder, higher LR for new modules)
     param_groups = get_param_groups(model_risk, base_lr=args.learning_rate, finetune_lr_scale=0.1)
 
     optimizer = torch.optim.AdamW(param_groups, weight_decay=args.weight_decay)
@@ -47,7 +50,8 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
     warmup_steps = args.warmup_steps #5000  # Number of warm-up steps
     warmup_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
                                                          lr_lambda=lambda step: linear_warmup(step, warmup_steps))
-
+    
+    # Optional validation-based scheduler
     scheduler = None
     if args.use_scheduler == "True":
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=args.lr_decay,
@@ -73,12 +77,12 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
                        "Train Year 1 AUC", "Train Year 2 AUC", "Train Year 3 AUC", "Train Year 4 AUC", "Train Year 5 AUC",  "Val Year 1 AUC", "Val Year 2 AUC", "Val Year 3 AUC", "Val Year 4 AUC", "Val Year 5 AUC"]:
             wandb.define_metric(metric, step_metric="epoch")
 
-    # --- Training Loop ---
     start_epoch = 0
     global_step = 0
     best_c_index = 0.0
     patience_counter = 0
 
+    # --- Optional Checkpoint Resumption ---
     if args.resume_from is not None:
         start_epoch, global_step, best_c_index = load_checkpoint(
             args.resume_from,
@@ -88,14 +92,12 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
             warmup_scheduler,
             accelerator,
         )
-        patience_counter = 0  # reset early stopping
+        patience_counter = 0 
 
         if accelerator.is_main_process:
             print(f"[INFO] Resumed from {args.resume_from} at epoch {start_epoch}")
 
-    # --------------------------------------------------
     # WandB (resume-safe)
-    # --------------------------------------------------
     if accelerator.is_main_process:
         wandb.init(
             project="Breast_Cancer_Risk_Prediction",
@@ -104,6 +106,9 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
             config=vars(args),
         )
 
+    # --------------------------------------------------
+    # Loop over epochs
+    # --------------------------------------------------
     for epoch in range(start_epoch, args.num_epochs):
         # --- Training ---
         avg_train_loss, train_c_index, auc_results_train = train_one_epoch(args, model_risk, train_loader, optimizer, accelerator,  warmup_scheduler, global_step, warmup_steps)
@@ -148,7 +153,7 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
                     warmup_scheduler, epoch, global_step, best_c_index,
                     os.path.join(args.results_dir, f"checkpoint_{epoch:04d}.pth")
                 )
-
+            # Save best model based on validation C-index
             if val_c_index > best_c_index:
                 best_c_index = val_c_index
                 patience_counter = 0
@@ -166,11 +171,11 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
                                                                                 f"early_stopping_risk_prediction_id-{args.id_training}.pth"))
                     break  # Exit loop
 
-        # Barrier to ensure all processes stop if early stopping was triggered on the main process
+        # Synchronize processes before next epoch
         accelerator.wait_for_everyone()
         global_step += len(train_loader)
 
-    # --- Final Cleanup ---
+    # --- Final Model Saving and WandB Artifact Logging ---
     if accelerator.is_main_process:
         print("[INFO] Saving final model ...")
         unwrapped_model = accelerator.unwrap_model(model_risk)
