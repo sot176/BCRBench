@@ -21,13 +21,9 @@ def loss_factory(args):
             risk_heads = model_risk.get_risk_heads(outputs, batch)
             for head_name, (logits, target, mask) in risk_heads.items():
                 weight = 1.0 if head_name == 'final' else 0.2
-                if logits is not None:
-                    total_loss += weight * get_risk_loss_BCE(
-                    logits , target , mask
-                )
-                    total_loss += weight * get_risk_loss_BCE(
-                    logits , target , mask
-                )
+                total_loss += weight * get_risk_loss_BCE(
+                logits , target , mask
+            )
             
 
             # --- MV loss for main/final head ---
