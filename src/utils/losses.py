@@ -3,15 +3,13 @@ import torch
 import torch.nn as nn
 
 
-def loss_factory(args):
+def loss_factory(args, criterion_POE=None, criterion_MV=None):
     """
     Returns a loss function for a given model.
     """
     if args.model == "OA-BreaCR":
         def oa_breacr_loss(outputs, batch, model_risk):
             total_loss = 0.0
-            MV_loss = MeanVarianceLoss()
-            POE_loss = ProbOrdiLoss()
 
             # --- optional extra loss from network ---
             if outputs.get('loss') is not None:
@@ -34,7 +32,7 @@ def loss_factory(args):
             if getattr(args, "use_sto", False) and risk.dim() == 3:
                 sample_size, batch_size, out_dim = risk.shape
 
-                loss_MV = MV_loss(
+                loss_MV = criterion_MV(
                     risk.view(-1, out_dim),
                     risk_label.repeat(sample_size),
                     years_last_followup.repeat(sample_size),
@@ -43,7 +41,7 @@ def loss_factory(args):
 
             # ---- Normal case ----
             else:
-                loss_MV = MV_loss(
+                loss_MV = criterion_MV(
                     risk,
                     risk_label,
                     years_last_followup,
@@ -54,7 +52,7 @@ def loss_factory(args):
 
             # --- POE loss ---
             if outputs.get('emb_final') is not None:
-                _, _, _, loss_POE = POE_loss(
+                _, _, _, loss_POE = criterion_POE(
                     model_risk.get_primary_risk_head(outputs),
                     outputs['emb_final'],
                     outputs['log_var_final'],
