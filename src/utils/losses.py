@@ -68,8 +68,8 @@ def loss_factory(args):
                     use_sto=args.use_sto,
                     weights=None
                 )
-                print("loss MV: %.4f, loss_POE: %.4f" % (loss_MV.item(), loss_POE.item()))
                 total_loss += 0.2 * loss_POE
+            print("loss MV: %.4f, loss_POE: %.4f" % (loss_MV.item(), loss_POE.item()))
 
             return total_loss
 
