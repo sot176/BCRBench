@@ -25,8 +25,8 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                 if is_sto and logits is not None:
                     sample_size, batch_size, out_dim = logits.shape
                     logits_flat = logits.view(-1, out_dim)
-                    target_flat = target.repeat([sample_size, 1]).view(-1)
-                    mask_flat = mask.repeat([sample_size, 1]).view(-1) if mask is not None else None
+                    target_flat = target.unsqueeze(0).repeat(sample_size, 1, 1).view(-1, out_dim)  # same shape
+                    mask_flat = mask.unsqueeze(0).repeat(sample_size, 1, 1).view(-1, out_dim) if mask is not None else None
                 else:
                     logits_flat, target_flat, mask_flat = logits, target, mask
 
