@@ -102,6 +102,9 @@ class OA_BreaCR(nn.Module):
             max_t = kwargs['max_t'] if 'max_t' in kwargs else 50
             use_sto = kwargs['use_sto'] if 'use_sto' in kwargs else True
             x, emb, log_var = self.POELatent(x, max_t=max_t, use_sto=use_sto)
+            print("using POE")
+            print("emb mean:", emb.abs().mean().item())
+            print("log_var mean:", log_var.abs().mean().item())
         else:
             emb, log_var = None, None
 
