@@ -10,8 +10,11 @@ class MiraiFull(nn.Module):
 
         # Image encoder
         if args.img_encoder_snapshot is not None:
-            # Load pretrained snapshot if available
-            self.image_encoder = load_model(args.img_encoder_snapshot, args, do_wrap_model=False)
+            self.image_encoder = load_model(
+                args.img_encoder_snapshot,
+                args,
+                ResNet18Backbone
+            )
         else:
             self.image_encoder = ResNet18Backbone(args)
 
@@ -24,7 +27,11 @@ class MiraiFull(nn.Module):
         # Transformer
          # --- Transformer ---
         if args.transformer_snapshot is not None:
-            self.transformer = load_model(args.transformer_snapshot, args, do_wrap_model=False)
+            self.transformer = load_model(
+                args.transformer_snapshot,
+                args,
+                SimpleTransformer
+            )
         else:
             args.precomputed_hidden_dim = self.image_repr_dim
             self.transformer = SimpleTransformer(args)

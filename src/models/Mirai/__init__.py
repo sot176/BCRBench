@@ -1,2 +1,3 @@
-from .model_utils import get_model_by_name, load_model
+from .model_utils import ResNet18Backbone, SimpleTransformer, load_model
 from .model import MiraiFull
+
