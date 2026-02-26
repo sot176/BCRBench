@@ -4,8 +4,6 @@ import torch.nn.functional as F
 
 from models.common_parts  import ContinuousPosEncoding, SpatialTransformerBlock
 from .model_utils import Simple_AttentionPool, POELatent, Feedforward, BaselineModel
-from utils import get_risk_loss_BCE
-from utils import MeanVarianceLoss, ProbOrdiLoss
 
 
 class OA_BreaCR(nn.Module):
@@ -108,6 +106,9 @@ class OA_BreaCR(nn.Module):
             emb, log_var = None, None
 
         logit = self.final(x)
+        if self.POE:
+            logit = logit.mean(dim=0)
+            
         return {
             'final': logit,
             'current': logit_current,
