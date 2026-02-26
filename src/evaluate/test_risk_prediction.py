@@ -62,6 +62,7 @@ def test_risk(
 
     model_risk = get_model(
         args.model,
+        args=args,
         path_saved_reg_model=path_saved_reg_model,
         max_followup=5,
         finetune_all=args.finetune_all,
