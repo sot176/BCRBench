@@ -19,11 +19,19 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
             risk_heads = model_risk.get_risk_heads(outputs, batch)
             for head_name, (logits, target, mask) in risk_heads.items():
                 weight = 1.0 if head_name == 'final' else 0.2
-                total_loss += weight * get_risk_loss_BCE(
-                logits , target , mask
-            )
-            
 
+                # Check if stochastic (POE) samples exist
+                is_sto = logits.dim() == 3
+                if is_sto and logits is not None:
+                    sample_size, batch_size, out_dim = logits.shape
+                    logits_flat = logits.view(-1, out_dim)
+                    target_flat = target.repeat([sample_size, 1]).view(-1)
+                    mask_flat = mask.repeat([sample_size, 1]).view(-1) if mask is not None else None
+                else:
+                    logits_flat, target_flat, mask_flat = logits, target, mask
+
+                total_loss += weight * get_risk_loss_BCE(logits_flat, target_flat, mask_flat)
+                        
             # --- MV loss for main/final head ---
             risk = model_risk.get_primary_risk_head(outputs)
             risk_label = batch['years_to_cancer']

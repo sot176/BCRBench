@@ -109,9 +109,7 @@ class OA_BreaCR(nn.Module):
             emb, log_var = None, None
 
         logit = self.final(x)
-        if self.POE:
-            logit = logit.mean(dim=0)
-            
+       
         return {
             'final': logit,
             'current': logit_current,
@@ -196,6 +194,9 @@ class OA_BreaCR(nn.Module):
         """
         Returns the main prediction head used for evaluation.
         """
-        return outputs["final"]
+        risk = outputs["final"]
+        if risk.dim()==3:
+            risk = risk.mean(dim=1)   
+        return risk
     
     
