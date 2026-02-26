@@ -60,7 +60,7 @@ def train_one_epoch(args,model_risk, train_loader, optimizer, accelerator,  warm
         all_preds.append(
             accelerator.gather(torch.sigmoid(primary_logits).detach())
         )
-        
+
         # Gather results for metric calculation
         all_times.append(accelerator.gather(batch["event_times"]))
         all_events.append(accelerator.gather(batch["event_observed"]))
@@ -90,8 +90,28 @@ def evaluate(args, model_risk, valid_loader, accelerator):
     model_risk.eval()
     running_risk_loss = 0.0
     val_preds, val_times, val_events = [], [], []
-    loss_fn = loss_factory(args)
+    
+    criterion_POE = None
+    criterion_MV = None
 
+    if args.model == "OA-BreaCR":
+        criterion_POE = ProbOrdiLoss(
+            distance=getattr(args, "distance", "Bhattacharyya"),
+            alpha_coeff=getattr(args, "alpha_coeff", 1e-5),
+            beta_coeff=getattr(args, "beta_coeff", 1e-4),
+            margin=getattr(args, "margin", 0.0),
+            main_loss_type='cls',
+            criterion='l1',
+            start_label=getattr(args, "start_label", 0)
+        ).cuda()
+
+        criterion_MV = MeanVarianceLoss(
+            cumpet_ce_loss=False
+        ).cuda()
+
+    # --- Create loss function passing criteria ---
+    loss_fn = loss_factory(args, criterion_POE=criterion_POE, criterion_MV=criterion_MV)
+    
     with torch.no_grad():
         for batch_val in valid_loader:
             outputs_val = model_risk(batch_val)
