@@ -16,7 +16,7 @@ def loss_factory(args):
             # --- optional extra loss from network ---
             if outputs.get('loss') is not None:
                 total_loss += outputs['loss'] 
-
+                print("L2 loss: %.4f" % outputs['loss'].item())
             # --- BCE for all heads ---
             risk_heads = model_risk.get_risk_heads(outputs, batch)
             for head_name, (logits, target, mask) in risk_heads.items():
@@ -68,6 +68,7 @@ def loss_factory(args):
                     use_sto=args.use_sto,
                     weights=None
                 )
+                print("loss MV: %.4f, loss_POE: %.4f" % (loss_MV.item(), loss_POE.item()))
                 total_loss += 0.2 * loss_POE
 
             return total_loss
