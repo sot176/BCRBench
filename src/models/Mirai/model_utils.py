@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import os
 
-from common_parts import Cumulative_Probability_Layer
+from models.common_parts import Cumulative_Probability_Layer
 
 class GlobalMaxPool(nn.Module):
     def forward(self, x):
