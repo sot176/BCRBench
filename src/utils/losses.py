@@ -45,19 +45,22 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                 total_loss += weight * get_risk_loss_BCE(logits_flat, target_flat, mask_flat)
 
                 # MV loss
+                risk_label = batch['years_to_cancer']
+                years_last_followup = batch['years_to_last_followup']
+
                 if is_sto:
                     sample_size, batch_size, out_dim = logits.shape
                     loss_MV = criterion_MV(
-                        logits.view(-1, out_dim),
-                        target.repeat(sample_size),
-                        mask.repeat(sample_size) if mask is not None else None,
+                    logits.view(-1, out_dim),
+                    risk_label.repeat(sample_size),
+                    years_last_followup.repeat(sample_size),
                         weights=getattr(args, "time_to_events_weights", None)
                     )
                 else:
                     loss_MV = criterion_MV(
                         logits,
-                        target,
-                        mask,
+                        risk_label,
+                        years_last_followup,
                         weights=getattr(args, "time_to_events_weights", None)
                     )
                 total_loss += weight * loss_MV

@@ -16,20 +16,23 @@ def train_one_epoch(args,model_risk, train_loader, optimizer, accelerator,  warm
     running_risk_loss = 0.0
     all_preds, all_times, all_events = [], [], []
 
-    criterion_POE = ProbOrdiLoss(
-        distance=args.distance,
-        alpha_coeff=args.alpha_coeff,
-        beta_coeff=args.beta_coeff,
-        margin=args.margin,
-        main_loss_type='cls',
-        criterion='l1',
-        start_label=args.start_label
-    ).cuda()
+    criterion_POE = None
+    criterion_MV = None
 
-    criterion_MV = MeanVarianceLoss(
-        cumpet_ce_loss=False,
-        start_label=args.start_label
-    ).cuda()
+    if args.model == "OA-BreaCR":
+        criterion_POE = ProbOrdiLoss(
+            distance=getattr(args, "distance", "Bhattacharyya"),
+            alpha_coeff=getattr(args, "alpha_coeff", 1e-5),
+            beta_coeff=getattr(args, "beta_coeff", 1e-4),
+            margin=getattr(args, "margin", 0.0),
+            main_loss_type='cls',
+            criterion='l1',
+            start_label=getattr(args, "start_label", 0)
+        ).cuda()
+
+        criterion_MV = MeanVarianceLoss(
+            cumpet_ce_loss=False
+        ).cuda()
 
     # --- Create loss function passing criteria ---
     loss_fn = loss_factory(args, criterion_POE=criterion_POE, criterion_MV=criterion_MV)
@@ -47,7 +50,6 @@ def train_one_epoch(args,model_risk, train_loader, optimizer, accelerator,  warm
         accelerator.backward(risk_loss)
         optimizer.step()
 
-
         # Update warm-up scheduler
         if global_step < warmup_steps:
             warmup_scheduler.step()
@@ -58,6 +60,7 @@ def train_one_epoch(args,model_risk, train_loader, optimizer, accelerator,  warm
         all_preds.append(
             accelerator.gather(torch.sigmoid(primary_logits).detach())
         )
+        
         # Gather results for metric calculation
         all_times.append(accelerator.gather(batch["event_times"]))
         all_events.append(accelerator.gather(batch["event_observed"]))
