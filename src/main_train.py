@@ -104,6 +104,9 @@ def parse_arguments():
         parser.add_argument('--use_sto', action='store_true', default=True,
                             help='Enable stochastic sampling in POE')
 
+    # -------------------
+    # Mirai-specific arguments
+    # -------------------
     if temp_args.model == "Mirai":
         # Snapshots / Pretrained weights
         parser.add_argument('--img_encoder_snapshot', type=str, default=None,
