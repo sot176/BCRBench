@@ -153,13 +153,12 @@ class OA_BreaCR(nn.Module):
     
 
     def get_risk_heads(self, outputs, batch):
-        max_followup = 6
         heads = {}
         y_true, y_mask = self.compute_risk_target_and_mask(outputs['final'],
-                batch['years_to_cancer'], batch['years_to_last_followup'], max_followup
+                batch['years_to_cancer'], batch['years_to_last_followup']
             )
         y_true_prior, y_mask_prior = self.compute_risk_target_and_mask(outputs['final'],
-                batch['years_to_cancer_prior'], batch['years_to_last_followup_prior'], max_followup
+                batch['years_to_cancer_prior'], batch['years_to_last_followup_prior']
             )
         print("y true", y_true
               , "y mask", y_mask
