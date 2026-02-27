@@ -122,7 +122,7 @@ class OA_BreaCR(nn.Module):
         loss_t1 = torch.mean((x - target_x_source) ** 2)
         return loss_t1 * 1e-2
 
-    def create_cumulative_targets(years_to_cancer, years_last_followup, max_followup):
+    def compute_risk_target_and_mask(self, years_to_cancer, years_last_followup, max_followup):
         """
         Converts scalar event times into cumulative binary target and mask.
 
