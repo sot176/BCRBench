@@ -104,8 +104,42 @@ def parse_arguments():
         parser.add_argument('--use_sto', action='store_true', default=True,
                             help='Enable stochastic sampling in POE')
 
+    if temp_args.model == "Mirai":
+        # Snapshots / Pretrained weights
+        parser.add_argument('--img_encoder_snapshot', type=str, default=None,
+                            help='Filename of image feature extractor snapshot for mirai_full models')
+        parser.add_argument('--transformer_snapshot', type=str, default=None,
+                            help='Filename of transformer snapshot for mirai_full models')
+
+        # Training / Fine-tuning options
+        parser.add_argument('--freeze_image_encoder', action='store_true', default=True,
+                            help='Whether to freeze image encoder during training')
+
+        # Annotation / Auxiliary supervision
+        parser.add_argument('--use_region_annotation', action='store_true', default=False,
+                            help='Include cancer region annotation loss')
+        parser.add_argument('--predict_birads', action='store_true', default=False,
+                            help='Predict BIRADS labels for negative mammograms')
+
+        # Analysis / Task setup
+        parser.add_argument('--survival_analysis_setup', action='store_true', default=False,
+                            help='Modify model/training for survival analysis')
+
+        # Model Architecture / Hyperparameters
+        parser.add_argument('--precomputed_hidden_dim', type=int, default=512,
+                            help='Input dimension for transformer projection layer')
+        parser.add_argument('--hidden_dim', type=int, default=512)
+        parser.add_argument('--num_layers', type=int, default=1)
+        parser.add_argument('--num_heads', type=int, default=8)
+        parser.add_argument('--dropout', type=float, default=0.1)
+
+        # Other Optional Configs
+        parser.add_argument('--num_classes', type=int, default=2)
+        parser.add_argument('--max_followup', type=int, default=5,
+                            help='Only used for survival analysis / cumulative probability layer')
+
     # -------------------
-    # Parse final args including OA-BreaCR args if any
+    # Parse final args
     # -------------------
     args = parser.parse_args()
 
