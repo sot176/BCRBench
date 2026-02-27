@@ -4,7 +4,7 @@ from .model_utils import ResNet18Backbone, SimpleTransformer, load_model
 
 class MiraiFull(nn.Module):
     def __init__(self, args):
-        super().__init__()
+        super(MiraiFull, self).__init__()
 
         self.args = args
 
