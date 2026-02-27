@@ -1,6 +1,6 @@
 import torch.nn as nn
-from .model_utils import ResNet18Backbone, AllImageTransformer, load_model
-
+from .model_utils import ResNet18Backbone, load_model
+from .transformer import AllImageTransformer
 
 class MiraiFull(nn.Module):
     def __init__(self, args):
