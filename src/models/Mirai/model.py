@@ -22,7 +22,7 @@ class MiraiFull(nn.Module):
             for p in self.image_encoder.parameters():
                 p.requires_grad = False
 
-        self.image_repr_dim = self.image_encoder.hidden_dim
+        self.image_repr_dim = 512
 
         # Transformer
          # --- Transformer ---
