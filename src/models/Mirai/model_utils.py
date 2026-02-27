@@ -192,25 +192,36 @@ def load_model(path, args, model_class):
 
     checkpoint = torch.load(path, map_location="cpu")
 
+    # -------------------------------
+    # Case 1: Full serialized model
+    # -------------------------------
+    if isinstance(checkpoint, nn.Module):
+
+        model = checkpoint
+
+        # unwrap DataParallel if present
+        if isinstance(model, torch.nn.DataParallel):
+            model = model.module
+
+        return model
+
+    # -------------------------------
+    # Case 2: state_dict checkpoint
+    # -------------------------------
     model = model_class(args)
 
-    if isinstance(checkpoint, dict):
-        state_dict = (
-            checkpoint.get("model")
-            or checkpoint.get("state_dict")
-            or checkpoint
-        )
-    else:
-        raise RuntimeError(
-            "Checkpoint contains full model object. "
-            "Please resave as state_dict."
-        )
+    state_dict = (
+        checkpoint.get("model")
+        or checkpoint.get("state_dict")
+        or checkpoint
+    )
 
-    # Remove DataParallel prefix
+    # remove DP prefix
     new_state_dict = {
         k.replace("module.", ""): v
         for k, v in state_dict.items()
     }
 
     model.load_state_dict(new_state_dict, strict=False)
+
     return model
