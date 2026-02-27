@@ -122,13 +122,13 @@ class OA_BreaCR(nn.Module):
         loss_t1 = torch.mean((x - target_x_source) ** 2)
         return loss_t1 * 1e-2
 
-    def compute_risk_target_and_mask(self, years_to_cancer, years_last_followup, max_followup):
+    def create_cumulative_targets(years_to_cancer, years_last_followup, max_followup):
         """
         Converts scalar event times into cumulative binary target and mask.
 
         Args:
-            years_to_cancer: Tensor [B]
-            years_last_followup: Tensor [B]
+            years_to_cancer: Tensor [B]  (event year)
+            years_last_followup: Tensor [B]  (last observed year)
             max_followup: int, max years
 
         Returns:
@@ -139,15 +139,16 @@ class OA_BreaCR(nn.Module):
         y_true = torch.zeros(B, max_followup, device=years_to_cancer.device)
         y_mask = torch.ones(B, max_followup, device=years_to_cancer.device)
 
-        years_to_cancer = years_to_cancer.clamp(0, max_followup-1)
-        years_last_followup = years_last_followup.clamp(0, max_followup-1)
-
         for i in range(B):
+            # Cumulative target: 1 up to and including the event
             y_true[i, :years_to_cancer[i]+1] = 1
-            if years_to_cancer[i] == max_followup-1 and years_last_followup[i] < max_followup-1:
+
+            # Mask out unobserved years
+            if years_to_cancer[i] == max_followup and years_last_followup[i] < max_followup:
                 y_mask[i, years_last_followup[i]+1:] = 0
 
         return y_true, y_mask
+    
 
     def get_risk_heads(self, outputs, batch):
         max_followup = 6
