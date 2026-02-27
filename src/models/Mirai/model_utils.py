@@ -185,53 +185,32 @@ class SimpleTransformer(nn.Module):
         return logit, x, {}
     
 
-
 def load_model(path, args, model_class):
-    """
-    Loads a model from a checkpoint path.
-
-    Args:
-        path (str): Path to checkpoint (.pt or .pth)
-        args: argparse args used to instantiate the model
-        model_class: Class of the model to instantiate
-                     (e.g. ResNet18Backbone or SimpleTransformer)
-
-    Returns:
-        model (nn.Module)
-    """
 
     if not os.path.exists(path):
         raise FileNotFoundError(f"Checkpoint not found: {path}")
 
     checkpoint = torch.load(path, map_location="cpu")
 
-    # Case 1: Full model was saved directly
-    if isinstance(checkpoint, nn.Module):
-        model = checkpoint
-        return model
+    model = model_class(args)
 
-    # Case 2: Checkpoint dict
     if isinstance(checkpoint, dict):
+        state_dict = (
+            checkpoint.get("model")
+            or checkpoint.get("state_dict")
+            or checkpoint
+        )
+    else:
+        raise RuntimeError(
+            "Checkpoint contains full model object. "
+            "Please resave as state_dict."
+        )
 
-        # Instantiate fresh model
-        model = model_class(args)
+    # Remove DataParallel prefix
+    new_state_dict = {
+        k.replace("module.", ""): v
+        for k, v in state_dict.items()
+    }
 
-        # Common keys
-        if "model" in checkpoint:
-            state_dict = checkpoint["model"]
-        elif "state_dict" in checkpoint:
-            state_dict = checkpoint["state_dict"]
-        else:
-            state_dict = checkpoint
-
-        # Remove DataParallel prefix if needed
-        new_state_dict = {}
-        for k, v in state_dict.items():
-            if k.startswith("module."):
-                k = k[7:]
-            new_state_dict[k] = v
-
-        model.load_state_dict(new_state_dict, strict=False)
-        return model
-
-    raise RuntimeError(f"Invalid checkpoint format at {path}")
+    model.load_state_dict(new_state_dict, strict=False)
+    return model
