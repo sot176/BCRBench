@@ -159,6 +159,11 @@ class OA_BreaCR(nn.Module):
         y_true_prior, y_mask_prior = self.compute_risk_target_and_mask(
                 batch['years_to_cancer_prior'], batch['years_to_last_followup_prior'], max_followup
             )
+        print("y true", y_true
+              , "y mask", y_mask
+              , "y true prior", y_true_prior
+              , "y mask prior", y_mask_prior
+                    )
         # Final/main head
         if 'final' in outputs and outputs['final'] is not None:
             heads['final'] = (outputs['final'], y_true, y_mask)
