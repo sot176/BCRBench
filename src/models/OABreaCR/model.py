@@ -135,6 +135,8 @@ class OA_BreaCR(nn.Module):
             y_true: [B, max_followup], 1 if event happened by year t
             y_mask: [B, max_followup], 1 if year t is observed, else 0
         """
+        if pred.dim()==3:
+            pred = pred.mean(dim=0) 
         B, num_pred_years = pred.shape
         followup = num_pred_years - 1
         B = years_to_cancer.shape[0]
