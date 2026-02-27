@@ -36,7 +36,9 @@ class MiraiFull(nn.Module):
             args.precomputed_hidden_dim = self.image_repr_dim
             self.transformer = SimpleTransformer(args)
 
-    def forward(self, x, risk_factors=None, batch=None):
+    def forward(self, data, risk_factors=None, batch=None):
+        # TODO insput should be batch and risk factors and then I need to adjust the input to all other functions as well with risk factors = None
+        x = data['images']
         B, C, N, H, W = x.shape
 
         x = x.transpose(1, 2).contiguous().view(B * N, C, H, W)
@@ -47,5 +49,16 @@ class MiraiFull(nn.Module):
 
         logit, transformer_hidden, activ_dict = self.transformer(img_hidden)
 
-        return logit, transformer_hidden, activ_dict
+        return {'logit': logit, 'transformer_hidden': transformer_hidden, 'activ_dict': activ_dict}
+
+    
+    def get_risk_heads(self, outputs, batch):
+        target = batch["target"]
+        mask = batch["y_mask"]
+
+        return {
+            "logit_output": (outputs["logit"], target, mask) }
+    
+    def get_primary_risk_head(self, outputs):
+        return outputs["logit"]
 
