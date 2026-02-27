@@ -122,7 +122,7 @@ class OA_BreaCR(nn.Module):
         loss_t1 = torch.mean((x - target_x_source) ** 2)
         return loss_t1 * 1e-2
 
-    def compute_risk_target_and_mask(self, years_to_cancer, years_last_followup, max_followup):
+    def compute_risk_target_and_mask(self, pred, years_to_cancer, years_last_followup):
         """
         Converts scalar event times into cumulative binary target and mask.
 
@@ -135,16 +135,18 @@ class OA_BreaCR(nn.Module):
             y_true: [B, max_followup], 1 if event happened by year t
             y_mask: [B, max_followup], 1 if year t is observed, else 0
         """
+        B, num_pred_years = pred.shape
+        followup = num_pred_years - 1
         B = years_to_cancer.shape[0]
-        y_true = torch.zeros(B, max_followup, device=years_to_cancer.device)
-        y_mask = torch.ones(B, max_followup, device=years_to_cancer.device)
+        y_true = torch.zeros(B, followup, device=years_to_cancer.device)
+        y_mask = torch.ones(B, followup, device=years_to_cancer.device)
 
         for i in range(B):
             # Cumulative target: 1 up to and including the event
-            y_true[i, :years_to_cancer[i]+1] = 1
+            y_true[i, :years_to_cancer[i]] = 1
 
             # Mask out unobserved years
-            if years_to_cancer[i] == max_followup and years_last_followup[i] < max_followup:
+            if years_to_cancer[i] == followup and years_last_followup[i] < followup:
                 y_mask[i, years_last_followup[i]+1:] = 0
 
         return y_true, y_mask
@@ -153,10 +155,10 @@ class OA_BreaCR(nn.Module):
     def get_risk_heads(self, outputs, batch):
         max_followup = 6
         heads = {}
-        y_true, y_mask = self.compute_risk_target_and_mask(
+        y_true, y_mask = self.compute_risk_target_and_mask(outputs['final'],
                 batch['years_to_cancer'], batch['years_to_last_followup'], max_followup
             )
-        y_true_prior, y_mask_prior = self.compute_risk_target_and_mask(
+        y_true_prior, y_mask_prior = self.compute_risk_target_and_mask(outputs['final'],
                 batch['years_to_cancer_prior'], batch['years_to_last_followup_prior'], max_followup
             )
         print("y true", y_true
