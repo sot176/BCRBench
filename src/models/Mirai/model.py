@@ -1,5 +1,5 @@
 import torch.nn as nn
-from model_utils import ResNet18Backbone, SimpleTransformer, load_model
+from .model_utils import ResNet18Backbone, SimpleTransformer, load_model
 
 
 class MiraiFull(nn.Module):
