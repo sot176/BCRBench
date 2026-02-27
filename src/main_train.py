@@ -135,6 +135,7 @@ def parse_arguments():
         parser.add_argument('--num_layers', type=int, default=1)
         parser.add_argument('--num_heads', type=int, default=8)
         parser.add_argument('--dropout', type=float, default=0.1)
+        parser.add_argument('--num_chan', type=int, default=3, help='Number of channels in img. [default:3]')
 
         # Other Optional Configs
         parser.add_argument('--num_classes', type=int, default=2)
