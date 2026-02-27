@@ -37,7 +37,6 @@ class MiraiFull(nn.Module):
             self.transformer = SimpleTransformer(args)
 
     def forward(self, data, risk_factors=None, batch=None):
-        # TODO insput should be batch and risk factors and then I need to adjust the input to all other functions as well with risk factors = None
         x = data['images']
         B, C, N, H, W = x.shape
 
