@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import os
 
-from models.common_parts import Cumulative_Probability_Layer
+from models.common_parts import CumulativeProbabilityLayer
 
 class GlobalMaxPool(nn.Module):
     def forward(self, x):
@@ -81,8 +81,8 @@ class ResNet18Backbone(nn.Module):
             self.birads_fc = nn.Linear(512, 2)
 
         if getattr(args, 'survival_analysis_setup', False):
-            self.prob_of_failure_layer = Cumulative_Probability_Layer(
-                512, args, max_followup=args.max_followup
+            self.prob_of_failure_layer = CumulativeProbabilityLayer(
+                512,  max_followup=args.max_followup
             )
 
     def _make_layer(self, planes, blocks, stride=1):
@@ -162,8 +162,8 @@ class SimpleTransformer(nn.Module):
         self.fc = nn.Linear(args.hidden_dim, args.num_classes)
 
         if getattr(args, 'survival_analysis_setup', False):
-            self.prob_of_failure_layer = Cumulative_Probability_Layer(
-                args.hidden_dim, args, max_followup=args.max_followup
+            self.prob_of_failure_layer = CumulativeProbabilityLayer(
+                args.hidden_dim, max_followup=args.max_followup
             )
 
     def forward(self, x):
