@@ -1,5 +1,5 @@
 import torch.nn as nn
-from .model_utils import ResNet18Backbone, SimpleTransformer, load_model
+from .model_utils import ResNet18Backbone, AllImageTransformer, load_model
 
 
 class MiraiFull(nn.Module):
@@ -30,11 +30,11 @@ class MiraiFull(nn.Module):
             self.transformer = load_model(
                 args.transformer_snapshot,
                 args,
-                SimpleTransformer
+                AllImageTransformer
             )
         else:
             args.precomputed_hidden_dim = self.image_repr_dim
-            self.transformer = SimpleTransformer(args)
+            self.transformer = AllImageTransformer(args)
 
     def forward(self, data, risk_factors=None, batch=None):
         x = data['images']
@@ -46,7 +46,8 @@ class MiraiFull(nn.Module):
 
         img_hidden = img_hidden.view(B, N, -1)
 
-        logit, transformer_hidden, activ_dict = self.transformer(img_hidden)
+        logit, transformer_hidden, activ_dict = self.transformer(img_hidden,risk_factors=risk_factors,
+            batch=data)
 
         return {'logit': logit, 'transformer_hidden': transformer_hidden, 'activ_dict': activ_dict}
 
