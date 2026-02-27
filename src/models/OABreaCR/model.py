@@ -163,6 +163,7 @@ class OA_BreaCR(nn.Module):
               , "y mask", y_mask
               , "y true prior", y_true_prior
               , "y mask prior", y_mask_prior
+              , "time gap", batch['time_gap']
                     )
         # Final/main head
         if 'final' in outputs and outputs['final'] is not None:
