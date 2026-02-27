@@ -135,24 +135,31 @@ class OA_BreaCR(nn.Module):
             y_true: [B, max_followup], 1 if event happened by year t
             y_mask: [B, max_followup], 1 if year t is observed, else 0
         """
-        if pred.dim()==3:
-            pred = pred.mean(dim=0) 
+        if pred.dim() == 3:
+            pred = pred.mean(dim=0)
+
         B, num_pred_years = pred.shape
-        followup = num_pred_years - 1
-        B = years_to_cancer.shape[0]
-        y_true = torch.zeros(B, followup, device=years_to_cancer.device)
-        y_mask = torch.ones(B, followup, device=years_to_cancer.device)
+        max_index = num_pred_years - 1
+
+        device = years_to_cancer.device
+
+        y_true = torch.zeros(B, num_pred_years, device=device)
+        y_mask = torch.ones(B, num_pred_years, device=device)
 
         for i in range(B):
-            # Cumulative target: 1 up to and including the event
-            y_true[i, :years_to_cancer[i]] = 1
 
-            # Mask out unobserved years
-            if years_to_cancer[i] == followup and years_last_followup[i] < followup:
-                y_mask[i, years_last_followup[i]+1:] = 0
+            # Clamp event year so it never exceeds prediction range
+            event_year = torch.clamp(years_to_cancer[i], max=max_index)
+
+            # ---- ONE HOT TARGET (old behavior) ----
+            y_true[i, event_year] = 1
+
+            # ---- Mask future unobserved years (censoring case) ----
+            if event_year == max_index and years_last_followup[i] < max_index:
+                y_mask[i, years_last_followup[i] + 1:] = 0
 
         return y_true, y_mask
-    
+        
 
     def get_risk_heads(self, outputs, batch):
         heads = {}
