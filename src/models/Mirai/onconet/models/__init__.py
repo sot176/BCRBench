@@ -1,5 +1,3 @@
-import onconet.models.discriminator
-import onconet.models.temporal_mmd
 import onconet.models.aggregate_hiddens
 import onconet.models.hiddens_transfomer
 import onconet.models.aggregate_feat_maps
