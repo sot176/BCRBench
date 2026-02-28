@@ -1,6 +1,5 @@
 import torch.nn as nn
 from onconet.models.factory import RegisterModel
-from onconet.datasets.abstract_onco_dataset import DEVICE_TO_ID
 
 NUM_DEVICES = len(set(DEVICE_TO_ID.values()))
 
