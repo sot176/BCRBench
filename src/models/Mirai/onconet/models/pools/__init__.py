@@ -1,9 +1,9 @@
-import onconet.models.pools.abstract_pool
-import onconet.models.pools.concat_pool
-import onconet.models.pools.attention_pool
-import onconet.models.pools.average_pool
-import onconet.models.pools.sliding_window
-import onconet.models.pools.risk_factor_pool
-import onconet.models.pools.deep_risk_factor_pool
-import onconet.models.pools.factory
-import onconet.models.pools.max_pool
+from . import abstract_pool
+from . import concat_pool
+from . import attention_pool
+from . import average_pool
+from . import sliding_window
+from . import risk_factor_pool
+from . import deep_risk_factor_pool
+from . import factory
+from . import max_pool
