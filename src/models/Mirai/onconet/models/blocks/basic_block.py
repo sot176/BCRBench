@@ -1,5 +1,5 @@
 import torch.nn as nn
-from onconet.models.blocks.factory import RegisterBlock
+from .factory import RegisterBlock
 import pdb
 
 def conv3x3(inplanes, outplanes, stride=1, groups=1):

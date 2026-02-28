@@ -3,8 +3,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from onconet.models.group_norm import GroupNorm
-from onconet.models.blocks.factory import RegisterBlock
+from models.group_norm import GroupNorm
+from .factory import RegisterBlock
 
 UNEXPECTED_INPUT_SIZE_ERR = "Unexpected input size! Expected a 4D or 5D tensor, instead got size {}"
 

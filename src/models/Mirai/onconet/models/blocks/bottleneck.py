@@ -1,5 +1,5 @@
 import torch.nn as nn
-from onconet.models.blocks.factory import RegisterBlock
+from .factory import RegisterBlock
 
 @RegisterBlock('Bottleneck')
 class Bottleneck(nn.Module):
