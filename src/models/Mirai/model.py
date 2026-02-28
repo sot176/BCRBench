@@ -1,5 +1,5 @@
 import torch.nn as nn
-from models.Mirai.onconet.models.factory import get_model_by_name, load_model
+from .onconet.models.factory import get_model_by_name, load_model
 
 class MiraiFull(nn.Module):
 
