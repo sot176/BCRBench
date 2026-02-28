@@ -1,6 +1,4 @@
 import onconet.models.discriminator
-import onconet.models.mirai_full
-import onconet.models.mmd
 import onconet.models.temporal_mmd
 import onconet.models.aggregate_hiddens
 import onconet.models.hiddens_transfomer
@@ -9,5 +7,4 @@ import onconet.models.custom_resnet
 import onconet.models.default_models
 import onconet.models.default_resnets
 import onconet.models.nonlocal_resnets
-import onconet.models.ensemble
 import onconet.models.factory
