@@ -1,18 +1,20 @@
-import torch
-from torch import nn
-import os
-import torch.nn.functional as F
+
 import math
-
-from .model_utils import GlobalMaxPool
-from models.common_parts import CumulativeProbabilityLayer
-
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import pdb
+import numpy as np
+from onconet.models.pools.factory import get_pool
+from onconet.models.factory import RegisterModel
+from onconet.models.cumulative_probability_layer import Cumulative_Probability_Layer
 
 EMBEDDING_DIM = 96
 MAX_TIME = 10
 MAX_VIEWS = 2
 MAX_SIDES = 2
 
+@RegisterModel("transformer")
 class AllImageTransformer(nn.Module):
     def __init__(self, args):
 
@@ -34,7 +36,7 @@ class AllImageTransformer(nn.Module):
         pool_name = args.pool_name
         if args.use_risk_factors:
             pool_name = 'DeepRiskFactorPool' if self.args.deep_risk_factor_pool else 'RiskFactorPool'
-        self.pool =GlobalMaxPool()
+        self.pool = get_pool(pool_name)(args, args.hidden_dim)
 
 
         if not self.pool.replaces_fc():
@@ -45,10 +47,10 @@ class AllImageTransformer(nn.Module):
 
         if args.survival_analysis_setup:
             if args.pred_both_sides:
-                self.prob_of_failure_layer_l = CumulativeProbabilityLayer(args.hidden_dim, args, max_followup=args.max_followup)
-                self.prob_of_failure_layer_r = CumulativeProbabilityLayer(args.hidden_dim, args, max_followup=args.max_followup)
+                self.prob_of_failure_layer_l = Cumulative_Probability_Layer(args.hidden_dim, args, max_followup=args.max_followup)
+                self.prob_of_failure_layer_r = Cumulative_Probability_Layer(args.hidden_dim, args, max_followup=args.max_followup)
             else:
-                self.prob_of_failure_layer = CumulativeProbabilityLayer(args.hidden_dim, args, max_followup=args.max_followup)
+                self.prob_of_failure_layer = Cumulative_Probability_Layer(args.hidden_dim, args, max_followup=args.max_followup)
 
     def mask_input(self, x, view_seq):
         B, N, _ = x.size()
@@ -129,7 +131,7 @@ class AllImageTransformer(nn.Module):
                 logit = self.prob_of_failure_layer(hidden)
 
         return logit, hidden
-    
+
 
 
 class Transformer(nn.Module):
@@ -239,4 +241,5 @@ class MultiHead_Attention(nn.Module):
         output = self.aggregate_fc(h)
 
         return output
-    
+
+
