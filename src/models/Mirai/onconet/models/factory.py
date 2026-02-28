@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from .blocks.factory import get_block
 import pdb
+import os
 
 MODEL_REGISTRY = {}
 
@@ -76,42 +77,54 @@ def wrap_model(model, allow_wrap_model, args, allow_data_parallel=True):
 
     return wrapped_model
 
-def load_model(path, args, do_wrap_model = True):
-    print('\nLoading model from [%s]...' % path)
+
+def load_model(path, model_class, args, do_wrap_model=True):
+    print(f"\nLoading state_dict from [{path}]...")
+
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Snapshot {path} does not exist!")
+
+    checkpoint = torch.load(path, map_location="cpu")
+
+    # Instantiate fresh model
+    model = model_class(args)
+
+    # Extract state_dict safely
+    if isinstance(checkpoint, dict):
+        state_dict = (
+            checkpoint.get("state_dict")
+            or checkpoint.get("model")
+            or checkpoint
+        )
+    else:
+        raise RuntimeError(
+            "Checkpoint is a full model object. "
+            "Please resave it as state_dict."
+        )
+
+    # Remove DataParallel prefix if present
+    new_state_dict = {
+        k.replace("module.", ""): v
+        for k, v in state_dict.items()
+    }
+
+    model.load_state_dict(new_state_dict, strict=False)
+
+    # Update args safely
     try:
-        model = torch.load(path, map_location='cpu')
-
-        if isinstance(model, dict):
-            model = model['model']
-
-        if isinstance(model, nn.DataParallel):
-            model = model.module.cpu()
-        try:
-           model.args.use_pred_risk_factors_at_test = args.use_pred_risk_factors_at_test 
-        except:
-           pass
-        try:
-            if hasattr(model, '_model'):
-                _model = model._model
-            else:
-                _model = model
-            _model.args.use_pred_risk_factors_at_test = args.use_pred_risk_factors_at_test
-            _model.args.use_precomputed_hiddens = args.use_precomputed_hiddens
-            _model.args.use_pred_risk_factors_if_unk = args.use_pred_risk_factors_if_unk
-            _model.args.pred_risk_factors = args.pred_risk_factors
-            _model.args.use_spatial_transformer = args.use_spatial_transformer
-        except:
-           pass
-        try:
-            args.img_only_dim = model._model.args.img_only_dim
-        except:
-            pass
-        if do_wrap_model:
-            model = {'model': wrap_model(model, True, args)}
+        model.args.use_pred_risk_factors_at_test = args.use_pred_risk_factors_at_test
+        model.args.use_precomputed_hiddens = args.use_precomputed_hiddens
+        model.args.use_pred_risk_factors_if_unk = args.use_pred_risk_factors_if_unk
+        model.args.pred_risk_factors = args.pred_risk_factors
+        model.args.use_spatial_transformer = args.use_spatial_transformer
     except:
-        raise Exception(
-            "Sorry, snapshot {} does not exist!".format(path))
+        pass
+
+    if do_wrap_model:
+        model = wrap_model(model, True, args)
+
     return model
+
 
 def validate_block_layout(block_layout):
     """Confirms that a block layout is in the right format.
