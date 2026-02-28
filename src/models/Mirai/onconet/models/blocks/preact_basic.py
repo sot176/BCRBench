@@ -1,6 +1,6 @@
 import torch.nn as nn
-from onconet.models.blocks.factory import RegisterBlock
-from onconet.models.blocks.basic_block import conv3x3
+from .factory import RegisterBlock
+from .basic_block import conv3x3
 import pdb
 
 

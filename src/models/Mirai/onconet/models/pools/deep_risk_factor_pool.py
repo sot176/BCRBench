@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
-from onconet.models.pools.abstract_pool import AbstractPool
-from onconet.models.pools.factory import RegisterPool
-from onconet.models.pools.factory import get_pool
-from onconet.utils.risk_factors import RiskFactorVectorizer
+from .abstract_pool import AbstractPool
+from .factory import RegisterPool
+from .factory import get_pool
+from utils.risk_factors import RiskFactorVectorizer
 import pdb
 
 @RegisterPool('DeepRiskFactorPool')

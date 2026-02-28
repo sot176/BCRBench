@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from onconet.models.pools.abstract_pool import AbstractPool
-from onconet.models.pools.factory import RegisterPool
+from .abstract_pool import AbstractPool
+from .factory import RegisterPool
 
 @RegisterPool('GlobalMaxPool')
 class GlobalMaxPool(AbstractPool):
