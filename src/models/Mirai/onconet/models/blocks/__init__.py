@@ -1,6 +1,6 @@
-import onconet.models.blocks.basic_block
-import onconet.models.blocks.preact_basic
-import onconet.models.blocks.bottleneck
-import onconet.models.blocks.factory
-import onconet.models.blocks.non_local_block
-import onconet.models.blocks.attend_compare_agg_block
+from . import basic_block
+from . import preact_basic
+from . import bottleneck
+from . import factory
+from . import non_local_block
+from . import attend_compare_agg_block
