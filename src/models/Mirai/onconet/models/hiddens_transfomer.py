@@ -5,9 +5,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pdb
 import numpy as np
-from onconet.models.pools.factory import get_pool
-from onconet.models.factory import RegisterModel
-from onconet.models.cumulative_probability_layer import Cumulative_Probability_Layer
+from .pools.factory import get_pool
+from .factory import RegisterModel
+from .cumulative_probability_layer import Cumulative_Probability_Layer
 
 EMBEDDING_DIM = 96
 MAX_TIME = 10

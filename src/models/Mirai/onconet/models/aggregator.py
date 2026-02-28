@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 import pdb
-from onconet.models.factory import RegisterModel, strip_model, get_output_size
+from .factory import RegisterModel, strip_model, get_output_size
 
 @RegisterModel("aggregator")
 class Aggregator(nn.Module):

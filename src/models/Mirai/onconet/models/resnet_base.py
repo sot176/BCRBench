@@ -5,9 +5,9 @@ import torch
 import torch.nn as nn
 import pdb
 import numpy as np
-from onconet.models.pools.factory import get_pool
-from onconet.models.spatial_transformers.factory import get_spatial_transformer
-from onconet.models.cumulative_probability_layer import Cumulative_Probability_Layer
+from .pools.factory import get_pool
+from .spatial_transformers.factory import get_spatial_transformer
+from .cumulative_probability_layer import Cumulative_Probability_Layer
 
 
 class ResNet(nn.Module):

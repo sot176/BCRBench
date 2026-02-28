@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 import pdb
-from onconet.models.factory import RegisterModel
+from .factory import RegisterModel
 
 @RegisterModel("all_image_lstm")
 class AllImageLSTM(nn.Module):

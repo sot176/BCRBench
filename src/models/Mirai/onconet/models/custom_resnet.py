@@ -1,8 +1,8 @@
 from torch import nn
 
-from onconet.models.factory import RegisterModel, load_pretrained_weights, get_layers
-from onconet.models.default_resnets import load_pretrained_model
-from onconet.models.resnet_base import ResNet
+from .factory import RegisterModel, load_pretrained_weights, get_layers
+from .default_resnets import load_pretrained_model
+from .resnet_base import ResNet
 
 @RegisterModel("custom_resnet")
 class CustomResnet(nn.Module):

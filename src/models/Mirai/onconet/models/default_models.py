@@ -3,7 +3,7 @@
 import torch.nn as nn
 import torchvision
 
-from onconet.models.factory import RegisterModel
+from .factory import RegisterModel
 
 @RegisterModel("vgg11")
 class Default_VGG11(nn.Module):

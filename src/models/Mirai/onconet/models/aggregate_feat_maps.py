@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 import pdb
-from onconet.models.factory import RegisterModel, load_model, get_layers
-from onconet.models.resnet_base import ResNet
+from .factory import RegisterModel, load_model, get_layers
+from .resnet_base import ResNet
 
 
 @RegisterModel("custom_agg")

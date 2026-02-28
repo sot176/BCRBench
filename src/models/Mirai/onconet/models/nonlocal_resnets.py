@@ -3,11 +3,11 @@
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
 
-from onconet.models.blocks.basic_block import BasicBlock
-from onconet.models.blocks.bottleneck import Bottleneck
-from onconet.models.factory import RegisterModel, load_pretrained_weights, get_layers
-from onconet.models.default_resnets import load_pretrained_model
-from onconet.models.resnet_base import ResNet
+from .blocks.basic_block import BasicBlock
+from .blocks.bottleneck import Bottleneck
+from .factory import RegisterModel, load_pretrained_weights, get_layers
+from .default_resnets import load_pretrained_model
+from .resnet_base import ResNet
 
 @RegisterModel("nonlocal_resnet18")
 class Nonlocal_Resnet18(nn.Module):

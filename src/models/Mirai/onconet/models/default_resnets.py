@@ -3,10 +3,10 @@
 from collections import OrderedDict
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
-from onconet.models.blocks.bottleneck import Bottleneck
-from onconet.models.blocks.basic_block import BasicBlock
-from onconet.models.factory import RegisterModel, load_pretrained_weights, get_layers
-from onconet.models.resnet_base import ResNet
+from .blocks.bottleneck import Bottleneck
+from .blocks.basic_block import BasicBlock
+from .factory import RegisterModel, load_pretrained_weights, get_layers
+from .resnet_base import ResNet
 
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
