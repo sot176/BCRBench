@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from onconet.models.blocks.factory import get_block
+from .blocks.factory import get_block
 import pdb
 
 MODEL_REGISTRY = {}
