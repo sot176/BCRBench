@@ -83,33 +83,42 @@ def load_model(path, model_class, args, do_wrap_model=True):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Snapshot {path} does not exist!")
 
-    #  weights_only=True prevents class unpickling
+    import sys
+    import torch.nn as nn
+    import models.Mirai.onconet.models as current_models
+
+    # Patch legacy import paths (for old checkpoints)
+    sys.modules['onconet.models'] = current_models
+    sys.modules['onconet.models.custom_resnet'] = current_models.custom_resnet
+
     checkpoint = torch.load(path, map_location="cpu")
 
     # Instantiate fresh model
     model = model_class(args)
 
     # Extract state_dict safely
-    if isinstance(checkpoint, dict):
+    if isinstance(checkpoint, nn.Module):
+        # Full pickled model
+        state_dict = checkpoint.state_dict()
+
+    elif isinstance(checkpoint, dict):
+        # Normal checkpoint dict
         state_dict = (
             checkpoint.get("state_dict")
             or checkpoint.get("model")
             or checkpoint
         )
+
     else:
-        raise RuntimeError(
-            "Checkpoint format unsupported. "
-            "It may be a full pickled model. "
-            "Please convert it to state_dict once."
-        )
+        raise RuntimeError("Unsupported checkpoint format")
 
     # Remove DataParallel prefix if present
-    new_state_dict = {
+    state_dict = {
         k.replace("module.", ""): v
         for k, v in state_dict.items()
     }
 
-    model.load_state_dict(new_state_dict, strict=False)
+    model.load_state_dict(state_dict, strict=False)
 
     # Update args safely
     if hasattr(model, "args"):
@@ -127,7 +136,6 @@ def load_model(path, model_class, args, do_wrap_model=True):
         model = wrap_model(model, True, args)
 
     return model
-
 
 def validate_block_layout(block_layout):
     """Confirms that a block layout is in the right format.
