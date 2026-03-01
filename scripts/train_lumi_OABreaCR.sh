@@ -9,7 +9,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=56
 #SBATCH --mem=480G
-#SBATCH --time=15:59:00               # Run time (hh:mm:ss)
+#SBATCH --time=23:59:00               # Run time (hh:mm:ss)
 #SBATCH --account=project_465002309     # Project for billing
 
 
@@ -54,7 +54,7 @@ accelerate launch  main_train.py \
             --weight_decay 1e-4 \
             --model "OA-BreaCR" \
             --lr_decay 0.3 \
-            --patience_lr_scheduler 5 \
+            --patience_lr_scheduler 3 \
             --num_epochs 30 \
             --patience 15 \
             --dataset "EMBED" \
