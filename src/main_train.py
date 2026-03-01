@@ -151,7 +151,7 @@ def parse_arguments():
 
         # Model Architecture / Hyperparameters
         parser.add_argument('--transfomer_hidden_dim', type=int, default=512, help='start hidden dim for transformer')
-        parser.add_argument('--use_precomputed_hiddens', action='store_true', default=False, help='Whether to only use hiddens from a pretrained model.')
+        parser.add_argument('--use_precomputed_hiddens', action='store_true', default=True, help='Whether to only use hiddens from a pretrained model.')
         parser.add_argument('--precomputed_hidden_dim', type=int, default=512,
                             help='Input dimension for transformer projection layer')
         parser.add_argument('--hidden_dim', type=int, default=512)
@@ -162,7 +162,7 @@ def parse_arguments():
         parser.add_argument('--img_only_dim', type=int, default=512,
                     help='Input dimension for image-only features in the image encoder')
         # resnet-specific
-        parser.add_argument('--model_name', type=str, default='resnet18', help="Form of model, i.e resnet18, aggregator, revnet, etc.")
+        parser.add_argument('--model_name', type=str, default='mirai_full', help="Form of model, i.e resnet18, aggregator, revnet, etc.")
         parser.add_argument('--block_layout', type=str, nargs='+', default=["BasicBlock,2", "BasicBlock,2", "BasicBlock,2", "BasicBlock,2"], help='Layout of blocks for a ResNet model. Must be a list of length 4. Each of the 4 elements is a string of form "block_name,num_repeats-block_name,num_repeats-...". [default: resnet18 layout]')
         parser.add_argument('--block_widening_factor', type=int, default=1, help='Factor by which to widen blocks.')
         parser.add_argument('--num_groups', type=int, default=1, help='Num groups per conv in Resnet blocks.')
