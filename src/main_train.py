@@ -134,7 +134,11 @@ def parse_arguments():
                             help='Filename of image feature extractor snapshot for mirai_full models')
         parser.add_argument('--transformer_snapshot', type=str, default=None,
                             help='Filename of transformer snapshot for mirai_full models')
-
+        parser.add_argument('--state_dict_path', type=str, default=None, help='filename of model snapshot to load[default: None]')
+        parser.add_argument('--snapshot', type=str, default=None, help='filename of model snapshot to load[default: None]')
+        parser.add_argument('--calibrator_snapshot', type=str, default=None, help='filename of calibrator. Produced for a single model on development set using Platt Scaling')
+        parser.add_argument('--patch_snapshot', type=str, default=None, help='filename of patch model snapshot to load. Only used for aggregator type models [default: None]')
+    
         # Training / Fine-tuning options
         parser.add_argument('--freeze_image_encoder', action='store_true', default=True,
                             help='Whether to freeze image encoder during training')
