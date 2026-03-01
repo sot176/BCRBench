@@ -25,7 +25,8 @@ class MiraiFull(nn.Module):
             self.transformer = get_model_by_name('transformer', False, args)
         args.img_only_dim = self.transformer.args.transfomer_hidden_dim
 
-    def forward(self, x, risk_factors=None, batch=None):
+    def forward(self, data, risk_factors=None, batch=None):
+        x = data['images']
         B, C, N, H, W = x.size()
         x = x.transpose(1,2).contiguous().view(B*N, C, H, W)
         risk_factors_per_img =  (lambda N, risk_factors: [factor.expand( [N, *factor.size()]).contiguous().view([-1, factor.size()[-1]]).contiguous() for factor in risk_factors])(N, risk_factors) if risk_factors is not None else None
