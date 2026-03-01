@@ -150,12 +150,13 @@ def parse_arguments():
                             help='Predict BIRADS labels for negative mammograms')
 
         # Model Architecture / Hyperparameters
+        parser.add_argument('--transfomer_hidden_dim', type=int, default=512, help='start hidden dim for transformer')
         parser.add_argument('--use_precomputed_hiddens', action='store_true', default=False, help='Whether to only use hiddens from a pretrained model.')
         parser.add_argument('--precomputed_hidden_dim', type=int, default=512,
                             help='Input dimension for transformer projection layer')
         parser.add_argument('--hidden_dim', type=int, default=512)
         parser.add_argument('--num_layers', type=int, default=1)
-        parser.add_argument('--num_heads', type=int, default=8)
+        parser.add_argument('--num_heads', type=int, default=8, help='Num heads for transformer')
         parser.add_argument('--dropout', type=float, default=0.1)
         parser.add_argument('--num_chan', type=int, default=3, help='Number of channels in img. [default:3]')
         parser.add_argument('--img_only_dim', type=int, default=512,
@@ -198,6 +199,8 @@ def parse_arguments():
         parser.add_argument('--model_parallel', action='store_true', default=False, help='spread single model across num_shards. Note must have num_shards > 1 to take effect and only support in specific models. So far supported in all models that extend Resnet-base, i.e resnet-[n], nonlocal-resnet[n], custom-resnet models')
 
         # Other Optional Configs
+        parser.add_argument('--num_images', type=int, default=1,
+                        help='In multi image setting, the number of images per single sample.')
         parser.add_argument('--num_classes', type=int, default=2)
         parser.add_argument('--max_followup', type=int, default=5,
                             help='Only used for survival analysis / cumulative probability layer')
