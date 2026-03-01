@@ -179,6 +179,14 @@ def parse_arguments():
         parser.add_argument('--mask_mechanism', default='default', help='How to mask for survival objective. options [default, indep, slice, linear].') #
         parser.add_argument('--eval_survival_on_risk', action='store_true', default=False, help='Port over survival model to risk model.') #
         parser.add_argument('--eval_risk_survival', action='store_true', default=False, help='Port over risk model to survival model.') #
+        
+        # device
+        parser.add_argument('--is_ccds_server', action='store_true', default=False, help='Change all paths accordingly.')
+        parser.add_argument('--cuda', action='store_true', default=False, help='enable the gpu')
+        parser.add_argument('--num_gpus', type=int, default=1, help='Num GPUs to use in data_parallel.')
+        parser.add_argument('--num_shards', type=int, default=1, help='Num GPUs to shard a single model.')
+        parser.add_argument('--data_parallel', action='store_true', default=False, help='spread batch size across all available gpus. Set to false when using model parallelism. The combo of model and data parallelism may result in unexpected behavior')
+        parser.add_argument('--model_parallel', action='store_true', default=False, help='spread single model across num_shards. Note must have num_shards > 1 to take effect and only support in specific models. So far supported in all models that extend Resnet-base, i.e resnet-[n], nonlocal-resnet[n], custom-resnet models')
 
         # Other Optional Configs
         parser.add_argument('--num_classes', type=int, default=2)
