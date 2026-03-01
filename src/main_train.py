@@ -14,6 +14,8 @@ from torch.serialization import SourceChangeWarning
 warnings.filterwarnings("ignore", category=SourceChangeWarning)
 
 from accelerate import Accelerator
+from accelerate.utils import DistributedDataParallelKwargs
+
 from train import train_val
 from datasets import get_dataset_and_loader
 
@@ -230,7 +232,11 @@ def parse_arguments():
 def main():
 
     args = parse_arguments()
-    accelerator = Accelerator()
+    ddp_kwargs = DistributedDataParallelKwargs(
+        find_unused_parameters=True
+    )
+
+    accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
 
     if args.seed is not None:
         random.seed(args.seed)
