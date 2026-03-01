@@ -41,7 +41,7 @@ set -xv  # Print commands for debugging
 # Run the training script using Singularity
 export PYTHONPATH=$WORKING_DIR
 #--img_encoder_snapshot /scratch/project_465002309/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_MIRAI_Base_May20_2019.p \
-            #--transformer_snapshot /scratch/project_465002309/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_cancer_MIRAI_Transformer_Jan13_2020.p \
+#--transformer_snapshot /scratch/project_465002309/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_cancer_MIRAI_Transformer_Jan13_2020.p \
 accelerate launch  main_train.py \
             --csv_file /scratch/project_465002309/thrunsol/embed_datasets/combined_cases_with_followup.csv \
             --data_root /scratch/project_465002309/thrunsol/embed_datasets/risk_dataset_1664_2048 \
