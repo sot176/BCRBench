@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from .abstract_pool import AbstractPool
 from .factory import RegisterPool
 from .factory import get_pool
-from utils.risk_factors import RiskFactorVectorizer
+from ...utils.risk_factors import RiskFactorVectorizer
 
 import pdb
 
