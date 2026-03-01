@@ -154,7 +154,6 @@ def parse_arguments():
         parser.add_argument('--num_heads', type=int, default=8)
         parser.add_argument('--dropout', type=float, default=0.1)
         parser.add_argument('--num_chan', type=int, default=3, help='Number of channels in img. [default:3]')
-        parser.add_argument('--pretrained_on_imagenet', action='store_true', default=False, help='Pretrain the model on imagenet. Only relevant for default models like VGG, resnet etc')
 
         # resnet-specific
         parser.add_argument('--block_layout', type=str, nargs='+', default=["BasicBlock,2", "BasicBlock,2", "BasicBlock,2", "BasicBlock,2"], help='Layout of blocks for a ResNet model. Must be a list of length 4. Each of the 4 elements is a string of form "block_name,num_repeats-block_name,num_repeats-...". [default: resnet18 layout]')
