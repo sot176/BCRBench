@@ -83,7 +83,7 @@ def load_model(path, model_class, args, do_wrap_model=True):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Snapshot {path} does not exist!")
 
-    # 🔥 IMPORTANT: weights_only=True prevents class unpickling
+    #  weights_only=True prevents class unpickling
     checkpoint = torch.load(path, map_location="cpu", weights_only=True)
 
     # Instantiate fresh model
@@ -144,7 +144,6 @@ def validate_block_layout(block_layout):
 
     # Confirm that each layer is a list of block specifications where
     # each block specification has length 2 (i.e. (block_name, num_repeats))
-    print("block layout", block_layout)
     for layer_layout in block_layout:
         for block_spec in layer_layout:
             if len(block_spec) != 2:
