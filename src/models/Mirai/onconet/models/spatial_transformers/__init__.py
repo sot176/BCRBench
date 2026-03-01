@@ -1,1 +1,2 @@
-import onconet.models.spatial_transformers.affine
+from . import affine
+from . import factory
