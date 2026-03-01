@@ -163,7 +163,11 @@ def parse_arguments():
         parser.add_argument('--pool_name', type=str, default='GlobalAvgPool', help='Pooling mechanism')
         parser.add_argument('--deep_risk_factor_pool', action='store_true', default=False, help='make risk factor pool use several layers to fuse image and rf info')
         parser.add_argument('--replace_snapshot_pool', action='store_true', default=False, help='Use detached models')
-        
+        parser.add_argument('--pretrained_on_imagenet', action='store_true', default=False, help='Pretrain the model on imagenet. Only relevant for default models like VGG, resnet etc')
+        parser.add_argument('--pretrained_imagenet_model_name', type=str, default='resnet18', help='Name of pretrained model to load for custom resnets.')
+        parser.add_argument('--make_fc', action='store_true', default=False, help='Replace last linear layer with convolutional layer')
+        parser.add_argument('--replace_bn_with_gn', action='store_true', default=False, help='Use group normalization instead of batch norm.')
+
         # risk factors
         parser.add_argument('--use_risk_factors', action='store_true', default=False, help='Whether to feed risk factors into last FC of model.') #
         parser.add_argument('--pred_risk_factors', action='store_true', default=False, help='Whether to predict value of all RF from image.') #
