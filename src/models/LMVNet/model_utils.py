@@ -4,7 +4,7 @@ import sys
 import torch.nn.functional as F
 
 from config.config import cfg
-from asymmetry_model import extract_mirai_backbone
+from models.common_parts import extract_mirai_backbone
 from models.common_parts  import ContinuousPosEncoding, SpatialTransformerBlock
 
 

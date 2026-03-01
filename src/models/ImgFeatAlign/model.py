@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import sys
 
 from config.config import cfg
-from asymmetry_model import extract_mirai_backbone
+from models.common_parts import extract_mirai_backbone
 from .model_utils import  RiskModelWithAttention
 from models.common_parts import SpatialTransformerBlock
 from utils import get_risk_loss_BCE
