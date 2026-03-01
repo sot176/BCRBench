@@ -1,3 +1,5 @@
+import sys
+
 import torch
 from torch import nn
 from .blocks.factory import get_block
@@ -85,11 +87,14 @@ def load_model(path, model_class, args, do_wrap_model=True):
 
     import sys
     import torch.nn as nn
-    import models.Mirai.onconet.models as current_models
+    import models.Mirai.onconet as current_onconet
 
     # Patch legacy import paths (for old checkpoints)
-    sys.modules['onconet.models'] = current_models
-    sys.modules['onconet.models.custom_resnet'] = current_models.custom_resnet
+    sys.modules['onconet'] = current_onconet
+    sys.modules['onconet.models'] = current_onconet.models
+    sys.modules['onconet.utils'] = current_onconet.utils
+    sys.modules['onconet.models.custom_resnet'] = current_onconet.models.custom_resnet
+    sys.modules['onconet.utils.risk_factors'] = current_onconet.utils.risk_factors
 
     checkpoint = torch.load(path, map_location="cpu")
 
