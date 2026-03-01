@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from onconet.models.spatial_transformers.factory import RegisterSpatialTransformer
-from onconet.models.factory import get_model
+from .factory import RegisterSpatialTransformer
+from ...models.factory import get_model
 import pdb
 import copy
 
