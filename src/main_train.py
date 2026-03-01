@@ -150,6 +150,7 @@ def parse_arguments():
                             help='Modify model/training for survival analysis')
 
         # Model Architecture / Hyperparameters
+        parser.add_argument('--use_precomputed_hiddens', action='store_true', default=False, help='Whether to only use hiddens from a pretrained model.')
         parser.add_argument('--precomputed_hidden_dim', type=int, default=512,
                             help='Input dimension for transformer projection layer')
         parser.add_argument('--hidden_dim', type=int, default=512)
