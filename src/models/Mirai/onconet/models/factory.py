@@ -84,7 +84,7 @@ def load_model(path, model_class, args, do_wrap_model=True):
         raise FileNotFoundError(f"Snapshot {path} does not exist!")
 
     #  weights_only=True prevents class unpickling
-    checkpoint = torch.load(path, map_location="cpu", weights_only=True)
+    checkpoint = torch.load(path, map_location="cpu")
 
     # Instantiate fresh model
     model = model_class(args)

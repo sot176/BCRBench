@@ -53,7 +53,7 @@ accelerate launch  main_train.py \
             --learning_rate 1e-5 \
             --weight_decay 1e-4 \
             --model "ImgFeatAlign" \
-            --lr_decay 0.3 \
+            --lr_decay 0.5 \
             --patience_lr_scheduler 3 \
             --num_epochs 30 \
             --patience 15 \
