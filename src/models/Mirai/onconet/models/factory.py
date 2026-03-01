@@ -144,6 +144,7 @@ def validate_block_layout(block_layout):
 
     # Confirm that each layer is a list of block specifications where
     # each block specification has length 2 (i.e. (block_name, num_repeats))
+    print("block layout", block_layout)
     for layer_layout in block_layout:
         for block_spec in layer_layout:
             if len(block_spec) != 2:

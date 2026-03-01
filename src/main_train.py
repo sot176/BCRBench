@@ -39,6 +39,27 @@ def setup_logging(path_logger, is_main_process):
         logger.addHandler(console_handler)
     return logger
 
+def parse_block_layout(raw_block_layout):
+    """
+    Convert CLI strings like ['BasicBlock,2', 'BasicBlock,2', ...]
+    into a proper nested list of tuples:
+    [
+        [('BasicBlock', 2)],
+        [('BasicBlock', 2)],
+        [('BasicBlock', 2)],
+        [('BasicBlock', 2)]
+    ]
+    Each stage is a list of (block_name, num_repeats) tuples.
+    """
+    block_layout = []
+    for stage_str in raw_block_layout:
+        stage_blocks = []
+        for block_spec in stage_str.split('-'):
+            name, repeats = block_spec.split(',')
+            stage_blocks.append((name, int(repeats)))
+        block_layout.append(stage_blocks)
+    return block_layout
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -139,7 +160,7 @@ def parse_arguments():
         parser.add_argument('--pretrained_on_imagenet', action='store_true', default=False, help='Pretrain the model on imagenet. Only relevant for default models like VGG, resnet etc')
 
         # resnet-specific
-        parser.add_argument('--block_layout', nargs='+', default=[('BasicBlock', 2), ('BasicBlock', 2), ('BasicBlock', 2), ('BasicBlock', 2)], help='Layout of blocks for a ResNet model. Must be a list of length 4. Each of the 4 elements is a string of form "block_name,num_repeats-block_name,num_repeats-...". [default: resnet18 layout]')
+        parser.add_argument('--block_layout', type=str, nargs='+', default=["BasicBlock,2", "BasicBlock,2", "BasicBlock,2", "BasicBlock,2"], help='Layout of blocks for a ResNet model. Must be a list of length 4. Each of the 4 elements is a string of form "block_name,num_repeats-block_name,num_repeats-...". [default: resnet18 layout]')
         parser.add_argument('--block_widening_factor', type=int, default=1, help='Factor by which to widen blocks.')
         parser.add_argument('--num_groups', type=int, default=1, help='Num groups per conv in Resnet blocks.')
         parser.add_argument('--pool_name', type=str, default='GlobalAvgPool', help='Pooling mechanism')
@@ -161,6 +182,10 @@ def parse_arguments():
         f"{args.path_out_dir}_Model_{args.model}_lr_{args.learning_rate}_wd_{args.weight_decay}"
         f"_epochs_{args.num_epochs}_bs_{args.batch_size}_{datetime.now().strftime('%Y-%m-%d-%H-%M')}/"
     )
+     # --- Mirai-specific post-processing ---
+    if args.model == "Mirai":
+        # Convert block layout strings into nested tuples/lists
+        args.block_layout = parse_block_layout(args.block_layout)
 
     return args
 
