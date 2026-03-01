@@ -178,7 +178,6 @@ def parse_arguments():
         parser.add_argument('--make_probs_indep', action='store_true', default=False, help='Make surival model produce indepedent probablities.') #
         parser.add_argument('--mask_mechanism', default='default', help='How to mask for survival objective. options [default, indep, slice, linear].') #
         parser.add_argument('--eval_survival_on_risk', action='store_true', default=False, help='Port over survival model to risk model.') #
-        parser.add_argument('--max_followup', type=int, default=5, help='Max followup to predict over')
         parser.add_argument('--eval_risk_survival', action='store_true', default=False, help='Port over risk model to survival model.') #
 
         # Other Optional Configs
