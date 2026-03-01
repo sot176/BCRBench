@@ -145,10 +145,6 @@ def parse_arguments():
         parser.add_argument('--predict_birads', action='store_true', default=False,
                             help='Predict BIRADS labels for negative mammograms')
 
-        # Analysis / Task setup
-        parser.add_argument('--survival_analysis_setup', action='store_true', default=False,
-                            help='Modify model/training for survival analysis')
-
         # Model Architecture / Hyperparameters
         parser.add_argument('--use_precomputed_hiddens', action='store_true', default=False, help='Whether to only use hiddens from a pretrained model.')
         parser.add_argument('--precomputed_hidden_dim', type=int, default=512,
@@ -167,6 +163,23 @@ def parse_arguments():
         parser.add_argument('--pool_name', type=str, default='GlobalAvgPool', help='Pooling mechanism')
         parser.add_argument('--deep_risk_factor_pool', action='store_true', default=False, help='make risk factor pool use several layers to fuse image and rf info')
         parser.add_argument('--replace_snapshot_pool', action='store_true', default=False, help='Use detached models')
+        
+        # risk factors
+        parser.add_argument('--use_risk_factors', action='store_true', default=False, help='Whether to feed risk factors into last FC of model.') #
+        parser.add_argument('--pred_risk_factors', action='store_true', default=False, help='Whether to predict value of all RF from image.') #
+        parser.add_argument('--pred_risk_factors_lambda',  type=float, default=0.25,  help='lambda to weigh the risk factor prediction.')
+        parser.add_argument('--use_pred_risk_factors_at_test', action='store_true', default=False, help='Whether to use predicted risk factor values at test time.') #
+        parser.add_argument('--use_pred_risk_factors_if_unk', action='store_true', default=False, help='Whether to use predicted risk factor values at test time only if rf is unk.') #
+        parser.add_argument('--risk_factor_keys', nargs='*', default=['density', 'binary_family_history', 'binary_biopsy_benign', 'binary_biopsy_LCIS', 'binary_biopsy_atypical_hyperplasia', 'age', 'menarche_age', 'menopause_age', 'first_pregnancy_age', 'prior_hist', 'race', 'parous', 'menopausal_status', 'weight','height', 'ovarian_cancer', 'ovarian_cancer_age', 'ashkenazi', 'brca', 'mom_bc_cancer_history', 'm_aunt_bc_cancer_history', 'p_aunt_bc_cancer_history', 'm_grandmother_bc_cancer_history', 'p_grantmother_bc_cancer_history', 'sister_bc_cancer_history', 'mom_oc_cancer_history', 'm_aunt_oc_cancer_history', 'p_aunt_oc_cancer_history', 'm_grandmother_oc_cancer_history', 'p_grantmother_oc_cancer_history', 'sister_oc_cancer_history', 'hrt_type', 'hrt_duration', 'hrt_years_ago_stopped'], help='List of risk factors to include in risk factor vector.')
+        parser.add_argument('--risk_factor_metadata_path', type=str, default='/home/administrator/Mounts/Isilon/metadata/risk_factors_jul22_2018_mammo_and_mri.json', help='Path to risk factor metadata file.')
+        
+        #survival analysis setup
+        parser.add_argument('--survival_analysis_setup', action='store_true', default=False, help='Whether to modify model, eval and training for survival analysis.') #
+        parser.add_argument('--make_probs_indep', action='store_true', default=False, help='Make surival model produce indepedent probablities.') #
+        parser.add_argument('--mask_mechanism', default='default', help='How to mask for survival objective. options [default, indep, slice, linear].') #
+        parser.add_argument('--eval_survival_on_risk', action='store_true', default=False, help='Port over survival model to risk model.') #
+        parser.add_argument('--max_followup', type=int, default=5, help='Max followup to predict over')
+        parser.add_argument('--eval_risk_survival', action='store_true', default=False, help='Port over risk model to survival model.') #
 
         # Other Optional Configs
         parser.add_argument('--num_classes', type=int, default=2)
