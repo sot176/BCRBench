@@ -77,14 +77,14 @@ def wrap_model(model, allow_wrap_model, args, allow_data_parallel=True):
 
     return wrapped_model
 
-
 def load_model(path, model_class, args, do_wrap_model=True):
     print(f"\nLoading state_dict from [{path}]...")
 
     if not os.path.exists(path):
         raise FileNotFoundError(f"Snapshot {path} does not exist!")
 
-    checkpoint = torch.load(path, map_location="cpu")
+    # 🔥 IMPORTANT: weights_only=True prevents class unpickling
+    checkpoint = torch.load(path, map_location="cpu", weights_only=True)
 
     # Instantiate fresh model
     model = model_class(args)
@@ -98,8 +98,9 @@ def load_model(path, model_class, args, do_wrap_model=True):
         )
     else:
         raise RuntimeError(
-            "Checkpoint is a full model object. "
-            "Please resave it as state_dict."
+            "Checkpoint format unsupported. "
+            "It may be a full pickled model. "
+            "Please convert it to state_dict once."
         )
 
     # Remove DataParallel prefix if present
@@ -111,14 +112,16 @@ def load_model(path, model_class, args, do_wrap_model=True):
     model.load_state_dict(new_state_dict, strict=False)
 
     # Update args safely
-    try:
-        model.args.use_pred_risk_factors_at_test = args.use_pred_risk_factors_at_test
-        model.args.use_precomputed_hiddens = args.use_precomputed_hiddens
-        model.args.use_pred_risk_factors_if_unk = args.use_pred_risk_factors_if_unk
-        model.args.pred_risk_factors = args.pred_risk_factors
-        model.args.use_spatial_transformer = args.use_spatial_transformer
-    except:
-        pass
+    if hasattr(model, "args"):
+        for attr in [
+            "use_pred_risk_factors_at_test",
+            "use_precomputed_hiddens",
+            "use_pred_risk_factors_if_unk",
+            "pred_risk_factors",
+            "use_spatial_transformer",
+        ]:
+            if hasattr(args, attr):
+                setattr(model.args, attr, getattr(args, attr))
 
     if do_wrap_model:
         model = wrap_model(model, True, args)
