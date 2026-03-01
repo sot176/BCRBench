@@ -139,7 +139,7 @@ def parse_arguments():
         parser.add_argument('--pretrained_on_imagenet', action='store_true', default=False, help='Pretrain the model on imagenet. Only relevant for default models like VGG, resnet etc')
 
         # resnet-specific
-        parser.add_argument('--block_layout', nargs='+', default=["BasicBlock,2", "BasicBlock,2", "BasicBlock,2", "BasicBlock,2"], help='Layout of blocks for a ResNet model. Must be a list of length 4. Each of the 4 elements is a string of form "block_name,num_repeats-block_name,num_repeats-...". [default: resnet18 layout]')
+        parser.add_argument('--block_layout', nargs='+', default=[('BasicBlock', 2), ('BasicBlock', 2), ('BasicBlock', 2), ('BasicBlock', 2)], help='Layout of blocks for a ResNet model. Must be a list of length 4. Each of the 4 elements is a string of form "block_name,num_repeats-block_name,num_repeats-...". [default: resnet18 layout]')
         parser.add_argument('--block_widening_factor', type=int, default=1, help='Factor by which to widen blocks.')
         parser.add_argument('--num_groups', type=int, default=1, help='Num groups per conv in Resnet blocks.')
         parser.add_argument('--pool_name', type=str, default='GlobalAvgPool', help='Pooling mechanism')
