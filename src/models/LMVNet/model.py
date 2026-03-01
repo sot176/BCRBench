@@ -3,7 +3,6 @@ import torch.nn as nn
 
 from .model_utils import CrossAttentionBlock, LongitudinalFeatureProcessor
 from models.common_parts  import  CumulativeProbabilityLayer
-from utils import get_risk_loss_BCE
 
 
 class LMVNet(nn.Module):

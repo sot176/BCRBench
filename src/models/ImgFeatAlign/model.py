@@ -7,7 +7,6 @@ from config.config import cfg
 from models.common_parts import extract_mirai_backbone
 from .model_utils import  RiskModelWithAttention
 from models.common_parts import SpatialTransformerBlock
-from utils import get_risk_loss_BCE
 
 
 class ImgFeatAlign(nn.Module):
