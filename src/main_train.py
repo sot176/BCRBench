@@ -146,9 +146,7 @@ def parse_arguments():
         # Annotation / Auxiliary supervision
         parser.add_argument('--use_region_annotation', action='store_true', default=False,
                             help='Include cancer region annotation loss')
-        parser.add_argument('--predict_birads', action='store_true', default=False,
-                            help='Predict BIRADS labels for negative mammograms')
-
+        
         # Model Architecture / Hyperparameters
         parser.add_argument('--transfomer_hidden_dim', type=int, default=512, help='start hidden dim for transformer')
         parser.add_argument('--use_precomputed_hiddens', action='store_true', default=False, help='Whether to only use hiddens from a pretrained model.')
