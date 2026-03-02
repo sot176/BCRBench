@@ -197,7 +197,7 @@ def parse_arguments():
                                  'hrt_duration', 'hrt_years_ago_stopped'],
                         help='List of risk factors to include in risk factor vector.')
         
-            #survival analysis setup
+        #survival analysis setup
         parser.add_argument('--survival_analysis_setup', action='store_true', default=False, help='Whether to modify model, eval and training for survival analysis.') #
         parser.add_argument('--make_probs_indep', action='store_true', default=False, help='Make surival model produce indepedent probablities.') #
         parser.add_argument('--mask_mechanism', default='default', help='How to mask for survival objective. options [default, indep, slice, linear].') #
@@ -214,12 +214,10 @@ def parse_arguments():
         parser.add_argument('--model_parallel', action='store_true', default=False, help='spread single model across num_shards. Note must have num_shards > 1 to take effect and only support in specific models. So far supported in all models that extend Resnet-base, i.e resnet-[n], nonlocal-resnet[n], custom-resnet models')
 
         # Other Optional Configs
-        parser.add_argument('--num_images', type=int, default=4,
+        parser.add_argument('--num_images', type=int, default=1,
                         help='In multi image setting, the number of images per single sample.')
         parser.add_argument('--num_classes', type=int, default=2)
-        parser.add_argument('--max_followup', type=int, default=5,
-                            help='Only used for survival analysis / cumulative probability layer')
-
+        
     # -------------------
     # Parse final args
     # -------------------
