@@ -65,23 +65,23 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                         )
 
                     total_loss += weight * loss_MV
-                    
-            # --- POE loss only for final head ---
-            if outputs.get('emb_final') is not None:
-                risk_final = model_risk.get_primary_risk_head(outputs)
-                _, _, _, loss_POE = criterion_POE(
-                    risk_final,
-                    outputs['emb_final'],
-                    outputs['log_var_final'],
-                    batch['years_to_cancer'],
-                    batch['years_to_last_followup'],
-                    mh_target=None,
-                    use_sto=getattr(args, "use_sto", True),
-                    weights=None
-                )
-                total_loss += 1.0 * loss_POE
-            else:
-                loss_POE = torch.tensor(0.0, device=next(model_risk.parameters()).device)
+
+                    # --- POE loss only for final head ---
+                    if outputs.get('emb_final') is not None:
+                        risk_final = model_risk.get_primary_risk_head(outputs)
+                        _, _, _, loss_POE = criterion_POE(
+                            risk_final,
+                            outputs['emb_final'],
+                            outputs['log_var_final'],
+                            batch['years_to_cancer'],
+                            batch['years_to_last_followup'],
+                            mh_target=None,
+                            use_sto=getattr(args, "use_sto", True),
+                            weights=None
+                        )
+                        total_loss += 1.0 * loss_POE
+                    else:
+                        loss_POE = torch.tensor(0.0, device=next(model_risk.parameters()).device)
 
             return total_loss
 
