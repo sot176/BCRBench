@@ -162,8 +162,9 @@ def parse_arguments():
         parser.add_argument('--num_chan', type=int, default=3, help='Number of channels in img. [default:3]')
         parser.add_argument('--img_only_dim', type=int, default=512,
                     help='Input dimension for image-only features in the image encoder')
+        
         # resnet-specific
-        parser.add_argument('--model_name', type=str, default='mirai_full', help="Form of model, i.e resnet18, aggregator, revnet, etc.")
+        parser.add_argument('--model_name', type=str, default='resnet18', help="Form of model, i.e resnet18, aggregator, revnet, etc.")
         parser.add_argument('--block_layout', type=str, nargs='+', default=["BasicBlock,2", "BasicBlock,2", "BasicBlock,2", "BasicBlock,2"], help='Layout of blocks for a ResNet model. Must be a list of length 4. Each of the 4 elements is a string of form "block_name,num_repeats-block_name,num_repeats-...". [default: resnet18 layout]')
         parser.add_argument('--block_widening_factor', type=int, default=1, help='Factor by which to widen blocks.')
         parser.add_argument('--num_groups', type=int, default=1, help='Num groups per conv in Resnet blocks.')
@@ -176,8 +177,8 @@ def parse_arguments():
         parser.add_argument('--replace_bn_with_gn', action='store_true', default=False, help='Use group normalization instead of batch norm.')
 
         # risk factors
-        parser.add_argument('--use_risk_factors', action='store_true', default=True, help='Whether to feed risk factors into last FC of model.') #
-        parser.add_argument('--pred_risk_factors', action='store_true', default=True, help='Whether to predict value of all RF from image.') #
+        parser.add_argument('--use_risk_factors', action='store_true', default=False, help='Whether to feed risk factors into last FC of model.') #
+        parser.add_argument('--pred_risk_factors', action='store_true', default=False, help='Whether to predict value of all RF from image.') #
         parser.add_argument('--pred_risk_factors_lambda',  type=float, default=0.25,  help='lambda to weigh the risk factor prediction.')
         parser.add_argument('--use_pred_risk_factors_at_test', action='store_true', default=False, help='Whether to use predicted risk factor values at test time.') #
         parser.add_argument('--use_pred_risk_factors_if_unk', action='store_true', default=False, help='Whether to use predicted risk factor values at test time only if rf is unk.') #
