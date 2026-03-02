@@ -9,7 +9,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=56
 #SBATCH --mem=480G
-#SBATCH --time=0:59:00               # Run time (hh:mm:ss)
+#SBATCH --time=12:59:00               # Run time (hh:mm:ss)
 #SBATCH --account=project_465002309     # Project for billing
 
 
@@ -46,7 +46,7 @@ accelerate launch  main_train.py \
             --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/$SLURM_JOB_NAME-$SLURM_JOB_ID \
             --transformer_snapshot /scratch/project_465002309/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_cancer_MIRAI_Transformer_Jan13_2020.p \
             --img_encoder_snapshot /scratch/project_465002309/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_MIRAI_Base_May20_2019.p \
-            --freeze_image_encoder True \
+            --freeze_image_encoder False \
             --id_training 1 \
             --use_scheduler "True" \
             --batch_size 4 \
