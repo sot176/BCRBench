@@ -142,7 +142,7 @@ def parse_arguments():
         parser.add_argument('--patch_snapshot', type=str, default=None, help='filename of patch model snapshot to load. Only used for aggregator type models [default: None]')
     
         # Training / Fine-tuning options
-        parser.add_argument('--freeze_image_encoder', action='store_true', default=True,
+        parser.add_argument('--freeze_image_encoder',   action='store_true', default=False,
                             help='Whether to freeze image encoder during training')
 
         # Annotation / Auxiliary supervision
