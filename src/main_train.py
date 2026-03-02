@@ -173,7 +173,7 @@ def parse_arguments():
         parser.add_argument('--replace_bn_with_gn', action='store_true', default=False, help='Use group normalization instead of batch norm.')
 
         # risk factors
-        parser.add_argument('--use_risk_factors', action='store_true', default=True, help='Whether to feed risk factors into last FC of model.') #
+        parser.add_argument('--use_risk_factors', action='store_true', default=False, help='Whether to feed risk factors into last FC of model.') #
         parser.add_argument('--pred_risk_factors', action='store_true', default=False, help='Whether to predict value of all RF from image.') #
         parser.add_argument('--pred_risk_factors_lambda',  type=float, default=0.25,  help='lambda to weigh the risk factor prediction.')
         parser.add_argument('--use_pred_risk_factors_at_test', action='store_true', default=False, help='Whether to use predicted risk factor values at test time.') #
@@ -214,7 +214,7 @@ def parse_arguments():
         parser.add_argument('--model_parallel', action='store_true', default=False, help='spread single model across num_shards. Note must have num_shards > 1 to take effect and only support in specific models. So far supported in all models that extend Resnet-base, i.e resnet-[n], nonlocal-resnet[n], custom-resnet models')
 
         # Other Optional Configs
-        parser.add_argument('--num_images', type=int, default=1,
+        parser.add_argument('--num_images', type=int, default=4,
                         help='In multi image setting, the number of images per single sample.')
         parser.add_argument('--num_classes', type=int, default=2)
         
