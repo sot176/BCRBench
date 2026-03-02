@@ -180,24 +180,11 @@ def parse_arguments():
         parser.add_argument('--pred_risk_factors_lambda',  type=float, default=0.25,  help='lambda to weigh the risk factor prediction.')
         parser.add_argument('--use_pred_risk_factors_at_test', action='store_true', default=False, help='Whether to use predicted risk factor values at test time.') #
         parser.add_argument('--use_pred_risk_factors_if_unk', action='store_true', default=False, help='Whether to use predicted risk factor values at test time only if rf is unk.') #
-        parser.add_argument('--risk_factor_metadata_path', type=str, default='/home/administrator/Mounts/Isilon/metadata/risk_factors_jul22_2018_mammo_and_mri.json', help='Path to risk factor metadata file.')
         parser.add_argument('--pred_both_sides', action='store_true', default=False, help='Simulatenously pred both sides for multi-img model')
         parser.add_argument('--predict_birads', action='store_true', default=False, help='Wether to predict birads label for negative mammos in risk dataset objects. Note, preds, probs, and labels converted to binary (cancer vs negative) after prediction for logging purposes')
         parser.add_argument('--pred_missing_mammos', action='store_true', default=False, help='Whether to predict missing images when doing image dropout.') #
         parser.add_argument('--also_pred_given_mammos', action='store_true', default=False, help='Whether to predict given images.') #
         parser.add_argument('--metadata_path', type=str, default=None, help='path of metadata csv.')
-        parser.add_argument('--risk_factor_keys', nargs='*',
-                        default=['density', 'binary_family_history', 'binary_biopsy_benign', 'binary_biopsy_LCIS',
-                                 'binary_biopsy_atypical_hyperplasia', 'age', 'menarche_age', 'menopause_age',
-                                 'first_pregnancy_age', 'prior_hist', 'race', 'parous', 'menopausal_status', 'weight',
-                                 'height', 'ovarian_cancer', 'ovarian_cancer_age', 'ashkenazi', 'brca',
-                                 'mom_bc_cancer_history', 'm_aunt_bc_cancer_history', 'p_aunt_bc_cancer_history',
-                                 'm_grandmother_bc_cancer_history', 'p_grantmother_bc_cancer_history',
-                                 'sister_bc_cancer_history', 'mom_oc_cancer_history', 'm_aunt_oc_cancer_history',
-                                 'p_aunt_oc_cancer_history', 'm_grandmother_oc_cancer_history',
-                                 'p_grantmother_oc_cancer_history', 'sister_oc_cancer_history', 'hrt_type',
-                                 'hrt_duration', 'hrt_years_ago_stopped'],
-                        help='List of risk factors to include in risk factor vector.')
         
         #survival analysis setup
         parser.add_argument('--survival_analysis_setup', action='store_true', default=True, help='Whether to modify model, eval and training for survival analysis.') #
