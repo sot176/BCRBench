@@ -123,8 +123,22 @@ def load_model(path, model_class, args, do_wrap_model=True):
         for k, v in state_dict.items()
     }
 
-    model.load_state_dict(state_dict, strict=False)
+    model_dict = model.state_dict()
 
+    filtered_state_dict = {}
+    skipped = []
+
+    for k, v in state_dict.items():
+        if k in model_dict and v.shape == model_dict[k].shape:
+            filtered_state_dict[k] = v
+        else:
+            skipped.append(k)
+
+    print(f"\nLoaded {len(filtered_state_dict)} layers")
+    print(f"Skipped {len(skipped)} incompatible layers")
+
+    model.load_state_dict(filtered_state_dict, strict=False)
+    
     # Update args safely
     if hasattr(model, "args"):
         for attr in [
