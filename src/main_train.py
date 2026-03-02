@@ -174,7 +174,7 @@ def parse_arguments():
 
         # risk factors
         parser.add_argument('--use_risk_factors', action='store_true', default=True, help='Whether to feed risk factors into last FC of model.') #
-        parser.add_argument('--pred_risk_factors', action='store_true', default=True, help='Whether to predict value of all RF from image.') #
+        parser.add_argument('--pred_risk_factors', action='store_true', default=False, help='Whether to predict value of all RF from image.') #
         parser.add_argument('--pred_risk_factors_lambda',  type=float, default=0.25,  help='lambda to weigh the risk factor prediction.')
         parser.add_argument('--use_pred_risk_factors_at_test', action='store_true', default=False, help='Whether to use predicted risk factor values at test time.') #
         parser.add_argument('--use_pred_risk_factors_if_unk', action='store_true', default=False, help='Whether to use predicted risk factor values at test time only if rf is unk.') #
