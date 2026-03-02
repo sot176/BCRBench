@@ -134,11 +134,8 @@ def load_model(path, model_class, args, do_wrap_model=True):
         else:
             skipped.append(k)
 
-    print(f"\nLoaded {len(filtered_state_dict)} layers")
-    print(f"Skipped {len(skipped)} incompatible layers")
-
     model.load_state_dict(filtered_state_dict, strict=False)
-    
+
     # Update args safely
     if hasattr(model, "args"):
         for attr in [
