@@ -161,7 +161,7 @@ def parse_arguments():
                     help='Input dimension for image-only features in the image encoder')
         
         # resnet-specific
-        parser.add_argument('--model_name', type=str, default='custom_resnet', help="Form of model, i.e resnet18, aggregator, revnet, etc.")
+        parser.add_argument('--model_name', type=str, default='mirai_full', help="Form of model, i.e resnet18, aggregator, revnet, etc.")
         parser.add_argument('--block_layout', type=str, nargs='+', default=["BasicBlock,2", "BasicBlock,2", "BasicBlock,2", "BasicBlock,2"], help='Layout of blocks for a ResNet model. Must be a list of length 4. Each of the 4 elements is a string of form "block_name,num_repeats-block_name,num_repeats-...". [default: resnet18 layout]')
         parser.add_argument('--block_widening_factor', type=int, default=1, help='Factor by which to widen blocks.')
         parser.add_argument('--num_groups', type=int, default=1, help='Num groups per conv in Resnet blocks.')
@@ -186,7 +186,18 @@ def parse_arguments():
         parser.add_argument('--pred_missing_mammos', action='store_true', default=False, help='Whether to predict missing images when doing image dropout.') #
         parser.add_argument('--also_pred_given_mammos', action='store_true', default=False, help='Whether to predict given images.') #
         parser.add_argument('--metadata_path', type=str, default=None, help='path of metadata csv.')
-
+        parser.add_argument('--risk_factor_keys', nargs='*',
+                        default=['density', 'binary_family_history', 'binary_biopsy_benign', 'binary_biopsy_LCIS',
+                                 'binary_biopsy_atypical_hyperplasia', 'age', 'menarche_age', 'menopause_age',
+                                 'first_pregnancy_age', 'prior_hist', 'race', 'parous', 'menopausal_status', 'weight',
+                                 'height', 'ovarian_cancer', 'ovarian_cancer_age', 'ashkenazi', 'brca',
+                                 'mom_bc_cancer_history', 'm_aunt_bc_cancer_history', 'p_aunt_bc_cancer_history',
+                                 'm_grandmother_bc_cancer_history', 'p_grantmother_bc_cancer_history',
+                                 'sister_bc_cancer_history', 'mom_oc_cancer_history', 'm_aunt_oc_cancer_history',
+                                 'p_aunt_oc_cancer_history', 'm_grandmother_oc_cancer_history',
+                                 'p_grantmother_oc_cancer_history', 'sister_oc_cancer_history', 'hrt_type',
+                                 'hrt_duration', 'hrt_years_ago_stopped'],
+                        help='List of risk factors to include in risk factor vector.')
         #survival analysis setup
         parser.add_argument('--survival_analysis_setup', action='store_true', default=True, help='Whether to modify model, eval and training for survival analysis.') #
         parser.add_argument('--make_probs_indep', action='store_true', default=False, help='Make surival model produce indepedent probablities.') #
