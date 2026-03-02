@@ -187,6 +187,7 @@ def parse_arguments():
         parser.add_argument('--predict_birads', action='store_true', default=False, help='Wether to predict birads label for negative mammos in risk dataset objects. Note, preds, probs, and labels converted to binary (cancer vs negative) after prediction for logging purposes')
         parser.add_argument('--pred_missing_mammos', action='store_true', default=False, help='Whether to predict missing images when doing image dropout.') #
         parser.add_argument('--also_pred_given_mammos', action='store_true', default=False, help='Whether to predict given images.') #
+        parser.add_argument('--metadata_path', type=str, default=None, help='path of metadata csv.')
 
         #survival analysis setup
         parser.add_argument('--survival_analysis_setup', action='store_true', default=True, help='Whether to modify model, eval and training for survival analysis.') #
