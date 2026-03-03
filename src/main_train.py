@@ -211,23 +211,17 @@ def parse_arguments():
         parser.add_argument('--depths_downsample', nargs='+', type=int,
                             default=[2, 2, 6, 2],
                             help='Depths for downsample blocks')
-
         parser.add_argument('--depths_upsample', nargs='+', type=int,
                             default=[2, 2, 6, 2],
                             help='Depths for upsample blocks')
-
         parser.add_argument('--num_heads', type=int, default=8,
                             help='Number of attention heads')
-
         parser.add_argument('--patch_size', type=int, default=32,
                             help='Patch size')
-
         parser.add_argument('--window_size', type=int, default=64,
                             help='Window size')
-
         parser.add_argument('--embed_dim', type=int, default=512,
                             help='Embedding dimension')
-
         parser.add_argument('--feature_resolution', nargs=2, type=int,
                             default=[64, 52],
                             help='Feature map resolution (H W)')
@@ -235,15 +229,11 @@ def parse_arguments():
         # Asymmetry module parameters
         parser.add_argument('--use_asymmetry', action='store_true',
                             help='Enable asymmetry module')
-
         parser.add_argument('--latent_h', type=int, default=52)
         parser.add_argument('--latent_w', type=int, default=64)
-
         parser.add_argument('--use_sad_bias', action='store_true')
         parser.add_argument('--use_lat_bn', action='store_true')
-
         parser.add_argument('--lat_dropout', type=float, default=0.1)
-
         parser.add_argument('--initial_asym_mean', type=float, default=2000)
         parser.add_argument('--initial_asym_std', type=float, default=300)
 

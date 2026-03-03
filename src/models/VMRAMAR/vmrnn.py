@@ -3,10 +3,10 @@ import torch.nn as nn
 from einops import rearrange
 from timm.models.swin_transformer import PatchMerging  # patch merging is still used for downsampling
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-from .vmamba import VSSBlock, SS2D  # ensure correct import of VSSBlock and SS2D
+from vmamba import VSSBlock, SS2D  # ensure correct import of VSSBlock and SS2D
 from typing import Optional, Callable
 from functools import partial
-from Mirai.onconet.models.factory import load_model, RegisterModel, get_model_by_name
+from Mirai.onconet.models.factory import RegisterModel
 
 
 class VSB(VSSBlock):
@@ -33,13 +33,10 @@ class VSB(VSSBlock):
         self.input_resolution = input_resolution
 
     def forward(self, x, hx=None):
-        print("input resolution", self.input_resolution)
-        print(" x resolution", x.shape)
         H, W = self.input_resolution
         B, L, C = x.shape
-        if not (H == 1 or W == 1):
-            assert L == H * W, f"Input feature has wrong size. Got L={L}, expected {H * W}."
-
+        assert L == H * W, "Input feature has wrong size."
+        
         shortcut = x
         x = self.ln_1(x)
 
@@ -165,20 +162,12 @@ class DownSample(nn.Module):
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths_downsample))]
         self.layers = nn.ModuleList()
         self.downsample = nn.ModuleList()
-        is_temporal = feature_resolution[0] == 1 or feature_resolution[1] == 1
-        self.is_temporal = is_temporal
 
         for i_layer in range(self.num_layers):
             # Downsample using PatchMerging if desired; otherwise, you could use another strategy.
-            if is_temporal:
-                downsample = nn.Identity()
-            else:
-                downsample = PatchMerging(
-                    input_resolution=(patches_resolution[0] // (2 ** i_layer),
-                                      patches_resolution[1] // (2 ** i_layer)),
-                    dim=int(embed_dim * 2 ** i_layer)
-                )
-
+            downsample = PatchMerging(input_resolution=(patches_resolution[0] // (2 ** i_layer),
+                                                        patches_resolution[1] // (2 ** i_layer)),
+                                      dim=int(embed_dim * 2 ** i_layer))
             layer = VMRNNCell(hidden_dim=int(embed_dim * 2 ** i_layer),
                               input_resolution=(patches_resolution[0] // (2 ** i_layer),
                                                   patches_resolution[1] // (2 ** i_layer)),
@@ -218,29 +207,21 @@ class UpSample(nn.Module):
         # In the upsampling branch, we assume features are already embedded.
         self.patch_embed = nn.Identity()
         patches_resolution = feature_resolution
-        is_temporal = feature_resolution[0] == 1 or feature_resolution[1] == 1
-        self.is_temporal = is_temporal
+
         # Optionally, if you need to reconstruct image-like output, you can use a patch inflating layer.
-        if is_temporal:
-            self.Unembed = nn.Identity()
-        else:
-            self.Unembed = PatchInflated(in_chans=out_chans if out_chans is not None else embed_dim,
-                                         embed_dim=embed_dim, input_resolution=patches_resolution)
+        self.Unembed = PatchInflated(in_chans=out_chans if out_chans is not None else embed_dim, 
+                                     embed_dim=embed_dim, input_resolution=patches_resolution)
 
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths_upsample))]
         self.layers = nn.ModuleList()
         self.upsample = nn.ModuleList()
-
 
         for i_layer in range(self.num_layers):
             resolution1 = (patches_resolution[0] // (2 ** (self.num_layers - i_layer)))
             resolution2 = (patches_resolution[1] // (2 ** (self.num_layers - i_layer)))
             dimension = int(embed_dim * 2 ** (self.num_layers - i_layer))
             # Use PatchExpanding for upsampling
-            if is_temporal:
-                upsample = nn.Identity()
-            else:
-                upsample = PatchExpanding(input_resolution=(resolution1, resolution2), dim=dimension)
+            upsample = PatchExpanding(input_resolution=(resolution1, resolution2), dim=dimension)
             layer = VMRNNCell(hidden_dim=dimension, input_resolution=(resolution1, resolution2),
                               depth=depths_upsample[(self.num_layers - 1 - i_layer)],
                               drop=drop_rate, attn_drop=attn_drop_rate, 
@@ -287,10 +268,6 @@ class VMRNN(nn.Module):
             states_down: Downsampling hidden states.
             states_up: Upsampling hidden states.
         """
-        B = features.shape[0]
-        if features.dim() == 3 and self.Downsample.is_temporal:
-            # Treat time as sequence length
-            features = features.view(B, -1, features.size(-1))
         states_down, x = self.Downsample(features, states_down)
         states_up, output = self.Upsample(x, states_up)
         return output, states_down, states_up

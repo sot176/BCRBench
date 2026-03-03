@@ -13,22 +13,18 @@ from timm.models.layers import DropPath, trunc_normal_
 from fvcore.nn import FlopCountAnalysis, flop_count_str, flop_count, parameter_count
 DropPath.__repr__ = lambda self: f"timm.DropPath({self.drop_prob})"
 
-
+# import mamba_ssm.selective_scan_fn (in which causal_conv1d is needed)
 try:
-    from mamba_ssm.ops.selective_scan_interface import selective_scan_ref as selective_scan_fn
-    print("✅ Using GPU selective_scan from mamba_ssm")
-except ImportError:
-    try:
-        from selective_scan import selective_scan_ref as selective_scan_fn
-        print("⚙️ Using selective_scan from selective_scan package")
-    except ImportError:
-        print("⚠️ selective_scan not found. Using dummy fallback (no Mamba dynamics).")
+    from mamba_ssm.ops.selective_scan_interface import selective_scan_fn, selective_scan_ref
+except:
+    pass
 
-        def selective_scan_fn(x, *args, **kwargs):
-            # Fallback: just return input unchanged
-            return x
-
-
+# an alternative for mamba_ssm
+try:
+    from selective_scan import selective_scan_fn as selective_scan_fn_v1
+    from selective_scan import selective_scan_ref as selective_scan_ref_v1
+except:
+    pass
 
 
 def flops_selective_scan_ref(B=1, L=256, D=768, N=16, with_D=True, with_Z=False, with_Group=True, with_complex=False):
@@ -775,5 +771,3 @@ if __name__ == "__main__":
 
 
     
-
-
