@@ -14,7 +14,7 @@ from fvcore.nn import FlopCountAnalysis, flop_count_str, flop_count, parameter_c
 DropPath.__repr__ = lambda self: f"timm.DropPath({self.drop_prob})"
 
 
-from mamba_ssm.selective_scan_interface import selective_scan_fn, selective_scan_ref
+from mamba_ssm.selective_scan_interface import selective_scan_fn
 
 
 
