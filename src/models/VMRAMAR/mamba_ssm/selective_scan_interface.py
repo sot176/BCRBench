@@ -2,7 +2,7 @@
 
 import torch
 import torch.nn.functional as F
-from mamba_ssm.utils.torch import custom_bwd, custom_fwd
+from .utils.torch import custom_bwd, custom_fwd
 
 from einops import rearrange, repeat
 

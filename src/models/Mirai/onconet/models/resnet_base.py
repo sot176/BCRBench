@@ -199,29 +199,21 @@ class ResNet(nn.Module):
             for name in layers:
                 layer = self._modules[name]
                 x = layer(x)
-        logit, hidden = self.aggregate_and_classify(x, risk_factors=risk_factors)
+        logit, hidden = self.aggregate_and_classify(x)
         activ_dict = {'activ':x}
         if self.args.use_region_annotation:
             activ_dict['region_logit'] = self.region_fc(x)
         if self.args.predict_birads:
             activ_dict['birads_logit'] = self.birads_fc(hidden)
 
-        if self.args.pred_risk_factors:
-            try:
-                activ_dict['pred_rf_loss'] = self.pool.get_pred_rf_loss(hidden, risk_factors)
-            except:
-                pass
         if self.args.use_precomputed_hiddens:
             return logit, logit, logit, hidden
         else:
             return logit, hidden, activ_dict
 
 
-    def aggregate_and_classify(self, x, risk_factors=None):
+    def aggregate_and_classify(self, x):
         # Pooling layer
-        #if getattr(self.args, "use_risk_factors", False) and risk_factors is not None:
-        #    logit, hidden = self.pool(x, risk_factors)
-        #else:
         logit, hidden = self.pool(x)
 
         if not self.pool.replaces_fc():
