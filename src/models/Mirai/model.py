@@ -28,6 +28,7 @@ class MiraiFull(nn.Module):
 
     def forward(self, data, risk_factors=None, batch=None):
         x = data['images']
+        batch=data
         B, C, N, H, W = x.size()
         x = x.transpose(1,2).contiguous().view(B*N, C, H, W)
         risk_factors_per_img =  (lambda N, risk_factors: [factor.expand( [N, *factor.size()]).contiguous().view([-1, factor.size()[-1]]).contiguous() for factor in risk_factors])(N, risk_factors) if risk_factors is not None else None
