@@ -218,6 +218,7 @@ class ResNet(nn.Module):
 
     def aggregate_and_classify(self, x, risk_factors=None):
         # Pooling layer
+        print("arg risk factors", self.args.use_risk_factors)
         if self.args.use_risk_factors:
             logit, hidden = self.pool(x, risk_factors)
         else:
