@@ -73,7 +73,7 @@ class ResNet(nn.Module):
         last_block = layers[-1][-1]
 
         pool_name = args.pool_name
-        if args.use_risk_factors:
+        if getattr(self.args, "use_risk_factors", False):
             pool_name = 'DeepRiskFactorPool' if self.args.deep_risk_factor_pool else 'RiskFactorPool'
         self.pool = get_pool(pool_name)(args, args.hidden_dim)
 
