@@ -5,6 +5,9 @@ from torch import nn
 from .blocks.factory import get_block
 import pdb
 import os
+from models.common_parts import CumulativeProbabilityLayer
+import models.Mirai.onconet as current_onconet
+import types
 
 MODEL_REGISTRY = {}
 
@@ -85,11 +88,11 @@ def load_model(path, model_class, args, do_wrap_model=True):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Snapshot {path} does not exist!")
 
-    import sys
-    import torch.nn as nn
-    import models.Mirai.onconet as current_onconet
+    # Remap legacy module paths
+    legacy_module = types.ModuleType('onconet.models.cumulative_probability_layer')
+    legacy_module.CumulativeProbabilityLayer = CumulativeProbabilityLayer
+    sys.modules['onconet.models.cumulative_probability_layer'] = legacy_module
 
-    # Patch legacy import paths (for old checkpoints)
     sys.modules['onconet'] = current_onconet
     sys.modules['onconet.models'] = current_onconet.models
     sys.modules['onconet.utils'] = current_onconet.models.utils
