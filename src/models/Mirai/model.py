@@ -4,10 +4,10 @@ from .onconet.models.custom_resnet import CustomResnet
 from .onconet.models.hiddens_transfomer import AllImageTransformer
 
 @RegisterModel("mirai_full")
-class MiraiFull(nn.Module):
+class Mirai(nn.Module):
 
     def __init__(self, args):
-        super(MiraiFull, self).__init__()
+        super(Mirai, self).__init__()
         self.args = args
         if args.img_encoder_snapshot is not None:
             self.image_encoder = load_model(args.img_encoder_snapshot,CustomResnet, args, do_wrap_model=False)

@@ -35,8 +35,8 @@ def get_model(model_name: str, args=None, path_saved_reg_model=None, **kwargs):
         mammo_reg_net = build_mammo_reg_net(path_saved_reg_model)
 
     if model_name == "Mirai":
-        from models.Mirai.model import MiraiFull
-        return _build_model(MiraiFull, args=args, **kwargs)
+        from models.Mirai.model import Mirai
+        return _build_model(Mirai, args=args, **kwargs)
 
     elif model_name == "ImgFeatAlign":
         from models.ImgFeatAlign.model import ImgFeatAlign
