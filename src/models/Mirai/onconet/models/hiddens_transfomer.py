@@ -7,7 +7,7 @@ import pdb
 import numpy as np
 from .pools.factory import get_pool
 from .factory import RegisterModel
-from .cumulative_probability_layer import Cumulative_Probability_Layer
+from models.common_parts  import  CumulativeProbabilityLayer
 
 EMBEDDING_DIM = 96
 MAX_TIME = 10
@@ -48,10 +48,10 @@ class AllImageTransformer(nn.Module):
 
         if args.survival_analysis_setup:
             if args.pred_both_sides:
-                self.prob_of_failure_layer_l = Cumulative_Probability_Layer(args.hidden_dim, args, max_followup=args.max_followup)
-                self.prob_of_failure_layer_r = Cumulative_Probability_Layer(args.hidden_dim, args, max_followup=args.max_followup)
+                self.prob_of_failure_layer_l = CumulativeProbabilityLayer(args.hidden_dim, max_followup=args.max_followup)
+                self.prob_of_failure_layer_r = CumulativeProbabilityLayer(args.hidden_dim, max_followup=args.max_followup)
             else:
-                self.prob_of_failure_layer = Cumulative_Probability_Layer(args.hidden_dim, args, max_followup=args.max_followup)
+                self.prob_of_failure_layer = CumulativeProbabilityLayer(args.hidden_dim, max_followup=args.max_followup)
 
     def mask_input(self, x, view_seq):
         B, N, _ = x.size()
