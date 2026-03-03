@@ -6,8 +6,7 @@ import torch.nn as nn
 import pdb
 import numpy as np
 from .pools.factory import get_pool
-from .spatial_transformers.factory import get_spatial_transformer
-from .cumulative_probability_layer import Cumulative_Probability_Layer
+from models.common_parts  import  CumulativeProbabilityLayer
 
 
 class ResNet(nn.Module):
@@ -37,9 +36,6 @@ class ResNet(nn.Module):
 
         self.args = args
         self.args.wrap_model = False
-
-        if hasattr(args, 'use_spatial_transformer') and args.use_spatial_transformer:
-            self.stn = get_spatial_transformer(args.spatial_transformer_name)(args)
 
         self.args.hidden_dim = 512 * args.block_widening_factor
         input_dim = self.args.input_dim if self.args.use_precomputed_hiddens else self.args.num_chan
@@ -94,7 +90,7 @@ class ResNet(nn.Module):
             self.birads_fc =  nn.Linear(args.hidden_dim, 2)
 
         if args.survival_analysis_setup:
-            self.prob_of_failure_layer = Cumulative_Probability_Layer(args.hidden_dim, args, max_followup=args.max_followup)
+            self.prob_of_failure_layer = CumulativeProbabilityLayer(args.hidden_dim, max_followup=args.max_followup)
 
         self.gpu_to_layer_assignments = self.get_gpu_to_layer()
 
@@ -196,8 +192,6 @@ class ResNet(nn.Module):
         # Go through all layers up to fc
         if self.args.use_precomputed_hiddens:
             x = x.transpose(2,1)
-        if hasattr(self.args, 'use_spatial_transformer') and self.args.use_spatial_transformer:
-            x = self.stn(x)
         for gpu, layers in enumerate(self.gpu_to_layer_assignments):
             if self.args.cuda and self.args.model_parallel:
                 x = x.cuda(gpu)
