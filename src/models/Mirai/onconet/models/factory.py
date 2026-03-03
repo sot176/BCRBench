@@ -94,7 +94,7 @@ def load_model(path, model_class, args, do_wrap_model=True):
     sys.modules['onconet.models'] = current_onconet.models
     sys.modules['onconet.utils'] = current_onconet.utils
     sys.modules['onconet.models.custom_resnet'] = current_onconet.models.custom_resnet
-    sys.modules['onconet.utils.risk_factors'] = current_onconet.utils.risk_factors
+    sys.modules['onconet.models.utils.risk_factors'] = current_onconet.models.utils.risk_factors
 
     try:
         model = torch.load(path, map_location='cpu')
