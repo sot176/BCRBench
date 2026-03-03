@@ -10,7 +10,7 @@ class MiraiFull(nn.Module):
         super(MiraiFull, self).__init__()
         self.args = args
         if args.img_encoder_snapshot is not None:
-            self.image_encoder = load_model(args.img_encoder_snapshot, args, do_wrap_model=False)
+            self.image_encoder = load_model(args.img_encoder_snapshot,'custom_resnet', args, do_wrap_model=False)
         else:
             self.image_encoder = get_model_by_name('custom_resnet', False, args)
 
@@ -20,7 +20,7 @@ class MiraiFull(nn.Module):
 
         self.image_repr_dim = self.image_encoder._model.args.img_only_dim
         if args.transformer_snapshot is not None:
-            self.transformer = load_model(args.transformer_snapshot, args, do_wrap_model=False)
+            self.transformer = load_model(args.transformer_snapshot,'transformer', args, do_wrap_model=False)
         else:
             args.precomputed_hidden_dim = self.image_repr_dim
             self.transformer = get_model_by_name('transformer', False, args)
