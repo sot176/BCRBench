@@ -14,6 +14,7 @@ MAX_TIME = 10
 MAX_VIEWS = 2
 MAX_SIDES = 2
 
+
 @RegisterModel("transformer")
 class AllImageTransformer(nn.Module):
     def __init__(self, args):
@@ -23,7 +24,6 @@ class AllImageTransformer(nn.Module):
         self.args = args
         self.args.wrap_model = False
         args.hidden_dim = args.transfomer_hidden_dim
-        
         assert args.use_precomputed_hiddens or args.model_name == 'mirai_full'
 
         self.projection_layer = nn.Linear(args.precomputed_hidden_dim, args.hidden_dim)
