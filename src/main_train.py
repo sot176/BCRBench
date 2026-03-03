@@ -174,15 +174,15 @@ def parse_arguments():
         parser.add_argument('--replace_bn_with_gn', action='store_true', default=False, help='Use group normalization instead of batch norm.')
 
         # risk factors
-        parser.add_argument('--use_risk_factors', default=False, help='Whether to feed risk factors into last FC of model.') #
-        parser.add_argument('--pred_risk_factors', default=False, help='Whether to predict value of all RF from image.') #
+        parser.add_argument('--use_risk_factors',type=bool, default=False, help='Whether to feed risk factors into last FC of model.') #
+        parser.add_argument('--pred_risk_factors', type=bool,default=False, help='Whether to predict value of all RF from image.') #
         parser.add_argument('--pred_risk_factors_lambda',  type=float, default=0.25,  help='lambda to weigh the risk factor prediction.')
-        parser.add_argument('--use_pred_risk_factors_at_test', default=False, help='Whether to use predicted risk factor values at test time.') #
-        parser.add_argument('--use_pred_risk_factors_if_unk', default=False, help='Whether to use predicted risk factor values at test time only if rf is unk.') #
-        parser.add_argument('--pred_both_sides', default=False, help='Simulatenously pred both sides for multi-img model')
-        parser.add_argument('--predict_birads',  default=False, help='Wether to predict birads label for negative mammos in risk dataset objects. Note, preds, probs, and labels converted to binary (cancer vs negative) after prediction for logging purposes')
-        parser.add_argument('--pred_missing_mammos', default=False, help='Whether to predict missing images when doing image dropout.') #
-        parser.add_argument('--also_pred_given_mammos', default=False, help='Whether to predict given images.') #
+        parser.add_argument('--use_pred_risk_factors_at_test',type=bool, default=False, help='Whether to use predicted risk factor values at test time.') #
+        parser.add_argument('--use_pred_risk_factors_if_unk',type=bool, default=False, help='Whether to use predicted risk factor values at test time only if rf is unk.') #
+        parser.add_argument('--pred_both_sides', type=bool,default=False, help='Simulatenously pred both sides for multi-img model')
+        parser.add_argument('--predict_birads',  type=bool,default=False, help='Wether to predict birads label for negative mammos in risk dataset objects. Note, preds, probs, and labels converted to binary (cancer vs negative) after prediction for logging purposes')
+        parser.add_argument('--pred_missing_mammos',type=bool, default=False, help='Whether to predict missing images when doing image dropout.') #
+        parser.add_argument('--also_pred_given_mammos',type=bool, default=False, help='Whether to predict given images.') #
         parser.add_argument('--metadata_path', type=str, default=None, help='path of metadata csv.')
         
         #survival analysis setup
