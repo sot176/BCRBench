@@ -207,7 +207,6 @@ def parse_arguments():
         parser.add_argument('--num_classes', type=int, default=2)
     
     if temp_args.model == "VMRA-MaR":
-
         # VMRNN architecture parameters
         parser.add_argument('--depths_downsample', nargs='+', type=int,
                             default=[2, 2, 6, 2],
