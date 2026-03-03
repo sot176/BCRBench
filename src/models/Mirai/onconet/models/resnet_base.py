@@ -72,7 +72,7 @@ class ResNet(nn.Module):
 
         last_block = layers[-1][-1]
         
-        pool_name = args.pool_name
+        pool_name = 'GlobalMaxPool'
         #if getattr(self.args, "use_risk_factors", False):
         #    pool_name = 'DeepRiskFactorPool' if self.args.deep_risk_factor_pool else 'RiskFactorPool'
        
@@ -219,10 +219,10 @@ class ResNet(nn.Module):
 
     def aggregate_and_classify(self, x, risk_factors=None):
         # Pooling layer
-        if getattr(self.args, "use_risk_factors", False) and risk_factors is not None:
-            logit, hidden = self.pool(x, risk_factors)
-        else:
-            logit, hidden = self.pool(x)
+        #if getattr(self.args, "use_risk_factors", False) and risk_factors is not None:
+        #    logit, hidden = self.pool(x, risk_factors)
+        #else:
+        logit, hidden = self.pool(x)
 
         if not self.pool.replaces_fc():
             # self.fc is always on last gpu, so direct call of fc(x) is safe
