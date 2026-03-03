@@ -1,1 +1,1 @@
-from .model import MiraiFull
+from .model import Mirai
