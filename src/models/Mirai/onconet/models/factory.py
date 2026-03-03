@@ -96,61 +96,39 @@ def load_model(path, model_class, args, do_wrap_model=True):
     sys.modules['onconet.models.custom_resnet'] = current_onconet.models.custom_resnet
     sys.modules['onconet.utils.risk_factors'] = current_onconet.utils.risk_factors
 
-    checkpoint = torch.load(path, map_location="cpu")
+    try:
+        model = torch.load(path, map_location='cpu')
 
-    # Instantiate fresh model
-    model = model_class(args)
+        if isinstance(model, dict):
+            model = model['model']
 
-    # Extract state_dict safely
-    if isinstance(checkpoint, nn.Module):
-        # Full pickled model
-        state_dict = checkpoint.state_dict()
-
-    elif isinstance(checkpoint, dict):
-        # Normal checkpoint dict
-        state_dict = (
-            checkpoint.get("state_dict")
-            or checkpoint.get("model")
-            or checkpoint
-        )
-
-    else:
-        raise RuntimeError("Unsupported checkpoint format")
-
-    # Remove DataParallel prefix if present
-    state_dict = {
-        k.replace("module.", ""): v
-        for k, v in state_dict.items()
-    }
-
-    model_dict = model.state_dict()
-
-    filtered_state_dict = {}
-    skipped = []
-
-    for k, v in state_dict.items():
-        if k in model_dict and v.shape == model_dict[k].shape:
-            filtered_state_dict[k] = v
-        else:
-            skipped.append(k)
-
-    model.load_state_dict(filtered_state_dict, strict=False)
-
-    # Update args safely
-    if hasattr(model, "args"):
-        for attr in [
-            "use_pred_risk_factors_at_test",
-            "use_precomputed_hiddens",
-            "use_pred_risk_factors_if_unk",
-            "pred_risk_factors",
-            "use_spatial_transformer",
-        ]:
-            if hasattr(args, attr):
-                setattr(model.args, attr, getattr(args, attr))
-
-    if do_wrap_model:
-        model = wrap_model(model, True, args)
-
+        if isinstance(model, nn.DataParallel):
+            model = model.module.cpu()
+        try:
+           model.args.use_pred_risk_factors_at_test = args.use_pred_risk_factors_at_test 
+        except:
+           pass
+        try:
+            if hasattr(model, '_model'):
+                _model = model._model
+            else:
+                _model = model
+            _model.args.use_pred_risk_factors_at_test = args.use_pred_risk_factors_at_test
+            _model.args.use_precomputed_hiddens = args.use_precomputed_hiddens
+            _model.args.use_pred_risk_factors_if_unk = args.use_pred_risk_factors_if_unk
+            _model.args.pred_risk_factors = args.pred_risk_factors
+            _model.args.use_spatial_transformer = args.use_spatial_transformer
+        except:
+           pass
+        try:
+            args.img_only_dim = model._model.args.img_only_dim
+        except:
+            pass
+        if do_wrap_model:
+            model = {'model': wrap_model(model, True, args)}
+    except:
+        raise Exception(
+            "Sorry, snapshot {} does not exist!".format(path))
     return model
 
 def validate_block_layout(block_layout):
