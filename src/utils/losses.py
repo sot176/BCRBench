@@ -29,7 +29,7 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                     continue
 
                 # Set weights
-                weight = 1.0 if head_name == 'final' else 0.2
+                weight = 1.0 # if head_name == 'final' else 0.2
 
                 # Check for stochastic (POE) logits
                 is_sto = logits.dim() == 3
