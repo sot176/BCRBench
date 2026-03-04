@@ -5,3 +5,4 @@ from . import risk_factor_pool
 from . import deep_risk_factor_pool
 from . import factory
 from . import max_pool
+from . import global_max_pool
