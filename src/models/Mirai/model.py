@@ -2,7 +2,7 @@ import torch.nn as nn
 from .onconet.models.factory import get_model_by_name, load_model, RegisterModel
 from .onconet.models.custom_resnet import CustomResnet
 from .onconet.models.hiddens_transfomer import AllImageTransformer
-from .onconet.models.pools.max_pool import GlobalMaxPool
+from .onconet.models.pools import GlobalMaxPool
 
 
 @RegisterModel("mirai_full")
