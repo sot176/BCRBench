@@ -10,9 +10,24 @@ class Mirai(nn.Module):
         super(Mirai, self).__init__()
         self.args = args
         if args.img_encoder_snapshot is not None:
-            self.image_encoder = load_model(args.img_encoder_snapshot,CustomResnet, args, do_wrap_model=False)
+            self.image_encoder = load_model(
+                args.img_encoder_snapshot,
+                CustomResnet,
+                args,
+                do_wrap_model=False
+            )
         else:
             self.image_encoder = get_model_by_name('custom_resnet', False, args)
+
+        if getattr(args, "replace_snapshot_pool", True):
+            from .onconet.models.pools import GlobalMaxPool
+            
+            hidden_dim = self.image_encoder._model.args.hidden_dim
+            
+            self.image_encoder._model.pool = GlobalMaxPool(
+                self.image_encoder._model.args,
+                hidden_dim
+            )
 
         if hasattr(self.args, "freeze_image_encoder") and self.args.freeze_image_encoder:
             for param in self.image_encoder.parameters():

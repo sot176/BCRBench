@@ -161,6 +161,7 @@ def parse_arguments():
                     help='Input dimension for image-only features in the image encoder')
         
         # resnet-specific
+        parser.add_argument('--replace_snapshot_pool', action='store_true', default=False, help='Use detached models')
         parser.add_argument('--model_name', type=str, default='mirai_full', help="Form of model, i.e resnet18, aggregator, revnet, etc.")
         parser.add_argument('--block_layout', type=str, nargs='+', default=["BasicBlock,2", "BasicBlock,2", "BasicBlock,2", "BasicBlock,2"], help='Layout of blocks for a ResNet model. Must be a list of length 4. Each of the 4 elements is a string of form "block_name,num_repeats-block_name,num_repeats-...". [default: resnet18 layout]')
         parser.add_argument('--block_widening_factor', type=int, default=1, help='Factor by which to widen blocks.')
