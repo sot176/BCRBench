@@ -20,19 +20,12 @@ def train_one_epoch(args,model_risk, train_loader, optimizer, accelerator,  warm
     criterion_MV = None
 
     if args.model == "OA-BreaCR":
-        criterion_POE = ProbOrdiLoss(
-            distance=getattr(args, "distance", "Bhattacharyya"),
-            alpha_coeff=getattr(args, "alpha_coeff", 1e-5),
-            beta_coeff=getattr(args, "beta_coeff", 1e-4),
-            margin=getattr(args, "margin", 0.0),
-            main_loss_type='cls',
-            criterion='l1',
-            start_label=getattr(args, "start_label", 0)
-        ).cuda()
+        criterion_POE = ProbOrdiLoss(distance=args.distance, alpha_coeff=args.alpha_coeff,
+                                 beta_coeff=args.beta_coeff, margin=args.margin,
+                                 main_loss_type='cls', criterion='l1',
+                                 start_label=args.start_label)
 
-        criterion_MV = MeanVarianceLoss(
-            cumpet_ce_loss=False
-        ).cuda()
+        criterion_MV = MeanVarianceLoss( cumpet_ce_loss=False, start_label=args.start_label)
 
     # --- Create loss function passing criteria ---
     loss_fn = loss_factory(args, criterion_POE=criterion_POE, criterion_MV=criterion_MV)

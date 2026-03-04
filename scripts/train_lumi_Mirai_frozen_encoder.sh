@@ -57,6 +57,7 @@ accelerate launch  main_train.py \
             --model "Mirai" \
             --lr_decay 0.5 \
             --patience_lr_scheduler 3 \
+            --survival_analysis_setup \
             --num_epochs 30 \
             --patience 15 \
             --dataset "EMBED" \

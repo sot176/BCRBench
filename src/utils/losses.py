@@ -118,7 +118,7 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                         risk_label,
                         years_last_followup,
                         None,
-                        use_sto=getattr(args, "use_sto", True),
+                        use_sto=getattr(args, "use_sto", False),
                         weights=getattr(args, "time_to_events_weights", None),
                     )
                     head_loss += loss_POE

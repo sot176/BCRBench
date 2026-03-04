@@ -141,11 +141,11 @@ def parse_arguments():
         parser.add_argument('--patch_snapshot', type=str, default=None, help='filename of patch model snapshot to load. Only used for aggregator type models [default: None]')
     
         # Training / Fine-tuning options
-        parser.add_argument('--freeze_image_encoder',   action='store_true', default=False,
+        parser.add_argument('--freeze_image_encoder',   action='store_true',
                             help='Whether to freeze image encoder during training')
 
         # Annotation / Auxiliary supervision
-        parser.add_argument('--use_region_annotation', action='store_true', default=False,
+        parser.add_argument('--use_region_annotation', action='store_true', 
                             help='Include cancer region annotation loss')
         
         # Model Architecture / Hyperparameters
@@ -166,12 +166,12 @@ def parse_arguments():
         parser.add_argument('--block_widening_factor', type=int, default=1, help='Factor by which to widen blocks.')
         parser.add_argument('--num_groups', type=int, default=1, help='Num groups per conv in Resnet blocks.')
         parser.add_argument('--pool_name', type=str, default='GlobalMaxPool', help='Pooling mechanism')
-        parser.add_argument('--deep_risk_factor_pool', action='store_true', default=False, help='make risk factor pool use several layers to fuse image and rf info')
-        parser.add_argument('--replace_snapshot_pool', action='store_true', default=False, help='Use detached models')
-        parser.add_argument('--pretrained_on_imagenet', action='store_true', default=True, help='Pretrain the model on imagenet. Only relevant for default models like VGG, resnet etc')
+        parser.add_argument('--deep_risk_factor_pool', action='store_true',  help='make risk factor pool use several layers to fuse image and rf info')
+        parser.add_argument('--replace_snapshot_pool', action='store_true',  help='Use detached models')
+        parser.add_argument('--pretrained_on_imagenet', action='store_true',  help='Pretrain the model on imagenet. Only relevant for default models like VGG, resnet etc')
         parser.add_argument('--pretrained_imagenet_model_name', type=str, default='resnet18', help='Name of pretrained model to load for custom resnets.')
-        parser.add_argument('--make_fc', action='store_true', default=False, help='Replace last linear layer with convolutional layer')
-        parser.add_argument('--replace_bn_with_gn', action='store_true', default=False, help='Use group normalization instead of batch norm.')
+        parser.add_argument('--make_fc', action='store_true',  help='Replace last linear layer with convolutional layer')
+        parser.add_argument('--replace_bn_with_gn', action='store_true', help='Use group normalization instead of batch norm.')
 
         # risk factors
         parser.add_argument('--use_risk_factors',type=bool, default=False, help='Whether to feed risk factors into last FC of model.') #
@@ -186,8 +186,8 @@ def parse_arguments():
         parser.add_argument('--metadata_path', type=str, default=None, help='path of metadata csv.')
         
         #survival analysis setup
-        parser.add_argument('--survival_analysis_setup', action='store_true', default=True, help='Whether to modify model, eval and training for survival analysis.') #
-        parser.add_argument('--make_probs_indep', action='store_true', default=False, help='Make surival model produce indepedent probablities.') #
+        parser.add_argument('--survival_analysis_setup', action='store_true',  help='Whether to modify model, eval and training for survival analysis.') #
+        parser.add_argument('--make_probs_indep', action='store_true',  help='Make surival model produce indepedent probablities.') #
         parser.add_argument('--mask_mechanism', default='default', help='How to mask for survival objective. options [default, indep, slice, linear].') #
         parser.add_argument('--eval_survival_on_risk', action='store_true', default=False, help='Port over survival model to risk model.') #
         parser.add_argument('--max_followup', type=int, default=5, help='Max followup to predict over')
