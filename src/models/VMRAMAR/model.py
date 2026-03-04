@@ -1,9 +1,9 @@
-from Mirai.onconet.models.factory import load_model, RegisterModel, get_model_by_name
+from models.Mirai.onconet.models.factory import load_model, RegisterModel, get_model_by_name
 import torch
 import torch.nn as nn
 
 from models.common_parts  import  CumulativeProbabilityLayer
-from Mirai.onconet.models.custom_resnet import CustomResnet
+from models.Mirai.onconet.models.custom_resnet import CustomResnet
 
 
 @RegisterModel("vmra_mar")

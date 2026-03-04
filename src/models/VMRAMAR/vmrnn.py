@@ -6,7 +6,7 @@ from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 from vmamba import VSSBlock, SS2D  # ensure correct import of VSSBlock and SS2D
 from typing import Optional, Callable
 from functools import partial
-from Mirai.onconet.models.factory import RegisterModel
+from models.Mirai.onconet.models.factory import RegisterModel
 
 
 class VSB(VSSBlock):
