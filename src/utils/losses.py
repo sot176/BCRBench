@@ -91,7 +91,6 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                     logits_flat,
                     target,
                     mask,
-                    weights=getattr(args, "time_to_events_weights", None),
                 )
 
                 # ------------------------------------------
