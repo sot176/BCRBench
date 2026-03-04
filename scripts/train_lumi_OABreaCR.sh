@@ -48,11 +48,11 @@ accelerate launch  main_train.py \
             --id_training 1 \
             --warmup_steps 0 \
             --use_scheduler "True" \
-            --batch_size 8 \
+            --batch_size 12 \
             --augmentations "True" \
             --num_workers 7 \
             --learning_rate 5e-5 \
-            --weight_decay 1e-4 \
+            --weight_decay 1e-6 \
             --model "OA-BreaCR" \
             --lr_decay 0.5 \
             --patience_lr_scheduler 5 \
