@@ -15,73 +15,114 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
             - MV for all heads
             - POE only for final head
             """
+            device = next(model_risk.parameters()).device
+            total_loss = torch.tensor(0.0, device=device)
 
-            total_loss = 0.0
+            # --------------------------------------------------
+            # Optional extra model loss
+            # --------------------------------------------------
+            if outputs.get("loss") is not None:
+                total_loss += outputs["loss"]
 
-            # --- optional extra loss from network ---
-            if outputs.get('loss') is not None:
-                total_loss += outputs['loss']
+            # --------------------------------------------------
+            # Iterate over heads
+            # --------------------------------------------------
+            head_weights = {
+                "final": 1.0,
+                "current": 0.2,
+                "difference": 0.2,
+                "prior": 0.2,
+            }
 
-            # --- BCE and MV for all heads ---
             risk_heads = model_risk.get_risk_heads(outputs, batch)
+
             for head_name, (logits, target, mask) in risk_heads.items():
+
                 if logits is None:
                     continue
 
-                # Set weights
-                weight = 1.0 # if head_name == 'final' else 0.2
+                weight = head_weights.get(head_name, 1.0)
 
-                # Check for stochastic (POE) logits
+                # ------------------------------------------
+                # Determine correct survival labels
+                # ------------------------------------------
+                if head_name == "prior":
+                    risk_label = batch["years_to_cancer_prior"]
+                    years_last_followup = batch["years_to_last_followup_prior"]
+                    emb = outputs.get("emb_prior", None)
+                    log_var = outputs.get("log_var_prior", None)
+                elif head_name == "current":
+                    risk_label = batch["years_to_cancer"]
+                    years_last_followup = batch["years_to_last_followup"]
+                    emb = outputs.get("emb_current", None)
+                    log_var = outputs.get("log_var_current", None)
+                elif head_name == "difference":
+                    risk_label = batch["years_to_cancer"]
+                    years_last_followup = batch["years_to_last_followup"]
+                    emb = outputs.get("emb_difference", None)
+                    log_var = outputs.get("log_var_difference", None)
+                else:  # final
+                    risk_label = batch["years_to_cancer"]
+                    years_last_followup = batch["years_to_last_followup"]
+                    emb = outputs.get("emb_final", None)
+                    log_var = outputs.get("log_var_final", None)
+
+                # ------------------------------------------
+                # Handle stochastic outputs
+                # ------------------------------------------
                 is_sto = logits.dim() == 3
+
                 if is_sto:
                     sample_size, batch_size, out_dim = logits.shape
+
                     logits_flat = logits.view(-1, out_dim)
-                    target_flat = target.unsqueeze(0).repeat(sample_size, 1, 1).view(-1, out_dim)
-                    mask_flat = mask.unsqueeze(0).repeat(sample_size, 1, 1).view(-1, out_dim) if mask is not None else None
+                    risk_label_flat = risk_label.repeat(sample_size)
+                    years_last_followup_flat = years_last_followup.repeat(sample_size)
+
                 else:
-                    logits_flat, target_flat, mask_flat = logits, target, mask
+                    logits_flat = logits
+                    risk_label_flat = risk_label
+                    years_last_followup_flat = years_last_followup
 
-                # BCE loss
-                total_loss += weight * get_risk_loss_BCE(logits_flat, target_flat, mask_flat)
+                # ------------------------------------------
+                # 1) BCE Loss
+                # ------------------------------------------
+                loss_BCE = get_risk_loss_BCE(
+                    logits_flat,
+                    target,
+                    mask,
+                    weights=getattr(args, "time_to_events_weights", None),
+                )
 
-                # --- MV loss (ONLY for final head) ---
-                if head_name == "final":
-                    risk_label = batch['years_to_cancer']
-                    years_last_followup = batch['years_to_last_followup']
+                # ------------------------------------------
+                # 2) MV Loss
+                # ------------------------------------------
+                loss_MV = criterion_MV(
+                    logits_flat,
+                    risk_label_flat,
+                    years_last_followup_flat,
+                    weights=getattr(args, "time_to_events_weights", None),
+                )
 
-                    if is_sto:
-                        loss_MV = criterion_MV(
-                            logits.view(-1, out_dim),
-                            risk_label.repeat(sample_size),
-                            years_last_followup.repeat(sample_size),
-                            weights=getattr(args, "time_to_events_weights", None)
-                        )
-                    else:
-                        loss_MV = criterion_MV(
-                            logits,
-                            risk_label,
-                            years_last_followup,
-                            weights=getattr(args, "time_to_events_weights", None)
-                        )
+                head_loss = loss_BCE + loss_MV
 
-                    total_loss += weight * loss_MV
+                # ------------------------------------------
+                # 3) POE Loss (if embedding exists)
+                # ------------------------------------------
+                if emb is not None and log_var is not None:
+                    _, _, _, loss_POE = criterion_POE(
+                        logits,
+                        emb,
+                        log_var,
+                        risk_label,
+                        years_last_followup,
+                        None,
+                        use_sto=getattr(args, "use_sto", True),
+                        weights=getattr(args, "time_to_events_weights", None),
+                    )
+                    head_loss += loss_POE
 
-                    # --- POE loss only for final head ---
-                    if outputs.get('emb_final') is not None:
-                        risk_final = model_risk.get_primary_risk_head(outputs)
-                        _, _, _, loss_POE = criterion_POE(
-                            risk_final,
-                            outputs['emb_final'],
-                            outputs['log_var_final'],
-                            batch['years_to_cancer'],
-                            batch['years_to_last_followup'],
-                            mh_target=None,
-                            use_sto=getattr(args, "use_sto", True),
-                            weights=None
-                        )
-                        total_loss += 1.0 * loss_POE
-                    else:
-                        loss_POE = torch.tensor(0.0, device=next(model_risk.parameters()).device)
+                total_loss += weight * head_loss
 
             return total_loss
 
