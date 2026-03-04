@@ -74,23 +74,25 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
 
                 if is_sto:
                     sample_size, batch_size, out_dim = logits.shape
-
                     logits_flat = logits.view(-1, out_dim)
                     risk_label_flat = risk_label.repeat(sample_size)
                     years_last_followup_flat = years_last_followup.repeat(sample_size)
-
+                    target_flat = target.unsqueeze(0).repeat(sample_size, 1, 1).view(-1, out_dim)
+                    mask_flat = mask.unsqueeze(0).repeat(sample_size, 1, 1).view(-1, out_dim) if mask is not None else None
                 else:
                     logits_flat = logits
                     risk_label_flat = risk_label
                     years_last_followup_flat = years_last_followup
+                    target_flat = target
+                    mask_flat = mask    
 
                 # ------------------------------------------
                 # 1) BCE Loss
                 # ------------------------------------------
                 loss_BCE = get_risk_loss_BCE(
                     logits_flat,
-                    target,
-                    mask,
+                    target_flat,
+                    mask_flat,
                 )
 
                 # ------------------------------------------
