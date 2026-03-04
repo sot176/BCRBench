@@ -123,7 +123,7 @@ def parse_arguments():
         parser.add_argument('--margin', type=float, default=2)
         parser.add_argument('--use_poe', action='store_true', default=True,
                             help='Enable POE functionality')
-        parser.add_argument('--use_sto', action='store_true', default=False,
+        parser.add_argument('--use_sto', action='store_true', 
                             help='Enable stochastic sampling in POE')
 
     # -------------------
