@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 
 from models.common_parts  import  CumulativeProbabilityLayer
+from Mirai.onconet.models.custom_resnet import CustomResnet
 
 
 @RegisterModel("vmra_mar")
@@ -10,8 +11,11 @@ class VMRAMaR(nn.Module):
     def __init__(self, args, image_encoder=None, vmrnn=None, sad_module=None, lat_module=None):
         super(VMRAMaR, self).__init__()
         self.args = args
-        if image_encoder is not None:
-            self.image_encoder = image_encoder
+        if args.img_encoder_snapshot is not None:
+            self.image_encoder = load_model(args.img_encoder_snapshot, CustomResnet, args, do_wrap_model=False)
+        else:
+            self.image_encoder = get_model_by_name('custom_resnet', False, args)
+
         if hasattr(self.args, "freeze_image_encoder") and self.args.freeze_image_encoder:
             for param in self.image_encoder.parameters():
                 param.requires_grad = False

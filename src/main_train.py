@@ -208,6 +208,8 @@ def parse_arguments():
     
     if temp_args.model == "VMRA-MaR":
         # VMRNN architecture parameters
+        parser.add_argument('--img_encoder_snapshot', type=str, default=None,
+                            help='Filename of image feature extractor snapshot for mirai_full models')
         parser.add_argument('--depths_downsample', nargs='+', type=int,
                             default=[2, 2, 6, 2],
                             help='Depths for downsample blocks')
