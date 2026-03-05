@@ -121,9 +121,9 @@ def parse_arguments():
         parser.add_argument('--alpha-coeff', type=float, default=1e-5)
         parser.add_argument('--beta-coeff', type=float, default=1e-4)
         parser.add_argument('--margin', type=float, default=2)
-        parser.add_argument('--use_poe', action='store_true',
+        parser.add_argument('--use_poe', type=bool, default=True,
                             help='Enable POE functionality')
-        parser.add_argument('--use_sto', action='store_true', 
+        parser.add_argument('--use_sto', type=bool, default=True, 
                             help='Enable stochastic sampling in POE')
 
     # -------------------

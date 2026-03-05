@@ -102,6 +102,9 @@ class OA_BreaCR(nn.Module):
             max_t = kwargs['max_t'] if 'max_t' in kwargs else 50
             use_sto = kwargs['use_sto'] if 'use_sto' in kwargs else False
             x, emb, log_var = self.POELatent(x, max_t=max_t, use_sto=use_sto)
+            print("x shape after POE:", x.shape)
+            print("emb shape after POE:", emb.shape)
+            print("log_var shape after POE:", log_var.shape)
         else:
             emb, log_var = None, None
 
