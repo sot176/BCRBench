@@ -80,8 +80,13 @@ def wrap_model(model, allow_wrap_model, args, allow_data_parallel=True):
                                     device_ids=range(args.num_gpus))
 
     return wrapped_model
-
+    '
+    
 def load_model(path, model_class, args, do_wrap_model=True):
+    import os, sys, types
+    import torch
+    import torch.nn as nn
+
     print(f"\nLoading state_dict from [{path}]...")
 
     if not os.path.exists(path):
@@ -91,7 +96,6 @@ def load_model(path, model_class, args, do_wrap_model=True):
     # Remap legacy module paths
     # -----------------------------
     legacy_module = types.ModuleType('onconet.models.cumulative_probability_layer')
-    # Map old class name to new class
     legacy_module.Cumulative_Probability_Layer = CumulativeProbabilityLayer
     sys.modules['onconet.models.cumulative_probability_layer'] = legacy_module
 
@@ -110,61 +114,67 @@ def load_model(path, model_class, args, do_wrap_model=True):
 
         if isinstance(model, nn.DataParallel):
             model = model.module.cpu()
-        
+
+        # -----------------------------
+        # Wrap model first if needed
+        # -----------------------------
+        if do_wrap_model:
+            model = wrap_model(model, True, args)
+
+        # -----------------------------
+        # Determine actual model instance for layer adjustments
+        # -----------------------------
+        real_model = model.get_model() if isinstance(model, dict) else model
+        base_model = getattr(real_model, "_model", real_model)
+
+        # -----------------------------
+        # Adjust FC layers if not using risk factors
+        # -----------------------------
         if not getattr(args, 'use_risk_factors', True):
-            print("Overriding model to not use risk factors at test time.")
-            try:
-                old_fc = model.fc
-                new_fc = nn.Linear(512, old_fc.out_features)
-                with torch.no_grad():
-                    new_fc.weight[:, :512] = old_fc.weight[:, :512]
-                    new_fc.bias[:] = old_fc.bias
-                model.fc = new_fc
+            print("[INFO] Adjusting model to not use risk factors (image-only).")
+            in_features_img = 512
 
-                # Adjust hazard_fc inside prob_of_failure_layer
-                old_hazard_fc = model._model.prob_of_failure_layer.hazard_fc
-                new_hazard_fc = nn.Linear(512, old_hazard_fc.out_features)
-                with torch.no_grad():
-                    new_hazard_fc.weight[:, :512] = old_hazard_fc.weight[:, :512]
-                    new_hazard_fc.bias[:] = old_hazard_fc.bias
-                model._model.prob_of_failure_layer.hazard_fc = new_hazard_fc
+            # Main FC
+            old_fc = base_model.fc
+            new_fc = nn.Linear(in_features_img, old_fc.out_features)
+            with torch.no_grad():
+                new_fc.weight[:, :in_features_img] = old_fc.weight[:, :in_features_img]
+                new_fc.bias[:] = old_fc.bias
+            base_model.fc = new_fc
 
-                # Adjust base_hazard_fc inside prob_of_failure_layer
-                old_base_hazard_fc = model._model.prob_of_failure_layer.base_hazard_fc
-                new_base_hazard_fc = nn.Linear(512, old_base_hazard_fc.out_features)
+            # Prob of failure layer
+            prob_layer = base_model.prob_of_failure_layer
+            for layer_name in ['hazard_fc', 'base_hazard_fc']:
+                old_layer = getattr(prob_layer, layer_name)
+                new_layer = nn.Linear(in_features_img, old_layer.out_features)
                 with torch.no_grad():
-                    new_base_hazard_fc.weight[:, :512] = old_base_hazard_fc.weight[:, :512]
-                    new_base_hazard_fc.bias[:] = old_base_hazard_fc.bias
-                model._model.prob_of_failure_layer.base_hazard_fc = new_base_hazard_fc
-            except: 
-                pass
+                    new_layer.weight[:, :in_features_img] = old_layer.weight[:, :in_features_img]
+                    new_layer.bias[:] = old_layer.bias
+                setattr(prob_layer, layer_name, new_layer)
 
-        
+            # Make sure forward uses no risk factors
+            base_model.args.use_risk_factors = False
+
+        # -----------------------------
+        # Set additional model args
+        # -----------------------------
         try:
-           model.args.use_pred_risk_factors_at_test = args.use_pred_risk_factors_at_test 
-        except:
-           pass
-        try:
-            if hasattr(model, '_model'):
-                _model = model._model
-            else:
-                _model = model
-            _model.args.use_pred_risk_factors_at_test = args.use_pred_risk_factors_at_test
-            _model.args.use_precomputed_hiddens = args.use_precomputed_hiddens
-            _model.args.use_pred_risk_factors_if_unk = args.use_pred_risk_factors_if_unk
-            _model.args.pred_risk_factors = args.pred_risk_factors
-            _model.args.use_spatial_transformer = args.use_spatial_transformer
-        except:
-           pass
-        try:
-            args.img_only_dim = model._model.args.img_only_dim
+            base_model.args.use_pred_risk_factors_at_test = args.use_pred_risk_factors_at_test
+            base_model.args.use_precomputed_hiddens = args.use_precomputed_hiddens
+            base_model.args.use_pred_risk_factors_if_unk = args.use_pred_risk_factors_if_unk
+            base_model.args.pred_risk_factors = args.pred_risk_factors
+            base_model.args.use_spatial_transformer = args.use_spatial_transformer
         except:
             pass
-        if do_wrap_model:
-            model = {'model': wrap_model(model, True, args)}
-    except:
-        raise Exception(
-            "Sorry, snapshot {} does not exist!".format(path))
+
+        try:
+            args.img_only_dim = base_model.args.img_only_dim
+        except:
+            pass
+
+    except Exception as e:
+        raise Exception(f"Error loading snapshot {path}: {e}")
+
     return model
 
 def validate_block_layout(block_layout):
