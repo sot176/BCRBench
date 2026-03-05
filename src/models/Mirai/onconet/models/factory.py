@@ -110,6 +110,31 @@ def load_model(path, model_class, args, do_wrap_model=True):
 
         if isinstance(model, nn.DataParallel):
             model = model.module.cpu()
+        
+        if not getattr(args, 'use_risk_factors', True):
+            try:
+                # Get original FC
+                old_fc = model.fc
+                old_in_features = old_fc.in_features
+                out_features = old_fc.out_features
+
+                # Assume first 512 dims are image features
+                image_in_features = 512
+
+                # Create new FC layer
+                new_fc = nn.Linear(image_in_features, out_features)
+
+                # Copy pretrained image weights
+                with torch.no_grad():
+                    new_fc.weight[:, :image_in_features] = old_fc.weight[:, :image_in_features]
+                    new_fc.bias[:] = old_fc.bias
+
+                # Replace FC
+                model.fc = new_fc
+            except: 
+                pass
+
+        
         try:
            model.args.use_pred_risk_factors_at_test = args.use_pred_risk_factors_at_test 
         except:
