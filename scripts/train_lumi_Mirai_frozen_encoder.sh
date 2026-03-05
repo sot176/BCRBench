@@ -46,13 +46,12 @@ accelerate launch  main_train.py \
             --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/$SLURM_JOB_NAME-$SLURM_JOB_ID \
             --img_encoder_snapshot /scratch/project_465002309/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_MIRAI_Base_May20_2019.p \
             --freeze_image_encoder \
-            --warmup_steps 0 \
             --id_training 1 \
             --use_scheduler "True" \
             --batch_size 6 \
             --augmentations "True" \
             --num_workers 7 \
-            --learning_rate 1e-4 \
+            --learning_rate 5e-5 \
             --weight_decay 1e-4 \
             --model "Mirai" \
             --lr_decay 0.5 \
