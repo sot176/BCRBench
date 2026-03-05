@@ -80,8 +80,8 @@ def wrap_model(model, allow_wrap_model, args, allow_data_parallel=True):
                                     device_ids=range(args.num_gpus))
 
     return wrapped_model
-    '
     
+
 def load_model(path, model_class, args, do_wrap_model=True):
     import os, sys, types
     import torch
