@@ -45,9 +45,10 @@ class OA_BreaCR(nn.Module):
         self.difference_single = nn.Sequential(
             nn.Linear(num_feat, args.num_output_neurons),
         )  # output layer
+        self.max_t = getattr(args, 'max_t', 50)
+        self.use_sto = getattr(args, 'use_sto', False)
 
-
-    def forward(self, batch, args):
+    def forward(self, batch):
 
         target_x = batch["current_image"]
         prior_x = batch["previous_image"]
@@ -99,9 +100,7 @@ class OA_BreaCR(nn.Module):
         x = self.mlp(x)
 
         if self.POE:
-            max_t = getattr(args, 'max_t', 50)
-            use_sto = getattr(args, 'use_sto', False)
-            x, emb, log_var = self.POELatent(x, max_t=max_t, use_sto=use_sto)
+            x, emb, log_var = self.POELatent(x, max_t=self.max_t, use_sto=self.use_sto)
             print("x shape after POE:", x.shape)
             print("emb shape after POE:", emb.shape)
             print("log_var shape after POE:", log_var.shape)
