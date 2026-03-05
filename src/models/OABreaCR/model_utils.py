@@ -53,15 +53,13 @@ class POELatent(nn.Module):
         log_var = self.var(x)
         sqrt_var = torch.exp(log_var * 0.5)
         if use_sto:
-            rep_emb = emb[None].expand(max_t, *emb.shape)
-            rep_sqrt_var = sqrt_var[None].expand(max_t, *sqrt_var.shape)
-            norm_v = torch.randn_like(rep_emb).cuda()
+            rep_emb = emb.unsqueeze(0).expand(max_t, *emb.shape)
+            rep_sqrt_var = sqrt_var.unsqueeze(0).expand(max_t, *sqrt_var.shape)
+            norm_v = torch.randn_like(rep_emb)
             sto_emb = rep_emb + rep_sqrt_var * norm_v
             drop_emb = self.drop(sto_emb)
-            # logit = self.final(drop_emb)
         else:
             drop_emb = self.drop(emb)
-            # logit = self.final(drop_emb)
         return drop_emb, emb, log_var
 
 
