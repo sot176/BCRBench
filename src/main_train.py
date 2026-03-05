@@ -116,7 +116,7 @@ def parse_arguments():
                             help='Number of samples during stochastic sampling')
         parser.add_argument('--no-sto', action='store_true',
                             help='Disable stochastic sampling')
-        parser.add_argument('--distance', type=str, default='JDistance',
+        parser.add_argument('--distance', type=str, default='Bhattacharyya',
                             help='Distance metric between two Gaussian distributions')
         parser.add_argument('--alpha-coeff', type=float, default=1e-5)
         parser.add_argument('--beta-coeff', type=float, default=1e-4)
