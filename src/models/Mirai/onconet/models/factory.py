@@ -112,6 +112,7 @@ def load_model(path, model_class, args, do_wrap_model=True):
             model = model.module.cpu()
         
         if not getattr(args, 'use_risk_factors', True):
+            print("Overriding model to not use risk factors at test time.")
             try:
                 old_fc = model.fc
                 new_fc = nn.Linear(512, old_fc.out_features)
