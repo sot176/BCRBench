@@ -101,9 +101,7 @@ class OA_BreaCR(nn.Module):
 
         if self.POE:
             x, emb, log_var = self.POELatent(x, max_t=self.max_t, use_sto=self.use_sto)
-            print("x shape after POE:", x.shape)
-            print("emb shape after POE:", emb.shape)
-            print("log_var shape after POE:", log_var.shape)
+    
         else:
             emb, log_var = None, None
 
