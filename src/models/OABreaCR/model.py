@@ -47,7 +47,7 @@ class OA_BreaCR(nn.Module):
         )  # output layer
 
 
-    def forward(self, batch, **kwargs):
+    def forward(self, batch, args):
 
         target_x = batch["current_image"]
         prior_x = batch["previous_image"]
@@ -99,8 +99,8 @@ class OA_BreaCR(nn.Module):
         x = self.mlp(x)
 
         if self.POE:
-            max_t = kwargs['max_t'] if 'max_t' in kwargs else 50
-            use_sto = kwargs['use_sto'] if 'use_sto' in kwargs else False
+            max_t = getattr(args, 'max_t', 50)
+            use_sto = getattr(args, 'use_sto', False)
             x, emb, log_var = self.POELatent(x, max_t=max_t, use_sto=use_sto)
             print("x shape after POE:", x.shape)
             print("emb shape after POE:", emb.shape)
