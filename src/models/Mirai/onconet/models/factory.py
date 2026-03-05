@@ -95,10 +95,11 @@ def load_model(path, model_class, args, do_wrap_model=True):
     legacy_module.Cumulative_Probability_Layer = CumulativeProbabilityLayer
     sys.modules['onconet.models.cumulative_probability_layer'] = legacy_module
 
+    import models.Mirai.onconet.models.utils
     import models.Mirai.onconet as current_onconet
     sys.modules['onconet'] = current_onconet
     sys.modules['onconet.models'] = current_onconet.models
-    sys.modules['onconet.utils'] = current_onconet.models.utils
+    sys.modules['onconet.utils'] = current_onconet.utils
     sys.modules['onconet.models.custom_resnet'] = current_onconet.models.custom_resnet
     sys.modules['onconet.models.utils.risk_factors'] = current_onconet.models.utils.risk_factors
 
