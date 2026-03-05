@@ -113,24 +113,28 @@ def load_model(path, model_class, args, do_wrap_model=True):
         
         if not getattr(args, 'use_risk_factors', True):
             try:
-                # Get original FC
                 old_fc = model.fc
-                old_in_features = old_fc.in_features
-                out_features = old_fc.out_features
-
-                # Assume first 512 dims are image features
-                image_in_features = 512
-
-                # Create new FC layer
-                new_fc = nn.Linear(image_in_features, out_features)
-
-                # Copy pretrained image weights
+                new_fc = nn.Linear(512, old_fc.out_features)
                 with torch.no_grad():
-                    new_fc.weight[:, :image_in_features] = old_fc.weight[:, :image_in_features]
+                    new_fc.weight[:, :512] = old_fc.weight[:, :512]
                     new_fc.bias[:] = old_fc.bias
-
-                # Replace FC
                 model.fc = new_fc
+
+                # Adjust hazard_fc inside prob_of_failure_layer
+                old_hazard_fc = model._model.prob_of_failure_layer.hazard_fc
+                new_hazard_fc = nn.Linear(512, old_hazard_fc.out_features)
+                with torch.no_grad():
+                    new_hazard_fc.weight[:, :512] = old_hazard_fc.weight[:, :512]
+                    new_hazard_fc.bias[:] = old_hazard_fc.bias
+                model._model.prob_of_failure_layer.hazard_fc = new_hazard_fc
+
+                # Adjust base_hazard_fc inside prob_of_failure_layer
+                old_base_hazard_fc = model._model.prob_of_failure_layer.base_hazard_fc
+                new_base_hazard_fc = nn.Linear(512, old_base_hazard_fc.out_features)
+                with torch.no_grad():
+                    new_base_hazard_fc.weight[:, :512] = old_base_hazard_fc.weight[:, :512]
+                    new_base_hazard_fc.bias[:] = old_base_hazard_fc.bias
+                model._model.prob_of_failure_layer.base_hazard_fc = new_base_hazard_fc
             except: 
                 pass
 
