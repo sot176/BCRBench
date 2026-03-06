@@ -29,9 +29,9 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
             # --------------------------------------------------
             head_weights = {
                 "final": 1.0,
-                "current": 0.2,
-                "difference": 0.2,
-                "prior": 0.2,
+                "current": 1.0,
+                "difference": 1.0,
+                "prior": 1.0,
             }
 
             risk_heads = model_risk.get_risk_heads(outputs, batch)
@@ -105,7 +105,7 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                     weights=getattr(args, "time_to_events_weights", None),
                 )
 
-                head_loss = loss_BCE + loss_MV
+                head_loss = loss_BCE + 0.2 * loss_MV
 
                 # ------------------------------------------
                 # 3) POE Loss (if embedding exists)
@@ -121,7 +121,7 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                         use_sto=getattr(args, "use_sto", False),
                         weights=getattr(args, "time_to_events_weights", None),
                     )
-                    head_loss += loss_POE
+                    head_loss += 0.2 * loss_POE
 
                 total_loss += weight * head_loss
 
