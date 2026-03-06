@@ -50,7 +50,7 @@ accelerate launch  main_train.py \
             --batch_size 6 \
             --augmentations "True" \
             --num_workers 7 \
-            --learning_rate 1e-5 \
+            --learning_rate 1e-4 \
             --weight_decay 1e-4 \
             --model "Mirai" \
             --survival_analysis_setup \
