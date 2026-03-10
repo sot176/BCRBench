@@ -57,11 +57,9 @@ accelerate launch  main_train.py \
             --survival_analysis_setup \
             --lr_decay 0.5 \
             --patience_lr_scheduler 3 \
-            --replace_snapshot_pool \
             --num_epochs 30 \
             --patience 15 \
             --dataset "EMBED" \
-            --finetune_all \
             --seed 2023
 
 
