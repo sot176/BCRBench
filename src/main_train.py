@@ -130,7 +130,7 @@ def parse_arguments():
     # -------------------
     # Mirai-specific arguments
     # -------------------
-    if temp_args.model == "Mirai":
+    if temp_args.model == "Mirai" or temp_args.model == "VMRA-MaR":
         # Snapshots / Pretrained weights
         parser.add_argument('--img_encoder_snapshot', type=str, default=None,
                             help='Filename of image feature extractor snapshot for mirai_full models')
@@ -209,7 +209,6 @@ def parse_arguments():
                         help='In multi image setting, the number of images per single sample.')
         parser.add_argument('--num_classes', type=int, default=2)
     
-    if temp_args.model == "VMRA-MaR":
         # VMRNN architecture parameters
         parser.add_argument('--img_encoder_snapshot', type=str, default=None,
                             help='Filename of image feature extractor snapshot for mirai_full models')
