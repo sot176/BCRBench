@@ -1,12 +1,8 @@
-import sys
-
 import torch
 from torch import nn
-from .blocks.factory import get_block
+from onconet.models.inflate import inflate_model
+from onconet.models.blocks.factory import get_block
 import pdb
-import os
-from models.common_parts import CumulativeProbabilityLayer
-import types
 
 MODEL_REGISTRY = {}
 
@@ -27,29 +23,38 @@ def RegisterModel(model_name):
     return decorator
 
 
-def get_model(args):
-    return get_model_by_name(args.model_name, True, args)
-
-
+def get_model(name_or_args, maybe_args=None):
+    """
+    Supports two styles:
+      1. get_model(args) — legacy
+      2. get_model('vmrnn', args) — explicit model name
+    """
+    if isinstance(name_or_args, str):
+        name = name_or_args
+        args = maybe_args
+        return get_model_by_name(name, True, args)
+    else:
+        args = name_or_args
+        return get_model_by_name(args.model_name, True, args)
 def get_model_by_name(name, allow_wrap_model, args):
-    '''
-        Get model from MODEL_REGISTRY based on args.model_name
-        args:
-        - name: Name of model, must exit in registry
-        - allow_wrap_model: whether or not override args.wrap_model and disable model_wrapping.
-        - args: run ime args from parsing
+    """
+    Get model from MODEL_REGISTRY based on args.model_name
+    """
+    if name not in MODEL_REGISTRY:
+        raise Exception(NO_MODEL_ERR.format(name, MODEL_REGISTRY.keys()))
 
-        returns:
-        - model: an instance of some torch.nn.Module
-    '''
-    if not name in MODEL_REGISTRY:
-        raise Exception(
-            NO_MODEL_ERR.format(
-                name, MODEL_REGISTRY.keys()))
+    model_cls = MODEL_REGISTRY[name]
 
+    if isinstance(args, dict):
+        model = model_cls(**args)
+    else:
+        model = model_cls(args)
 
-    model = MODEL_REGISTRY[name](args)
-    allow_data_parallel = 'discriminator' not in name and ('mirai_full' not in args.model_name or allow_wrap_model)
+    allow_data_parallel = (
+        'discriminator' not in name and
+        ('mirai_full' not in getattr(args, "model_name", "") or allow_wrap_model)
+    )
+
     return wrap_model(model, allow_wrap_model, args, allow_data_parallel)
 
 def wrap_model(model, allow_wrap_model, args, allow_data_parallel=True):
@@ -57,6 +62,8 @@ def wrap_model(model, allow_wrap_model, args, allow_data_parallel=True):
         model._model.args.use_precomputed_hiddens = args.use_precomputed_hiddens
     except:
         pass
+    if args.multi_image and not args.model_name in ['mirai_full']:
+        model = inflate_model(model)
 
     if allow_wrap_model and args.wrap_model:
         model._model = strip_model(model._model)
@@ -80,32 +87,9 @@ def wrap_model(model, allow_wrap_model, args, allow_data_parallel=True):
                                     device_ids=range(args.num_gpus))
 
     return wrapped_model
-    
 
-def load_model(path, model_class, args, do_wrap_model=True):
-    import os, sys, types
-    import torch
-    import torch.nn as nn
-
-    print(f"\nLoading state_dict from [{path}]...")
-
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Snapshot {path} does not exist!")
-
-    # -----------------------------
-    # Remap legacy module paths
-    # -----------------------------
-    legacy_module = types.ModuleType('onconet.models.cumulative_probability_layer')
-    legacy_module.Cumulative_Probability_Layer = CumulativeProbabilityLayer
-    sys.modules['onconet.models.cumulative_probability_layer'] = legacy_module
-
-    import models.Mirai.onconet as current_onconet
-    sys.modules['onconet'] = current_onconet
-    sys.modules['onconet.models'] = current_onconet.models
-    sys.modules['onconet.utils'] = current_onconet.utils
-    sys.modules['onconet.models.custom_resnet'] = current_onconet.models.custom_resnet
-    sys.modules['onconet.models.utils.risk_factors'] = current_onconet.utils.risk_factors
-
+def load_model(path, args, do_wrap_model = True):
+    print('\nLoading model from [%s]...' % path)
     try:
         model = torch.load(path, map_location='cpu')
 
@@ -114,67 +98,31 @@ def load_model(path, model_class, args, do_wrap_model=True):
 
         if isinstance(model, nn.DataParallel):
             model = model.module.cpu()
-
-        # -----------------------------
-        # Wrap model first if needed
-        # -----------------------------
+        try:
+           model.args.use_pred_risk_factors_at_test = args.use_pred_risk_factors_at_test 
+        except:
+           pass
+        try:
+            if hasattr(model, '_model'):
+                _model = model._model
+            else:
+                _model = model
+            _model.args.use_pred_risk_factors_at_test = args.use_pred_risk_factors_at_test
+            _model.args.use_precomputed_hiddens = args.use_precomputed_hiddens
+            _model.args.use_pred_risk_factors_if_unk = args.use_pred_risk_factors_if_unk
+            _model.args.pred_risk_factors = args.pred_risk_factors
+            _model.args.use_spatial_transformer = args.use_spatial_transformer
+        except:
+           pass
+        try:
+            args.img_only_dim = model._model.args.img_only_dim
+        except:
+            pass
         if do_wrap_model:
-            model = wrap_model(model, True, args)
-
-        # -----------------------------
-        # Determine actual model instance for layer adjustments
-        # -----------------------------
-        real_model = model.get_model() if isinstance(model, dict) else model
-        base_model = getattr(real_model, "_model", real_model)
-
-        # -----------------------------
-        # Adjust FC layers if not using risk factors
-        # -----------------------------
-        if not getattr(args, 'use_risk_factors', True):
-            print("[INFO] Adjusting model to not use risk factors (image-only).")
-            in_features_img = 512
-
-            # Main FC
-            old_fc = base_model.fc
-            new_fc = nn.Linear(in_features_img, old_fc.out_features)
-            with torch.no_grad():
-                new_fc.weight[:, :in_features_img] = old_fc.weight[:, :in_features_img]
-                new_fc.bias[:] = old_fc.bias
-            base_model.fc = new_fc
-
-            # Prob of failure layer
-            prob_layer = base_model.prob_of_failure_layer
-            for layer_name in ['hazard_fc', 'base_hazard_fc']:
-                old_layer = getattr(prob_layer, layer_name)
-                new_layer = nn.Linear(in_features_img, old_layer.out_features)
-                with torch.no_grad():
-                    new_layer.weight[:, :in_features_img] = old_layer.weight[:, :in_features_img]
-                    new_layer.bias[:] = old_layer.bias
-                setattr(prob_layer, layer_name, new_layer)
-
-            # Make sure forward uses no risk factors
-            base_model.args.use_risk_factors = False
-
-        # -----------------------------
-        # Set additional model args
-        # -----------------------------
-        try:
-            base_model.args.use_pred_risk_factors_at_test = args.use_pred_risk_factors_at_test
-            base_model.args.use_precomputed_hiddens = args.use_precomputed_hiddens
-            base_model.args.use_pred_risk_factors_if_unk = args.use_pred_risk_factors_if_unk
-            base_model.args.pred_risk_factors = args.pred_risk_factors
-            base_model.args.use_spatial_transformer = args.use_spatial_transformer
-        except:
-            pass
-
-        try:
-            args.img_only_dim = base_model.args.img_only_dim
-        except:
-            pass
-
-    except Exception as e:
-        raise Exception(f"Error loading snapshot {path}: {e}")
-
+            model = {'model': wrap_model(model, True, args)}
+    except:
+        raise Exception(
+            "Sorry, snapshot {} does not exist!".format(path))
     return model
 
 def validate_block_layout(block_layout):
@@ -371,3 +319,4 @@ class ModelWrapper(nn.Module):
         # TODO: It looks like all wrapped models will not work with the current model_step because the current version
         # of the model_step requires that output of a model to be logit, hidden, activ
         return logit, hidden
+
