@@ -216,8 +216,6 @@ def parse_arguments():
         parser.add_argument('--depths_upsample', nargs='+', type=int,
                             default=[2, 2, 6, 2],
                             help='Depths for upsample blocks')
-        parser.add_argument('--num_heads', type=int, default=8,
-                            help='Number of attention heads')
         parser.add_argument('--patch_size', type=int, default=32,
                             help='Patch size')
         parser.add_argument('--window_size', type=int, default=64,
