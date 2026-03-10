@@ -14,7 +14,7 @@ class VMRAMaR(nn.Module):
         super(VMRAMaR, self).__init__()
         self.args = args
         sys.path.append(cfg["paths"]["asymMirai_master_onconet"])
-        self.encoder = extract_mirai_backbone(
+        self.image_encoder = extract_mirai_backbone(
             cfg["paths"]["mirai_path"]
         )
 
