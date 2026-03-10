@@ -1,9 +1,11 @@
 from models.Mirai.onconet.models.factory import load_model, RegisterModel, get_model_by_name
 import torch
 import torch.nn as nn
+import sys
 
 from models.common_parts  import  CumulativeProbabilityLayer
-from models.Mirai.onconet.models.custom_resnet import CustomResnet
+from models.common_parts import extract_mirai_backbone
+from config.config import cfg
 
 
 @RegisterModel("vmra_mar")
@@ -11,21 +13,20 @@ class VMRAMaR(nn.Module):
     def __init__(self, args, image_encoder=None, vmrnn=None, sad_module=None, lat_module=None):
         super(VMRAMaR, self).__init__()
         self.args = args
-        if args.img_encoder_snapshot is not None:
-            self.image_encoder = load_model(args.img_encoder_snapshot, CustomResnet, args, do_wrap_model=False)
-        else:
-            self.image_encoder = get_model_by_name('custom_resnet', False, args)
+        sys.path.append(cfg["paths"]["asymMirai_master_onconet"])
+        self.encoder = extract_mirai_backbone(
+            cfg["paths"]["mirai_path"]
+        )
 
         if hasattr(self.args, "freeze_image_encoder") and self.args.freeze_image_encoder:
             for param in self.image_encoder.parameters():
                 param.requires_grad = False
-        self.image_repr_dim = self.image_encoder._model.args.img_only_dim
+
         if vmrnn is not None:
             self.vmrnn = vmrnn
         elif getattr(args, "vmrnn_snapshot", None) is not None:
             self.vmrnn = load_model(args.vmrnn_snapshot, args, do_wrap_model=False)
         else:
-            args.precomputed_hidden_dim = self.image_repr_dim
             self.vmrnn = get_model_by_name('vmrnn', False, args)
         self.use_asymmetry = getattr(args, "use_asymmetry", False)
         if self.use_asymmetry:
@@ -49,7 +50,7 @@ class VMRAMaR(nn.Module):
         img_feats = img_feats[:, :, :, :self.image_repr_dim]
 
         fused_feats = img_feats.mean(dim=2)
-        """  
+          
         temporal_output, hidden_states = self.vmrnn(fused_feats, risk_factors, batch)
         if self.use_asymmetry:
             left_feats = img_feats[:, :, 0, :]
@@ -62,7 +63,7 @@ class VMRAMaR(nn.Module):
         else:
             combined_feats = temporal_output.mean(dim=1)
         risk_pred = self.ahl(combined_feats)
-        """
+        
         # If asymmetry is used, compute left-right features
         if self.use_asymmetry:
             left_feats = img_feats[:, :, 0, :]
