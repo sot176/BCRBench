@@ -201,9 +201,11 @@ def parse_arguments():
         parser.add_argument('--num_shards', type=int, default=1, help='Num GPUs to shard a single model.')
         parser.add_argument('--data_parallel', action='store_true', default=False, help='spread batch size across all available gpus. Set to false when using model parallelism. The combo of model and data parallelism may result in unexpected behavior')
         parser.add_argument('--model_parallel', action='store_true', default=False, help='spread single model across num_shards. Note must have num_shards > 1 to take effect and only support in specific models. So far supported in all models that extend Resnet-base, i.e resnet-[n], nonlocal-resnet[n], custom-resnet models')
-
+        parser.add_argument('--multi_image', action='store_true', default=False,
+                        help='Whether image will contain multiple slices. Slices could indicate different times, depths, or views')
+    
         # Other Optional Configs
-        parser.add_argument('--num_images', type=int, default=4,
+        parser.add_argument('--num_images', type=int, default=1,
                         help='In multi image setting, the number of images per single sample.')
         parser.add_argument('--num_classes', type=int, default=2)
     
