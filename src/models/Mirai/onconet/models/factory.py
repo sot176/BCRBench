@@ -1,7 +1,7 @@
 import torch
 from torch import nn
-from onconet.models.inflate import inflate_model
-from onconet.models.blocks.factory import get_block
+from .inflate import inflate_model
+from .blocks.factory import get_block
 import pdb
 
 MODEL_REGISTRY = {}
