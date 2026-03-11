@@ -3,7 +3,7 @@ import torch.nn as nn
 from einops import rearrange
 from timm.models.swin_transformer import PatchMerging  # patch merging is still used for downsampling
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-from vmamba import VSSBlock, SS2D  # ensure correct import of VSSBlock and SS2D
+from .vmamba import VSSBlock, SS2D  # ensure correct import of VSSBlock and SS2D
 from typing import Optional, Callable
 from functools import partial
 from models.Mirai.onconet.models.factory import RegisterModel
