@@ -31,10 +31,14 @@ class Mirai(nn.Module):
         batch=data
         B, C, N, H, W = x.size()
         x = x.transpose(1,2).contiguous().view(B*N, C, H, W)
+        print("x before encoder", x.shape)
         img_x = self.image_encoder(x)
+        print("x shape after encoder", img_x.shape)
         img_x = torch.nn.functional.adaptive_avg_pool2d(img_x, 1)
+        print("x shape after pool", img_x.shape)
         img_x = img_x.flatten(1)
         img_x = img_x.view(B, N, -1)
+        print("x shape before transformer", img_x.shape)
         logit, transformer_hidden, activ_dict = self.transformer(img_x, risk_factors, batch)
 
         return {'logit': logit, 'transformer_hidden': transformer_hidden, 'activ_dict': activ_dict}
