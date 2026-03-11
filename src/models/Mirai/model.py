@@ -1,5 +1,6 @@
 import torch.nn as nn
 import sys
+import torch 
 from .onconet.models.factory import get_model_by_name, load_model, RegisterModel
 from .onconet.models.hiddens_transfomer import AllImageTransformer
 from models.common_parts import extract_mirai_backbone
@@ -31,6 +32,8 @@ class Mirai(nn.Module):
         B, C, N, H, W = x.size()
         x = x.transpose(1,2).contiguous().view(B*N, C, H, W)
         img_x = self.image_encoder(x)
+        img_x = torch.nn.functional.adaptive_avg_pool2d(img_x, 1)
+        img_x = img_x.flatten(1)
         img_x = img_x.view(B, N, -1)
         logit, transformer_hidden, activ_dict = self.transformer(img_x, risk_factors, batch)
 
