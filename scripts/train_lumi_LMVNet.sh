@@ -54,7 +54,7 @@ accelerate launch  main_train.py \
             --weight_decay 1e-4 \
             --model "LMV-Net" \
             --lr_decay 0.5 \
-            --patience_lr_scheduler 3 \
+            --patience_lr_scheduler 5 \
             --num_epochs 30 \
             --patience 15 \
             --dataset "EMBED" \
