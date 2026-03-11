@@ -38,17 +38,10 @@ class VMRAMaR(nn.Module):
         B, T, C, V, H, W = x.size()
         x = x.view(B * T * V, C, H, W)
 
-        if risk_factors is not None:
-            risk_factors_per_img = [
-                factor.expand([V, *factor.size()]).contiguous().view(-1, factor.size(-1))
-                for factor in risk_factors
-            ]
-        else:
-            risk_factors_per_img = None
-        _, img_feats, _ = self.image_encoder(x, risk_factors_per_img, batch)
+        img_feats= self.image_encoder(x)
         img_feats = img_feats.view(B, T, V, -1)
-        img_feats = img_feats[:, :, :, :self.image_repr_dim]
-
+        #img_feats = img_feats[:, :, :, :self.image_repr_dim]
+        print("img feats shape", img_feats.shape)
         fused_feats = img_feats.mean(dim=2)
           
         temporal_output, hidden_states = self.vmrnn(fused_feats, risk_factors, batch)
