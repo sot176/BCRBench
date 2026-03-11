@@ -36,6 +36,7 @@ def get_model(name_or_args, maybe_args=None):
     else:
         args = name_or_args
         return get_model_by_name(args.model_name, True, args)
+    
 def get_model_by_name(name, allow_wrap_model, args):
     """
     Get model from MODEL_REGISTRY based on args.model_name

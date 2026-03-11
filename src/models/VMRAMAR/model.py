@@ -6,7 +6,9 @@ import sys
 from models.common_parts  import  CumulativeProbabilityLayer
 from models.common_parts import extract_mirai_backbone
 from config.config import cfg
-
+from .sad import SpatialAsymmetryDetector
+from .lat import LongitudinalAsymmetryTracker
+from .vmrnn import VMRNN
 
 @RegisterModel("vmra_mar")
 class VMRAMaR(nn.Module):
@@ -27,11 +29,11 @@ class VMRAMaR(nn.Module):
         elif getattr(args, "vmrnn_snapshot", None) is not None:
             self.vmrnn = load_model(args.vmrnn_snapshot, args, do_wrap_model=False)
         else:
-            self.vmrnn = get_model_by_name('vmrnn', False, args)
+            self.vmrnn = VMRNN(args)
         self.use_asymmetry = getattr(args, "use_asymmetry", False)
         if self.use_asymmetry:
-            self.sad = sad_module or get_model_by_name('sad', False, args)
-            self.lat = lat_module or get_model_by_name('lat', False, args)
+            self.sad = sad_module or SpatialAsymmetryDetector(args)
+            self.lat = lat_module or LongitudinalAsymmetryTracker(args)
         self.ahl = CumulativeProbabilityLayer(512, max_followup=5)
 
     def forward(self, x, risk_factors=None, batch=None):
