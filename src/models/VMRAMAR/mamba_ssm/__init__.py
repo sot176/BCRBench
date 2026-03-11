@@ -1,1 +1,1 @@
-from .selective_scan_interface import SelectiveScanInterface
+from .selective_scan_interface import SelectiveScanFn
