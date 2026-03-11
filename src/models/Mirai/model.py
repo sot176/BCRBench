@@ -31,7 +31,7 @@ class Mirai(nn.Module):
         B, C, N, H, W = x.size()
         x = x.transpose(1,2).contiguous().view(B*N, C, H, W)
         risk_factors_per_img =  (lambda N, risk_factors: [factor.expand( [N, *factor.size()]).contiguous().view([-1, factor.size()[-1]]).contiguous() for factor in risk_factors])(N, risk_factors) if risk_factors is not None else None
-        _, img_x, _ = self.image_encoder(x, risk_factors_per_img, batch)
+        _, img_x, _ = self.image_encoder(x)
         img_x = img_x.view(B, N, -1)
         img_x = img_x[:,:,: self.image_repr_dim]
         logit, transformer_hidden, activ_dict = self.transformer(img_x, risk_factors, batch)
