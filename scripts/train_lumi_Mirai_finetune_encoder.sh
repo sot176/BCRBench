@@ -48,7 +48,7 @@ accelerate launch  main_train.py \
             --id_training 1 \
             --use_scheduler "True" \
             --warmup_steps 0\
-            --batch_size 6 \
+            --batch_size 8 \
             --augmentations "True" \
             --num_workers 7 \
             --learning_rate 5e-5 \
