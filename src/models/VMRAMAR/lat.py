@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from Mirai.onconet.models.factory import RegisterModel
+from models.Mirai.onconet.models.factory import RegisterModel
 
 @RegisterModel("lat")
 class LongitudinalAsymmetryTracker(nn.Module):

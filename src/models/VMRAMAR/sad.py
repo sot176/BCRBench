@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .asymmetry_metrics import hybrid_asymmetry
-from Mirai.onconet.models.factory import RegisterModel
+from models.Mirai.onconet.models.factory import RegisterModel
 
 @RegisterModel("sad")
 class SpatialAsymmetryDetector(nn.Module):
