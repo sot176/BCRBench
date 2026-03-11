@@ -1,4 +1,4 @@
-from Mirai.onconet.models.factory import load_model, RegisterModel
+from models.Mirai.onconet.models.factory import load_model, RegisterModel
 import torch
 import torch.nn as nn
 import sys
