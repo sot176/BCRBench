@@ -36,7 +36,10 @@ class VMRAMaR(nn.Module):
             self.lat = lat_module or LongitudinalAsymmetryTracker(args)
         self.ahl = CumulativeProbabilityLayer(512, max_followup=5)
 
-    def forward(self, x, risk_factors=None, batch=None):
+    def forward(self, data, risk_factors=None, batch=None):
+        x = data['images']
+        batch=data
+
         B, T, C, V, H, W = x.size()
         x = x.view(B * T * V, C, H, W)
 
