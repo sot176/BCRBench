@@ -165,8 +165,7 @@ class DownSample(nn.Module):
 
         for i_layer in range(self.num_layers):
             # Downsample using PatchMerging if desired; otherwise, you could use another strategy.
-            downsample = PatchMerging(input_resolution=(patches_resolution[0] // (2 ** i_layer),
-                                                        patches_resolution[1] // (2 ** i_layer)),
+            downsample = PatchMerging(
                                       dim=int(embed_dim * 2 ** i_layer))
             layer = VMRNNCell(hidden_dim=int(embed_dim * 2 ** i_layer),
                               input_resolution=(patches_resolution[0] // (2 ** i_layer),
