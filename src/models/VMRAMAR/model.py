@@ -29,7 +29,7 @@ class VMRAMaR(nn.Module):
         elif getattr(args, "vmrnn_snapshot", None) is not None:
             self.vmrnn = load_model(args.vmrnn_snapshot, args, do_wrap_model=False)
         else:
-            self.vmrnn = VMRNN(args)
+            self.vmrnn = VMRNN(args.embed_dim, args.depths_downsample, args.depths_upsample, args.feature_resolution)
         self.use_asymmetry = getattr(args, "use_asymmetry", False)
         if self.use_asymmetry:
             self.sad = sad_module or SpatialAsymmetryDetector(args)
