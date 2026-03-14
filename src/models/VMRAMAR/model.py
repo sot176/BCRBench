@@ -44,14 +44,11 @@ class VMRAMaR(nn.Module):
         img_feats = self.image_encoder(x)
         C_feat, Hf, Wf = img_feats.shape[1:]
 
-        img_feats = img_feats.view(B, T, V, C_feat, Hf, Wf)
+        img_feats = img_feats.view(B, T, V, -1)
         fused_feats = img_feats.mean(dim=2)  # fuse left/right views
 
-        fused_feats = fused_feats.view(B*T, C_feat, Hf, Wf)
-        fused_feats = fused_feats.flatten(2).transpose(1,2)  # (B*T, Hf*Wf, C)
-
-        temporal_output, _, _ = self.vmrnn(fused_feats)
-        temporal_feature = temporal_output.view(B, T, -1).mean(dim=1)
+        temporal_output, hidden_states = self.vmrnn(fused_feats, risk_factors, batch)
+        temporal_feature = temporal_output.mean(dim=1)  # mean over time
 
         if self.use_asymmetry:
             left_feats = img_feats[:, :, 0, :]
