@@ -393,7 +393,7 @@ class SS2D(nn.Module):
 
         x = x.permute(0, 3, 1, 2).contiguous()
         x = self.act(self.conv2d(x)) # (b, d, h, w)
-        y = self.forward_core(x)
+        y = self.forward_corev0(x)
         y = y * F.silu(z)
         out = self.out_proj(y)
         if self.dropout is not None:
