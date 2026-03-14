@@ -52,8 +52,7 @@ class VMRAMaR(nn.Module):
         img_feats = img_feats.view(B, T, V, C_feat * Hf * Wf)  # (B, T, V, L_raw)
 
         # Ensure fixed feature length for VMRNN
-        H_rnn, W_rnn = self.vmrnn.Downsample.feature_resolution
-        L_expected = H_rnn * W_rnn
+        L_expected = 64 * 52
         if img_feats.shape[-1] > L_expected:
             img_feats = img_feats[:, :, :, :L_expected]
         elif img_feats.shape[-1] < L_expected:
