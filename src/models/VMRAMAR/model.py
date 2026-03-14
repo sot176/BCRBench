@@ -23,7 +23,7 @@ class VMRAMaR(nn.Module):
         if hasattr(self.args, "freeze_image_encoder") and self.args.freeze_image_encoder:
             for param in self.image_encoder.parameters():
                 param.requires_grad = False
-        self.image_repr_dim = 512
+
         if vmrnn is not None:
             self.vmrnn = vmrnn
         elif getattr(args, "vmrnn_snapshot", None) is not None:
@@ -41,26 +41,12 @@ class VMRAMaR(nn.Module):
         B, T, C, V, H, W = x.size()
         x = x.view(B * T * V, C, H, W)
 
-        img_feats = self.image_encoder(x)  # shape: (B*T*V, C_feat, Hf, Wf)
-        C_feat, Hf, Wf = img_feats.shape[1:]
+        img_feats= self.image_encoder(x)
+        img_feats = img_feats.view(B, T, V, -1)
 
-            # Reshape back to (B, T, V, C_feat, Hf*Wf)
-        img_feats = img_feats.view(B, T, V, C_feat, Hf * Wf)
 
-        # Merge channel + spatial dims into a single feature vector
-        img_feats = img_feats.view(B, T, V, -1)  # (B, T, V, C_feat*Hf*Wf)
+        fused_feats = img_feats.mean(dim=2)
 
-        # Ensure fixed feature length for VMRNN
-        L = img_feats.shape[-1]
-        if L > self.image_repr_dim:
-            img_feats = img_feats[:, :, :, :self.image_repr_dim]
-        elif L < self.image_repr_dim:
-            pad_size = self.image_repr_dim - L
-            padding = torch.zeros(B, T, V, pad_size, device=img_feats.device)
-            img_feats = torch.cat([img_feats, padding], dim=-1)
-
-        # Fuse views (e.g., left/right breast)
-        fused_feats = img_feats.mean(dim=2)  # (B, T, image_repr_dim)
         temporal_output, hidden_states = self.vmrnn(fused_feats, risk_factors, batch)
         temporal_feature = temporal_output.mean(dim=1)  # mean over time
 
