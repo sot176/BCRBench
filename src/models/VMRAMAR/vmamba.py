@@ -222,7 +222,7 @@ class PatchMerging2D(nn.Module):
         return x
 
 class SS2D(nn.Module):
-    def __init__(self, d_model, d_state=16, expand=2, K=4):
+    def __init__(self, d_model, d_state=8, expand=1, K=4):
         super().__init__()
         self.d_model = d_model        # Input channel dimension
         self.d_state = d_state        # State dimension of SSM
@@ -408,7 +408,7 @@ class VSSBlock(nn.Module):
         drop_path: float = 0,
         norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
         attn_drop_rate: float = 0,
-        d_state: int = 16,
+        d_state: int = 8,
         **kwargs,
     ):
         super().__init__()
@@ -442,8 +442,8 @@ class VSSLayer(nn.Module):
         drop_path=0., 
         norm_layer=nn.LayerNorm, 
         downsample=None, 
-        use_checkpoint=False, 
-        d_state=16,
+        use_checkpoint=True, 
+        d_state=8,
         **kwargs,
     ):
         super().__init__()
@@ -489,9 +489,9 @@ class VSSLayer(nn.Module):
 
 class VSSM(nn.Module):
     def __init__(self, patch_size=4, in_chans=3, num_classes=1000, depths=[2, 2, 9, 2], 
-                 dims=[96, 192, 384, 768], d_state=16, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
+                 dims=[96, 192, 384, 768], d_state=8, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
                  norm_layer=nn.LayerNorm, patch_norm=True,
-                 use_checkpoint=False, **kwargs):
+                 use_checkpoint=True, **kwargs):
         super().__init__()
         self.num_classes = num_classes
         self.num_layers = len(depths)
