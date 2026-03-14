@@ -41,12 +41,11 @@ class VMRAMaR(nn.Module):
         B, T, C, V, H, W = x.size()
         x = x.view(B * T * V, C, H, W)
 
-        img_feats = self.image_encoder(x)
+        img_feats = self.image_encoder(x)  # shape: (B*T*V, C_feat, Hf, Wf)
         C_feat, Hf, Wf = img_feats.shape[1:]
 
-        img_feats = img_feats.view(B, T, V, -1)
+        img_feats = img_feats.view(B, T, V, C_feat * Hf * Wf)  # flatten safely
         fused_feats = img_feats.mean(dim=2)  # fuse left/right views
-
         temporal_output, hidden_states = self.vmrnn(fused_feats, risk_factors, batch)
         temporal_feature = temporal_output.mean(dim=1)  # mean over time
 
