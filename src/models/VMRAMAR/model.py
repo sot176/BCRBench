@@ -38,56 +38,40 @@ class VMRAMaR(nn.Module):
 
     def forward(self, data, risk_factors=None, batch=None):
         x = data['images']
-        batch=data
-
         B, T, C, V, H, W = x.size()
         x = x.view(B * T * V, C, H, W)
 
-        img_feats = self.image_encoder(x)   # (B*T*V, C, Hf, Wf)
-
+        img_feats = self.image_encoder(x)
         C_feat, Hf, Wf = img_feats.shape[1:]
 
-        # reshape back to time / views
         img_feats = img_feats.view(B, T, V, C_feat, Hf, Wf)
+        fused_feats = img_feats.mean(dim=2)  # fuse left/right views
 
-        # fuse left/right views
-        fused_feats = img_feats.mean(dim=2)   # (B, T, C, Hf, Wf)
-
-        # merge time into batch for VMRNN
         fused_feats = fused_feats.view(B*T, C_feat, Hf, Wf)
+        fused_feats = fused_feats.flatten(2).transpose(1,2)  # (B*T, Hf*Wf, C)
 
-        # convert CNN map → tokens
-        fused_feats = fused_feats.flatten(2).transpose(1,2)   # (B*T, Hf*Wf, C)
+        temporal_output, _, _ = self.vmrnn(fused_feats)
+        temporal_feature = temporal_output.view(B, T, -1).mean(dim=1)
 
-        # run VMRNN
-        temporal_output, states_down, states_up = self.vmrnn(fused_feats)
-        
         if self.use_asymmetry:
             left_feats = img_feats[:, :, 0, :]
             right_feats = img_feats[:, :, 1, :]
             aligned_right_feats = self.sad(right_feats)
             asym_feats = torch.abs(left_feats - aligned_right_feats)
             asym_feature = self.lat(asym_feats)
-            temporal_feature = temporal_output.mean(dim=1)
             combined_feats = torch.cat([temporal_feature, asym_feature], dim=1)
         else:
-            combined_feats = temporal_output.mean(dim=1)
-        risk_pred = self.ahl(combined_feats)
+            combined_feats = temporal_feature
         
-        # If asymmetry is used, compute left-right features
-        if self.use_asymmetry:
-            left_feats = img_feats[:, :, 0, :]
-            right_feats = img_feats[:, :, 1, :]
-            aligned_right_feats = self.sad(right_feats)
-            asym_feats = torch.abs(left_feats - aligned_right_feats)
-            asym_feature = self.lat(asym_feats)
-            # Temporal pooling (mean over time)
-            temporal_feature = fused_feats.mean(dim=1)
-            combined_feats = torch.cat([temporal_feature, asym_feature], dim=1)
-        else:
-            # Just average over time dimension
-            combined_feats = fused_feats.mean(dim=1)
-
-        # Predict risk
         risk_pred = self.ahl(combined_feats)
-        return risk_pred
+        return {'logit': risk_pred}
+    
+    def get_risk_heads(self, outputs, batch):
+        target = batch["target"]
+        mask = batch["y_mask"]
+
+        return {
+            "logit_output": (outputs["logit"], target, mask) }
+    
+    def get_primary_risk_head(self, outputs):
+        return outputs["logit"]
