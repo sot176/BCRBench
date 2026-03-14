@@ -317,7 +317,7 @@ class SS2D(nn.Module):
         Cs = Cs.float().view(B, K, -1, L) # (b, k, d_state, l)
         
         Ds = self.Ds.float().view(-1) # (k * d)
-        As = -torch.exp(self.A_logs.float()).view(-1, self.d_state)  # (k * d, d_state)
+        As = -torch.exp(self.A_logs[:, :self.d_inner])  # ensure [d_inner, d_inner]
         dt_projs_bias = self.dt_projs_bias.float().view(-1) # (k * d)
 
         out_y = []
@@ -362,7 +362,7 @@ class SS2D(nn.Module):
         Bs = Bs.view(B, K, -1, L) # (b, k, d_state, l)
         Cs = Cs.view(B, K, -1, L) # (b, k, d_state, l)
         
-        As = -torch.exp(self.A_logs.float()).view(-1, self.d_state)  # (k * d, d_state)
+        As = -torch.exp(self.A_logs[:, :self.d_inner])  # ensure [d_inner, d_inner]
         Ds = self.Ds.view(-1) # (k * d)
         dt_projs_bias = self.dt_projs_bias.view(-1) # (k * d)
 
