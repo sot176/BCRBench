@@ -53,6 +53,9 @@ accelerate launch  main_train.py \
             --learning_rate 1e-4 \
             --weight_decay 1e-4 \
             --model "VMRA-MaR" \
+            --use_asymmetry \
+            --use_sad_bias \
+            --use_lat_bn \
             --lr_decay 0.5 \
             --patience_lr_scheduler 3 \
             --num_epochs 30 \
