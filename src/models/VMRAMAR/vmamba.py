@@ -250,9 +250,9 @@ class SS2D(nn.Module):
         # SSM dynamics parameters (As and Ds)
         # Automatically sized: (K*d_inner, d_state) for As and (K*d_inner,) for Ds
         self.A_logs = nn.Parameter(
-            torch.log(torch.arange(1, self.d_state + 1, dtype=torch.float32)
-                      .repeat(self.K * self.d_inner, 1))
-        )
+                torch.log(torch.arange(1, self.d_state + 1, dtype=torch.float32)
+                        .unsqueeze(0).repeat(self.d_inner, 1))
+            )  # shape (d_inner, d_state)
         self.Ds = nn.Parameter(torch.ones(self.K * self.d_inner, dtype=torch.float32))
 
     def forward_corev0(self, x: torch.Tensor):
@@ -278,7 +278,7 @@ class SS2D(nn.Module):
         Bs = Bs.contiguous().view(B, -1, L)
         Cs = Cs.contiguous().view(B, -1, L)
         Ds = self.Ds.view(-1)
-        As = -torch.exp(self.A_logs).view(-1, self.d_state)
+        As = -torch.exp(self.A_logs[:, :self.d_inner])  # ensure [d_inner, d_inner]
         dt_projs_bias = self.dt_projs_bias.view(-1)
 
         # Call SSM solver / selective scan
