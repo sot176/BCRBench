@@ -240,7 +240,7 @@ class SS2D(nn.Module):
         self.act = nn.SiLU()
 
         # Rank for dt projection (for efficiency)
-        self.dt_rank = math.ceil(self.d_inner / 16)
+        self.dt_rank = self.d_inner - 2 * self.d_state
 
         # Learnable parameters for SSM projections (automatic sizing)
         self.x_proj_weight = nn.Parameter(torch.randn(self.K, self.d_inner, self.d_inner))
