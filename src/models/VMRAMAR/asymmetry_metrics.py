@@ -28,10 +28,20 @@ def hybrid_asymmetry(left, right, latent_h=5, latent_w=5,
     dif = torch.norm(dif, dim=-3)
     
     if topk is None:
-        max_by_ftr, y_argmin = torch.max(dif, dim=-1)
-        max_by_ftr, x_argmin = torch.max(max_by_ftr, dim=-1)
+        max_by_ftr, y_argmin = torch.max(dif, dim=-1)        # (B, latent_h)
+        max_asym, x_argmin = torch.max(max_by_ftr, dim=-1)   # (B,)
 
-        return max_by_ftr, {'y_argmin': y_argmin.detach(), 'x_argmin': x_argmin.detach(), 'heatmap': dif.detach()}
+        # Get the y coordinate at the winning x position
+        best_y_argmin = y_argmin[
+            torch.arange(y_argmin.shape[0], device=y_argmin.device),
+            x_argmin
+        ]  # (B,) — pick the y at the column that had max asymmetry
+
+        return max_asym, {
+            'y_argmin': best_y_argmin,   # (B,) — consistent with x_argmin
+            'x_argmin': x_argmin,        # (B,)
+            'heatmap': dif.detach()
+        }
     else:
         topk_by_ftr, indices = torch.topk(dif.view(dif.shape[0], -1), topk, dim=-1)
 
