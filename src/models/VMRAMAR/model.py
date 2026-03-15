@@ -90,18 +90,24 @@ class VMRAMaR(nn.Module):
         states_down = None
         states_up = None
         outputs = []
-
         for t in range(T):
             xt = visit_embeddings[:, t]  # (B, C, H, W)
             B, C, Hc, Wc = xt.shape
-            xt = xt.view(B, C, Hc * Wc).permute(0, 2, 1) 
+            xt_flat = xt.view(B, Hc*Wc, C)  # (B, L, C)
+            
             out, states_down, states_up = self.vmrnn(
-                xt, states_down, states_up
-            )
-            out = out.permute(0, 2, 1).view(B, C, Hc, Wc)
+                xt_flat, states_down, states_up
+            )  # out: (B, L_out, C_out)
+            
+            # Infer output H/W
+            L_out, C_out = out.shape[1], out.shape[2]
+            H_out = W_out = int(L_out ** 0.5)
+            out = out.view(B, H_out, W_out, C_out).permute(0, 3, 1, 2)  # (B, C_out, H_out, W_out)
+            
             outputs.append(out)
 
-        outputs = torch.stack(outputs, dim=1)  # (B, T, C, H, W)
+        outputs = torch.stack(outputs, dim=1)  # (B, T, C_out, H_out, W_out)
+
 
         # --------------------------------------------------
         # Temporal pooling over T and spatial dims
