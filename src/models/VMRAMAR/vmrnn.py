@@ -9,32 +9,39 @@ from einops import rearrange
 class ConvDownsample(nn.Module):
     def __init__(self, in_ch, out_ch):
         super().__init__()
-        self.conv = nn.Conv2d(in_ch, out_ch, kernel_size=3, stride=2, padding=1)
+        self.conv = nn.Conv2d(in_ch, out_ch, kernel_size=2, stride=2)
 
     def forward(self, x, H, W):
         B, L, C = x.shape
-        x = x.view(B, H, W, C).permute(0, 3, 1, 2)  # B, C, H, W
-        x = self.conv(x)
-        B, C, H, W = x.shape
-        x = x.permute(0, 2, 3, 1).view(B, H * W, C)
-        return x, H, W
-
-class ConvUpsample(nn.Module):
-    def __init__(self, in_ch, out_ch):
-        super().__init__()
-        self.conv = nn.ConvTranspose2d(in_ch, out_ch, kernel_size=2, stride=2)
-
-    def forward(self, x):
-        B, L, C = x.shape
-        H = W = int(L ** 0.5)
-        if H * W != L:
-            # fallback: compute W from L and H
-            H, W = L // C, C
+        assert L == H * W, f"Expected L={H*W}, got L={L}"
         x = x.view(B, H, W, C).permute(0, 3, 1, 2)
         x = self.conv(x)
-        B, C, H, W = x.shape
-        x = x.permute(0, 2, 3, 1).view(B, H * W, C)
-        return x
+        B, C, H_out, W_out = x.shape
+        x = x.permute(0, 2, 3, 1).view(B, H_out*W_out, C)
+        return x, H_out, W_out
+
+class ConvUpsample(nn.Module):
+    def __init__(self, in_ch, out_ch, H=None, W=None):
+        super().__init__()
+        self.conv = nn.ConvTranspose2d(in_ch, out_ch, kernel_size=2, stride=2)
+        self.H = H
+        self.W = W
+
+    def forward(self, x, H=None, W=None):
+        B, L, C = x.shape
+
+        # Use provided H/W, else fallback to stored resolution
+        H = H or self.H
+        W = W or self.W
+        if H is None or W is None:
+            raise ValueError(f"Cannot infer H/W for ConvUpsample: L={L}, C={C}")
+
+        # reshape to image
+        x = x.view(B, H, W, C).permute(0, 3, 1, 2)  # (B, C, H, W)
+        x = self.conv(x)                             # (B, out_ch, H*2, W*2)
+        B, C, H_out, W_out = x.shape
+        x = x.permute(0, 2, 3, 1).view(B, H_out*W_out, C)  # back to (B, L, C)
+        return x, H_out, W_out
 
 ############################################################
 # VSB Block
@@ -90,72 +97,68 @@ class VMRNNCell(nn.Module):
 # Downsample Encoder
 ############################################################
 class DownSample(nn.Module):
-    def __init__(self, embed_dim, depths, feature_resolution, self_attention):
+    def __init__(self, embed_dim, depths, feature_resolution):
         super().__init__()
-        H, W = feature_resolution
-        self.H, self.W = H, W
         self.layers = nn.ModuleList()
         self.downsample = nn.ModuleList()
+        H, W = feature_resolution
         dim = embed_dim
 
-        for depth in depths:
-            res = (H, W)
-            self.layers.append(VMRNNCell(dim, res, depth, self_attention=self_attention))
-            self.downsample.append(ConvDownsample(dim, dim * 2))
+        for i, depth in enumerate(depths):
+            res = (H // (2**i), W // (2**i))
+            self.layers.append(VMRNNCell(dim, res, depth))
+            self.downsample.append(ConvDownsample(dim, dim*2))
             dim *= 2
-            H //= 2
-            W //= 2
 
     def forward(self, x, states):
         if states is None:
             states = [None] * len(self.layers)
         new_states = []
-        H, W = self.H, self.W
+        H, W = self.layers[0].input_resolution
         for i, layer in enumerate(self.layers):
             x, state = layer(x, states[i])
             new_states.append(state)
             x, H, W = self.downsample[i](x, H, W)
-        return new_states, x
+        return new_states, x, H, W
+
 
 ############################################################
 # Upsample Decoder
 ############################################################
 class UpSample(nn.Module):
-    def __init__(self, embed_dim, depths, feature_resolution, self_attention):
+    def __init__(self, embed_dim, depths, feature_resolution):
         super().__init__()
-        H, W = feature_resolution
         self.layers = nn.ModuleList()
         self.upsample = nn.ModuleList()
-        dim = embed_dim * (2 ** len(depths))
+        H, W = feature_resolution
+        dim = embed_dim * (2**len(depths))
 
-        for depth in depths:
-            res = (H, W)
-            self.layers.append(VMRNNCell(dim, res, depth, self_attention=self_attention))
-            self.upsample.append(ConvUpsample(dim, dim // 2))
+        for i, depth in enumerate(depths):
+            res = (H // (2**(len(depths)-i)), W // (2**(len(depths)-i)))
+            self.layers.append(VMRNNCell(dim, res, depth))
+            self.upsample.append(ConvUpsample(dim, dim//2))
             dim //= 2
-            H *= 2
-            W *= 2
 
-    def forward(self, x, states):
+    def forward(self, x, states, H, W):
         if states is None:
             states = [None] * len(self.layers)
         new_states = []
         for i, layer in enumerate(self.layers):
             x, state = layer(x, states[i])
             new_states.append(state)
-            x = self.upsample[i](x)
-        return new_states, x
+            x, H, W = self.upsample[i](x, H, W)
+        return new_states, x, H, W
 
 ############################################################
 # Full VMRNN
 ############################################################
 class VMRNN(nn.Module):
-    def __init__(self, embed_dim=256, depths_down=[2,2,6], depths_up=[2,2,2], feature_resolution=(64,52), self_attention=None):
+    def __init__(self, embed_dim=256, depths_down=[2,2,6], depths_up=[2,2,2], feature_resolution=(64,52)):
         super().__init__()
-        self.down = DownSample(embed_dim, depths_down, feature_resolution, self_attention)
-        self.up = UpSample(embed_dim, depths_up, feature_resolution, self_attention)
+        self.down = DownSample(embed_dim, depths_down, feature_resolution)
+        self.up = UpSample(embed_dim, depths_up, feature_resolution)
 
     def forward(self, x, states_down=None, states_up=None):
-        states_down, x = self.down(x, states_down)
-        states_up, x = self.up(x, states_up)
+        states_down, x, H, W = self.down(x, states_down)
+        states_up, x, H, W = self.up(x, states_up, H, W)
         return x, states_down, states_up
