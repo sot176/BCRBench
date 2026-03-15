@@ -37,18 +37,34 @@ class PatchMergingWrapper(nn.Module):
 class PatchExpanding(nn.Module):
     def __init__(self, input_resolution, dim, norm_layer=nn.LayerNorm):
         super().__init__()
-        self.input_resolution = input_resolution
+        self.input_resolution = input_resolution  # nominal only
         self.expand = nn.Linear(dim, 2 * dim)
         self.norm = norm_layer(dim // 2)
 
     def forward(self, x):
-        H, W = self.input_resolution
         B, L, C = x.shape
+
+        # Dynamically infer H, W
+        H = W = int(L ** 0.5)
+        if H * W != L:
+            # fallback to nominal resolution
+            H, W = self.input_resolution
+            if H * W != L:
+                # compute W from L and H
+                W = L // H
+
         x = self.expand(x)
         x = x.view(B, H, W, C * 2)
-        x = rearrange(x, "b h w (p1 p2 c) -> b (h p1) (w p2) c", p1=2, p2=2, c=(C*2)//4)
-        x = x.view(B, -1, (C*2)//4)
+        x = rearrange(
+            x,
+            "b h w (p1 p2 c) -> b (h p1) (w p2) c",
+            p1=2,
+            p2=2,
+            c=(C * 2) // 4
+        )
+        x = x.view(B, -1, (C * 2) // 4)
         x = self.norm(x)
+
         return x
 
 ############################################################
