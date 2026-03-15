@@ -87,7 +87,7 @@ class VSB(nn.Module):
             hx = self.norm(hx)
             x = torch.cat((x, hx), dim=-1)
             x = self.linear(x)
-        x, _ = self.self_attention(x)
+        x, _ = self.self_attention(x, x, x)
         x = self.drop_path(x)
         x = x.view(B, H * W, C)
         x = shortcut + x
