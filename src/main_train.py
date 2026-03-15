@@ -211,10 +211,10 @@ def parse_arguments():
     
         # VMRNN architecture parameters
         parser.add_argument('--depths_downsample', nargs='+', type=int,
-                            default=[2, 2, 6, 2],
+                            default=[2, 2, 6],
                             help='Depths for downsample blocks')
         parser.add_argument('--depths_upsample', nargs='+', type=int,
-                            default=[2, 2, 6, 2],
+                            default=[2, 2, 2],
                             help='Depths for upsample blocks')
         parser.add_argument('--patch_size', type=int, default=32,
                             help='Patch size')

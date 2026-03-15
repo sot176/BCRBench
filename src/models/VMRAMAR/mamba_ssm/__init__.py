@@ -1,1 +1,0 @@
-from .selective_scan_interface import SelectiveScanFn
