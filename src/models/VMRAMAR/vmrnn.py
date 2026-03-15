@@ -77,6 +77,7 @@ class VMRNNCell(nn.Module):
             VSB(hidden_dim, input_resolution, drop_path, norm_layer, self_attention)
             for _ in range(depth)
         ])
+        self.input_Resolution = input_resolution
 
     def forward(self, xt, states):
         if states is None:
