@@ -72,21 +72,22 @@ class VMRAMaR(nn.Module):
         x = x.permute(0,1,3,2,4,5).contiguous()  # (B, T, V, C, H, W)
         x = x.view(B*T*V, C, H, W)
         feats = self.image_encoder(x)  # (B*T*V, C_feat, Hf, Wf)
+        BTV, C_feat, Hf, Wf = feats.shape
 
         # --------------------------------------------------
         # Pad height and width to even for Swin Transformer
         # --------------------------------------------------
-        BTV, C_feat, Hf, Wf = feats.shape
         pad_H = Hf % 2
         pad_W = Wf % 2
         if pad_H > 0 or pad_W > 0:
-            feats = torch.nn.functional.pad(feats, (0, pad_W, 0, pad_H))  # pad W then H
-        Hf_pad, Wf_pad = Hf + pad_H, Wf + pad_W
+            feats = torch.nn.functional.pad(feats, (0, pad_W, 0, pad_H))
+            Hf += pad_H
+            Wf += pad_W
 
         # --------------------------------------------------
-        # Reshape for ImageAggregator
+        # Reshape back to (B, T, C, V, H, W) for ImageAggregator
         # --------------------------------------------------
-        feats = feats.view(B, T, V, C_feat, Hf_pad, Wf_pad)  # (B, T, V, C, H, W)
+        feats = feats.view(B, T, V, C_feat, Hf, Wf)
 
         # --------------------------------------------------
         # Image Aggregator: fuse views
@@ -102,8 +103,6 @@ class VMRAMaR(nn.Module):
 
         for t in range(T):
             xt = visit_embeddings[:, t]  # (B, C, H, W)
-            B, C, H, W = xt.shape
-            xt = xt.view(B, C, H*W).permute(0, 2, 1).contiguous()  # (B, L=H*W, C)
             out, states_down, states_up = self.vmrnn(
                 xt, states_down, states_up
             )
