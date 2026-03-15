@@ -20,7 +20,7 @@ class Mirai(nn.Module):
         if hasattr(self.args, "freeze_image_encoder") and self.args.freeze_image_encoder:
             for param in self.image_encoder.parameters():
                 param.requires_grad = False
-
+        
         if args.transformer_snapshot is not None:
             self.transformer = load_model(args.transformer_snapshot, AllImageTransformer, args, do_wrap_model=False)
         else:
@@ -30,11 +30,21 @@ class Mirai(nn.Module):
         x = data['images']
         batch=data
         B, C, N, H, W = x.size()
-        x = x.transpose(1,2).contiguous().view(B*N, C, H, W)
-        img_x = self.image_encoder(x)
-        img_x = torch.nn.functional.adaptive_avg_pool2d(img_x, 1)
-        img_x = img_x.flatten(1)
-        img_x = img_x.view(B, N, -1)
+
+            # 1. Encode every view with shared backbone
+        x = x.transpose(1, 2).contiguous()              # (B, N, C, H, W)
+        x = x.view(B * N, C, H, W)
+        img_x = self.image_encoder(x)                   # (B·N, 512, 52, 64)
+
+        # 2. Pool spatial dims — preserve N, transformer handles view fusion
+        img_x = nn.functional.adaptive_avg_pool2d(img_x, 1)  # (B·N, 512, 1, 1)
+        img_x = img_x.flatten(1)                         # (B·N, 512)
+        img_x = img_x.view(B, N, -1)                    # (B, N, 512)
+
+        # 3. Transformer aggregates views internally
+        logit, transformer_hidden, activ_dict = self.transformer(
+            img_x, risk_factors, batch
+        )
         logit, transformer_hidden, activ_dict = self.transformer(img_x, risk_factors, batch)
 
         return {'logit': logit, 'transformer_hidden': transformer_hidden, 'activ_dict': activ_dict}
