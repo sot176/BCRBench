@@ -11,20 +11,14 @@ class ImageAggregator(nn.Module):
         self.out = nn.Linear(dim, dim)
 
     def forward(self, x):
-        # x: (B,T,V,L,C)
-
-        B,T,V,L,C = x.shape
-
-        x = x.view(B*T*L, V, C)
-
+        # x: (B, T, V, C, H, W)
+        B, T, V, C, H, W = x.shape
+        L = H * W
+        x = x.view(B, T, V, L, C)       # flatten H/W into tokens
+        x = x.contiguous().view(B*T*L, V, C)
         x = self.view_fc(x)
-
-        x,_ = self.attn(x,x,x)
-
+        x, _ = self.attn(x, x, x)
         x = self.out(x)
-
-        x = x.mean(dim=1)   # fuse views
-
-        x = x.view(B,T,L,C)
-
+        x = x.mean(dim=1)                # fuse views
+        x = x.view(B, T, L, C)
         return x
