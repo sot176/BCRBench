@@ -14,8 +14,8 @@ class SpatialAsymmetryDetector(nn.Module):
         super(SpatialAsymmetryDetector, self).__init__()
         self.args = args
         self.feature_dim = 512
-        self.latent_h = getattr(args, "latent_h", 64)
-        self.latent_w = getattr(args, "latent_w", 52)
+        self.latent_h = getattr(args, "latent_h", 5)
+        self.latent_w = getattr(args, "latent_w", 5)
 
         # Optional bias term
         self.use_bias = getattr(args, "use_sad_bias", True)
