@@ -74,17 +74,21 @@ class VMRAMaR(nn.Module):
         x = x.view(B * T * V, C, H, W)
         feats = self.image_encoder(x) # (B*T*V, C_feat, Hf, Wf)
 
-        C_feat, Hf, Wf = feats.shape[1:]
-        feats = feats.view(B, T, V, C_feat, Hf, Wf)
+        # --------------------------------------------------
+        # Ensure height and width are even (Swin transformer requirement)
+        # --------------------------------------------------
+        BTV, C_feat, Hf, Wf = feats.shape
+        pad_H = Hf % 2
+        pad_W = Wf % 2
+        if pad_H > 0 or pad_W > 0:
+            feats = torch.nn.functional.pad(feats, (0, pad_W, 0, pad_H))  # pad last 2 dims
 
         # --------------------------------------------------
-        # Convert to tokens
+        # Reshape for ImageAggregator
         # --------------------------------------------------
-
-        L = Hf * Wf
-        feats = feats.view(B, T, V, C_feat, L)
-        feats = feats.permute(0, 1, 2, 4, 3).contiguous()  # (B,T,V,L,C)
-
+        feats = feats.view(B, T, V, C_feat, Hf * Wf)  # flatten spatial dims
+        feats = feats.permute(0, 1, 2, 4, 3).contiguous()  # (B, T, V, L, C)
+        
         # --------------------------------------------------
         # Image Aggregator
         # --------------------------------------------------
