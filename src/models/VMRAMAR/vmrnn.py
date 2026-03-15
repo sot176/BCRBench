@@ -7,7 +7,22 @@ from timm.models.layers import DropPath
 ############################################################
 # Patch Expanding
 ############################################################
+class PatchMergingWrapper(nn.Module):
 
+    def __init__(self, dim):
+        super().__init__()
+
+        self.merge = PatchMerging(dim=dim)
+
+    def forward(self, x, H, W):
+        B, L, C = x.shape
+        x = x.view(B, H, W, C)
+        x = self.merge(x)
+        H, W = H // 2, W // 2
+        x = x.view(B, H * W, -1)
+
+        return x, H, W
+    
 class PatchExpanding(nn.Module):
 
     def __init__(self, input_resolution, dim, norm_layer=nn.LayerNorm):
@@ -141,7 +156,7 @@ class DownSample(nn.Module):
         super().__init__()
 
         H, W = feature_resolution
-
+        self.H, self.W = feature_resolution
         self.layers = nn.ModuleList()
         self.downsample = nn.ModuleList()
         dim = embed_dim
@@ -162,10 +177,7 @@ class DownSample(nn.Module):
 
             self.layers.append(layer)
             self.downsample.append(
-                PatchMerging(
-                    input_resolution=resolution,
-                    dim=dim
-                )
+                PatchMergingWrapper(dim)
             )
 
             dim *= 2
@@ -176,11 +188,13 @@ class DownSample(nn.Module):
             states = [None] * len(self.layers)
 
         new_states = []
+        B, L, C = x.shape
+        H, W = self.H, self.W  # or store from feature_resolution
 
         for i, layer in enumerate(self.layers):
             x, state = layer(x, states[i])
             new_states.append(state)
-            x = self.downsample[i](x)
+            x, H, W = self.downsample[i](x, H, W)
 
         return new_states, x
 
