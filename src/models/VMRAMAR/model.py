@@ -116,10 +116,15 @@ class VMRAMaR(nn.Module):
         # --------------------------------------------------
         features = [temporal_feature]
         if self.use_asymmetry and V >= 4:
-            left = feats[:, :, [0, 2]]  # (B, T, 2, C, H, W)
-            right = feats[:, :, [1, 3]]  # (B, T, 2, C, H, W)
-            asym = self.sad(left, right)
-            asym_feature = self.lat(asym)
+            # feats: (B, T, V, C, H, W)
+            # Views: 0=left CC, 1=right CC, 2=left MLO, 3=right MLO
+            
+            # Average CC+MLO views per side → (B, T, C, H, W)
+            left  = feats[:, :, [0, 2]].mean(dim=2)   # (B, T, C, H, W)
+            right = feats[:, :, [1, 3]].mean(dim=2)   # (B, T, C, H, W)
+
+            asym = self.sad(left, right)               # returns dict with (B, T) values
+            asym_feature = self.lat(asym)              # (B, asym_dim)
             features.append(asym_feature)
 
         holistic_embedding = torch.cat(features, dim=1)
