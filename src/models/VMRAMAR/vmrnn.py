@@ -192,6 +192,17 @@ class DownSample(nn.Module):
         for i, layer in enumerate(self.layers):
             x, state = layer(x, states[i])
             new_states.append(state)
+            B, L, C = x.shape
+            H_curr = H
+            W_curr = W
+            pad_H = H_curr % 2
+            pad_W = W_curr % 2
+            if pad_H > 0 or pad_W > 0:
+                x = x.view(B, H_curr, W_curr, C)
+                x = torch.nn.functional.pad(x, (0,0, 0, pad_W, 0, pad_H))
+                H_curr += pad_H
+                W_curr += pad_W
+                x = x.view(B, H_curr*W_curr, C)
             x, H, W = self.downsample[i](x, H, W)
 
         return new_states, x

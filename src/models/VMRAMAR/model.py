@@ -75,16 +75,6 @@ class VMRAMaR(nn.Module):
         BTV, C_feat, Hf, Wf = feats.shape
 
         # --------------------------------------------------
-        # Pad height and width to even for Swin Transformer
-        # --------------------------------------------------
-        pad_H = Hf % 2
-        pad_W = Wf % 2
-        if pad_H > 0 or pad_W > 0:
-            feats = torch.nn.functional.pad(feats, (0, pad_W, 0, pad_H))
-            Hf += pad_H
-            Wf += pad_W
-
-        # --------------------------------------------------
         # Reshape back to (B, T, C, V, H, W) for ImageAggregator
         # --------------------------------------------------
         feats = feats.view(B, T, V, C_feat, Hf, Wf)
