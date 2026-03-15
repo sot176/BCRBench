@@ -187,7 +187,6 @@ class DownSample(nn.Module):
             states = [None] * len(self.layers)
 
         new_states = []
-        B, L, C = x.shape
         H, W = self.H, self.W  # or store from feature_resolution
 
         for i, layer in enumerate(self.layers):
