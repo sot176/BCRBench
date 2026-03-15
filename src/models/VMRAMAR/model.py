@@ -64,8 +64,8 @@ class VMRAMaR(nn.Module):
 
     def forward(self, data, risk_factors=None):
 
-        x = data["images"] # (B,T,V,C,H,W)
-        B, T, V, C, H, W = x.shape
+        x = data["images"] # (B,T,C, V,H,W)
+        B, T, C, V, H, W = x.shape
 
         # --------------------------------------------------
         # Image encoder
