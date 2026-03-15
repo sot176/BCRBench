@@ -60,7 +60,7 @@ class VMRAMaR(nn.Module):
         input_dim = args.embed_dim
 
         if self.use_asymmetry:
-            input_dim += args.asym_dim
+            input_dim += 512         # LAT always outputs 512 (feature_dim in lat.py)
 
         self.ahl =  CumulativeProbabilityLayer(input_dim, max_followup=5)
 
