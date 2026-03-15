@@ -103,7 +103,7 @@ class VMRAMaR(nn.Module):
         for t in range(T):
             xt = visit_embeddings[:, t]  # (B, C, H, W)
             out, states_down, states_up = self.vmrnn(
-                xt, states_down, states_up, Hf_pad, Wf_pad
+                xt, states_down, states_up
             )
             outputs.append(out)
 
