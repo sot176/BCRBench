@@ -1,4 +1,3 @@
-from models.Mirai.onconet.models.factory import load_model, RegisterModel
 import torch
 import torch.nn as nn
 import sys
@@ -11,7 +10,6 @@ from .lat import LongitudinalAsymmetryTracker
 from .vmrnn import VMRNN
 from .image_aggregator import ImageAggregator
 
-@RegisterModel("vmra_mar")
 class VMRAMaR(nn.Module):
 
     def __init__(self, args):
@@ -125,6 +123,7 @@ class VMRAMaR(nn.Module):
             asym = self.sad(left, right)
             asym_feature = self.lat(asym)
             features.append(asym_feature)
+            print("Asym feat shape", asym_feature.shape)
 
         holistic_embedding = torch.cat(features, dim=1)
 
@@ -148,5 +147,3 @@ class VMRAMaR(nn.Module):
 
     def get_primary_risk_head(self, outputs):
         return outputs["logit"]
-
- 

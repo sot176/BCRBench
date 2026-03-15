@@ -236,6 +236,7 @@ def parse_arguments():
         parser.add_argument('--lat_dropout', type=float, default=0.1)
         parser.add_argument('--initial_asym_mean', type=float, default=2000)
         parser.add_argument('--initial_asym_std', type=float, default=300)
+        parser.add_argument("--asym_dim", type=int, default=0, help="Dimension of asymmetry features ")
 
     # -------------------
     # Parse final args
