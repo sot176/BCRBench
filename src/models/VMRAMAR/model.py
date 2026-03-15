@@ -80,13 +80,15 @@ class VMRAMaR(nn.Module):
         BTV, C_feat, Hf, Wf = feats.shape
         pad_H = Hf % 2
         pad_W = Wf % 2
+        Hf_pad = Hf + pad_H
+        Wf_pad = Wf + pad_W
         if pad_H > 0 or pad_W > 0:
             feats = torch.nn.functional.pad(feats, (0, pad_W, 0, pad_H))  # pad last 2 dims
 
         # --------------------------------------------------
         # Reshape for ImageAggregator
         # --------------------------------------------------
-        feats = feats.view(B, T, V, C_feat, Hf * Wf)  # flatten spatial dims
+        feats = feats.view(B, T, V, C_feat, Hf_pad * Wf_pad)  # flatten spatial dims
         feats = feats.permute(0, 1, 2, 4, 3).contiguous()  # (B, T, V, L, C)
         
         # --------------------------------------------------
