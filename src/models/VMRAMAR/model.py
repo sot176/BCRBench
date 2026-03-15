@@ -80,17 +80,14 @@ class VMRAMaR(nn.Module):
         BTV, C_feat, Hf, Wf = feats.shape
         pad_H = Hf % 2
         pad_W = Wf % 2
-        Hf_pad = Hf + pad_H
-        Wf_pad = Wf + pad_W
-
         if pad_H > 0 or pad_W > 0:
             feats = torch.nn.functional.pad(feats, (0, pad_W, 0, pad_H))  # pad W then H
+        Hf_pad, Wf_pad = Hf + pad_H, Wf + pad_W
 
         # --------------------------------------------------
         # Reshape for ImageAggregator
         # --------------------------------------------------
-        feats = feats.view(B, T, V, C_feat, Hf_pad * Wf_pad)
-        feats = feats.permute(0, 1, 2, 4, 3).contiguous()  # (B, T, V, L, C)
+        feats = feats.view(B, T, V, C_feat, Hf_pad, Wf_pad)  # (B, T, V, C, H, W)
 
         # --------------------------------------------------
         # Image Aggregator: fuse views
@@ -106,19 +103,13 @@ class VMRAMaR(nn.Module):
         outputs = []
 
         for t in range(T):
-            xt = visit_embeddings[:, t]
-            out, states_down, states_up = self.vmrnn(
-                xt,
-                states_down,
-                states_up
-            )
+            xt = visit_embeddings[:, t]  # (B, C, H, W)
+            out, states_down, states_up = self.vmrnn(xt, states_down, states_up)
             outputs.append(out)
-        outputs = torch.stack(outputs, dim=1)    # (B,T,L,C)
 
-        # --------------------------------------------------
-        # Temporal pooling
-        # --------------------------------------------------
-        temporal_feature = outputs.mean(dim=(1, 2))
+        # Temporal pooling over T and spatial dims after VMRNN
+        outputs = torch.stack(outputs, dim=1)  # (B, T, C, H, W)
+        temporal_feature = outputs.mean(dim=(1, 3, 4))  # (B, C)
 
         # --------------------------------------------------
         # Asymmetry features
