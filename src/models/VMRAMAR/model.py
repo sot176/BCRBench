@@ -83,7 +83,7 @@ class VMRAMaR(nn.Module):
 
         L = Hf * Wf
         feats = feats.view(B, T, V, C_feat, L)
-        feats = feats.permute(0, 1, 2, 4, 3) # (B,T,V,L,C)
+        feats = feats.permute(0, 1, 2, 4, 3).contiguous()  # (B,T,V,L,C)
 
         # --------------------------------------------------
         # Image Aggregator
