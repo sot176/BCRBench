@@ -102,6 +102,8 @@ class VMRAMaR(nn.Module):
 
         for t in range(T):
             xt = visit_embeddings[:, t]  # (B, C, H, W)
+            B, C, H, W = xt.shape
+            xt = xt.view(B, C, H*W).permute(0, 2, 1).contiguous()  # (B, L=H*W, C)
             out, states_down, states_up = self.vmrnn(
                 xt, states_down, states_up
             )
