@@ -8,14 +8,13 @@ from timm.models.layers import DropPath
 # Patch Expanding
 ############################################################
 class PatchMergingWrapper(nn.Module):
-
     def __init__(self, dim):
         super().__init__()
-
         self.merge = PatchMerging(dim=dim)
 
     def forward(self, x, H, W):
         B, L, C = x.shape
+
         x = x.view(B, H, W, C)
         x = self.merge(x)
         H, W = H // 2, W // 2
@@ -187,22 +186,21 @@ class DownSample(nn.Module):
             states = [None] * len(self.layers)
 
         new_states = []
-        H, W = self.H, self.W  # or store from feature_resolution
+        H, W = self.H, self.W
+
+        # Pad H and W to be even
+        pad_H = H % 2
+        pad_W = W % 2
+        if pad_H > 0 or pad_W > 0:
+            x = x.view(-1, H, W, x.shape[-1])  # B, H, W, C
+            x = torch.nn.functional.pad(x, (0, 0, 0, pad_W, 0, pad_H))
+            H += pad_H
+            W += pad_W
+            x = x.view(-1, H*W, x.shape[-1])
 
         for i, layer in enumerate(self.layers):
             x, state = layer(x, states[i])
             new_states.append(state)
-            B, L, C = x.shape
-            H_curr = H
-            W_curr = W
-            pad_H = H_curr % 2
-            pad_W = W_curr % 2
-            if pad_H > 0 or pad_W > 0:
-                x = x.view(B, H_curr, W_curr, C)
-                x = torch.nn.functional.pad(x, (0,0, 0, pad_W, 0, pad_H))
-                H_curr += pad_H
-                W_curr += pad_W
-                x = x.view(B, H_curr*W_curr, C)
             x, H, W = self.downsample[i](x, H, W)
 
         return new_states, x
