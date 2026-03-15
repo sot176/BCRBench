@@ -67,7 +67,6 @@ class VSB(nn.Module):
     def forward(self, x, hx=None):
         H, W = self.input_resolution
         B, L, C = x.shape
-        assert L == H * W
 
         shortcut = x
         x = self.norm(x)
