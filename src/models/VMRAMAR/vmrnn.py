@@ -1,74 +1,43 @@
 import torch
 import torch.nn as nn
-from einops import rearrange
-from timm.models.swin_transformer import PatchMerging
-from timm.models.layers import DropPath
 import torch.nn.functional as F
+from einops import rearrange
 
 ############################################################
-# Patch Merging with automatic padding
+# Conv Downsample / Upsample
 ############################################################
-class PatchMergingWrapper(nn.Module):
-    def __init__(self, dim):
+class ConvDownsample(nn.Module):
+    def __init__(self, in_ch, out_ch):
         super().__init__()
-        self.merge = PatchMerging(dim=dim)
+        self.conv = nn.Conv2d(in_ch, out_ch, kernel_size=3, stride=2, padding=1)
 
     def forward(self, x, H, W):
         B, L, C = x.shape
-        x = x.view(B, H, W, C)
-
-        # Pad H/W if odd
-        pad_H = H % 2
-        pad_W = W % 2
-        if pad_H or pad_W:
-            x = F.pad(x, (0, 0, 0, pad_W, 0, pad_H))
-            H += pad_H
-            W += pad_W
-
-        # Merge patches
-        x = self.merge(x)
-        H, W = H // 2, W // 2
-        x = x.view(B, H * W, -1)
+        x = x.view(B, H, W, C).permute(0, 3, 1, 2)  # B, C, H, W
+        x = self.conv(x)
+        B, C, H, W = x.shape
+        x = x.permute(0, 2, 3, 1).view(B, H * W, C)
         return x, H, W
 
-############################################################
-# Patch Expanding
-############################################################
-class PatchExpanding(nn.Module):
-    def __init__(self, input_resolution, dim, norm_layer=nn.LayerNorm):
+class ConvUpsample(nn.Module):
+    def __init__(self, in_ch, out_ch):
         super().__init__()
-        self.input_resolution = input_resolution  # nominal only
-        self.expand = nn.Linear(dim, 2 * dim)
-        self.norm = norm_layer(dim // 2)
+        self.conv = nn.ConvTranspose2d(in_ch, out_ch, kernel_size=2, stride=2)
 
     def forward(self, x):
         B, L, C = x.shape
-
-        # Dynamically infer H, W
         H = W = int(L ** 0.5)
         if H * W != L:
-            # fallback to nominal resolution
-            H, W = self.input_resolution
-            if H * W != L:
-                # compute W from L and H
-                W = L // H
-
-        x = self.expand(x)
-        x = x.view(B, H, W, C * 2)
-        x = rearrange(
-            x,
-            "b h w (p1 p2 c) -> b (h p1) (w p2) c",
-            p1=2,
-            p2=2,
-            c=(C * 2) // 4
-        )
-        x = x.view(B, -1, (C * 2) // 4)
-        x = self.norm(x)
-
+            # fallback: compute W from L and H
+            H, W = L // C, C
+        x = x.view(B, H, W, C).permute(0, 3, 1, 2)
+        x = self.conv(x)
+        B, C, H, W = x.shape
+        x = x.permute(0, 2, 3, 1).view(B, H * W, C)
         return x
 
 ############################################################
-# VSB Block (Vision State Space Block)
+# VSB Block
 ############################################################
 class VSB(nn.Module):
     def __init__(self, hidden_dim, input_resolution, drop_path=0., norm_layer=nn.LayerNorm, self_attention=None):
@@ -76,25 +45,20 @@ class VSB(nn.Module):
         self.hidden_dim = hidden_dim
         self.input_resolution = input_resolution
         self.norm = norm_layer(hidden_dim)
-        self.self_attention = nn.MultiheadAttention(embed_dim=self.hidden_dim, num_heads=4, batch_first=True)
-        self.drop_path = DropPath(drop_path) if drop_path > 0 else nn.Identity()
+        self.self_attention = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=4, batch_first=True)
+        self.drop_path = nn.Identity() if drop_path == 0 else nn.Dropout(drop_path)
         self.linear = nn.Linear(hidden_dim * 2, hidden_dim)
 
     def forward(self, x, hx=None):
-        H, W = self.input_resolution
-        B, L, C = x.shape
-
         shortcut = x
         x = self.norm(x)
         if hx is not None:
             hx = self.norm(hx)
-            x = torch.cat((x, hx), dim=-1)
+            x = torch.cat([x, hx], dim=-1)
             x = self.linear(x)
-
         x, _ = self.self_attention(x, x, x)
         x = self.drop_path(x)
-        x = shortcut + x
-        return x
+        return shortcut + x
 
 ############################################################
 # VMRNN Cell
@@ -103,7 +67,7 @@ class VMRNNCell(nn.Module):
     def __init__(self, hidden_dim, input_resolution, depth, drop_path=0., norm_layer=nn.LayerNorm, self_attention=None):
         super().__init__()
         self.layers = nn.ModuleList([
-            VSB(hidden_dim, input_resolution, drop_path, norm_layer, self_attention=self_attention)
+            VSB(hidden_dim, input_resolution, drop_path, norm_layer, self_attention)
             for _ in range(depth)
         ])
 
@@ -134,16 +98,17 @@ class DownSample(nn.Module):
         self.downsample = nn.ModuleList()
         dim = embed_dim
 
-        for i, depth in enumerate(depths):
-            res = (H // (2 ** i), W // (2 ** i))
+        for depth in depths:
+            res = (H, W)
             self.layers.append(VMRNNCell(dim, res, depth, self_attention=self_attention))
-            self.downsample.append(PatchMergingWrapper(dim))
+            self.downsample.append(ConvDownsample(dim, dim * 2))
             dim *= 2
+            H //= 2
+            W //= 2
 
     def forward(self, x, states):
         if states is None:
             states = [None] * len(self.layers)
-
         new_states = []
         H, W = self.H, self.W
         for i, layer in enumerate(self.layers):
@@ -163,11 +128,13 @@ class UpSample(nn.Module):
         self.upsample = nn.ModuleList()
         dim = embed_dim * (2 ** len(depths))
 
-        for i, depth in enumerate(depths):
-            res = (H // (2 ** (len(depths) - i)), W // (2 ** (len(depths) - i)))
+        for depth in depths:
+            res = (H, W)
             self.layers.append(VMRNNCell(dim, res, depth, self_attention=self_attention))
-            self.upsample.append(PatchExpanding(res, dim))
+            self.upsample.append(ConvUpsample(dim, dim // 2))
             dim //= 2
+            H *= 2
+            W *= 2
 
     def forward(self, x, states):
         if states is None:
