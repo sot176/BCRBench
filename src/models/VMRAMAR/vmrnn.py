@@ -216,4 +216,4 @@ class VMRNN(nn.Module):
         H, W = self.feature_resolution
         states_down, skips, x, H_bot, W_bot = self.down(x, H, W, states_down)
         states_up, x, H_out, W_out = self.up(x, H_bot, W_bot, skips, states_up)
-        return x, states_down, states_up
+        return x, H_out, W_out, states_down, states_up

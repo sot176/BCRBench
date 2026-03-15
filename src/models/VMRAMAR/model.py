@@ -91,19 +91,16 @@ class VMRAMaR(nn.Module):
         states_up = None
         outputs = []
         for t in range(T):
-            xt = visit_embeddings[:, t]  # (B, C, H, W)
+            xt = visit_embeddings[:, t]              # (B, C, H, W)
             B, C, Hc, Wc = xt.shape
-            xt_flat = xt.view(B, Hc*Wc, C)  # (B, L, C)
-            
-            out, states_down, states_up = self.vmrnn(
+            xt_flat = xt.view(B, Hc * Wc, C)        # (B, L, C)
+
+            out, H_out, W_out, states_down, states_up = self.vmrnn(
                 xt_flat, states_down, states_up
             )  # out: (B, L_out, C_out)
-            
-            # Infer output H/W
-            L_out, C_out = out.shape[1], out.shape[2]
-            H_out = W_out = int(L_out ** 0.5)
+
+            C_out = out.shape[2]
             out = out.view(B, H_out, W_out, C_out).permute(0, 3, 1, 2)  # (B, C_out, H_out, W_out)
-            
             outputs.append(out)
 
         outputs = torch.stack(outputs, dim=1)  # (B, T, C_out, H_out, W_out)
