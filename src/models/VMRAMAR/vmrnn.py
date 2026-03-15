@@ -70,7 +70,7 @@ class VSB(nn.Module):
         self.hidden_dim = hidden_dim
         self.input_resolution = input_resolution
         self.norm = norm_layer(hidden_dim)
-        self.self_attention = nn.MultiheadAttention(embed_dim=C, num_heads=4, batch_first=True)
+        self.self_attention = nn.MultiheadAttention(embed_dim=self.hidden_dim, num_heads=4, batch_first=True)
         self.drop_path = DropPath(drop_path) if drop_path > 0 else nn.Identity()
         self.linear = nn.Linear(hidden_dim * 2, hidden_dim)
 
