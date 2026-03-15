@@ -51,7 +51,9 @@ class VMRAMaR(nn.Module):
         if self.use_asymmetry:
             self.sad = SpatialAsymmetryDetector(args)
             self.lat = LongitudinalAsymmetryTracker(args)
-
+            latent_h = getattr(args, "latent_h", 5)
+            latent_w = getattr(args, "latent_w", 5)
+            self.asym_proj = nn.Linear(latent_h * latent_w, 512)
         # --------------------------------------------------
         # Additive Hazard Layer
         # --------------------------------------------------
@@ -123,8 +125,17 @@ class VMRAMaR(nn.Module):
             left  = feats[:, :, [0, 2]].mean(dim=2)   # (B, T, C, H, W)
             right = feats[:, :, [1, 3]].mean(dim=2)   # (B, T, C, H, W)
 
-            asym = self.sad(left, right)               # returns dict with (B, T) values
-            asym_feature = self.lat(asym)              # (B, asym_dim)
+            asym = self.sad(left, right)                
+            heatmaps = asym['heatmap']                           
+            B_a, T_a, H_a, W_a = heatmaps.shape
+            asym_features = heatmaps.view(B_a, T_a, H_a * W_a) # (B, T, H*W)
+            asym_features = self.asym_proj(asym_features)       # (B, T, 512)
+
+            asym_feature = self.lat(
+                asym_features,                  # (B, T, 512)
+                asym['asymmetry_coords'],       # (B, T, 2)
+                asym['heatmap']                 # (B, T, H, W)
+            )
             features.append(asym_feature)
 
         holistic_embedding = torch.cat(features, dim=1)
