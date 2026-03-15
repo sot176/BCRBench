@@ -31,7 +31,7 @@ class Mirai(nn.Module):
         batch=data
         B, C, N, H, W = x.size()
 
-            # 1. Encode every view with shared backbone
+        # 1. Encode every view with shared backbone
         x = x.transpose(1, 2).contiguous()              # (B, N, C, H, W)
         x = x.view(B * N, C, H, W)
         img_x = self.image_encoder(x)                   # (B·N, 512, 52, 64)

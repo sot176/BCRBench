@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from einops import rearrange
 
 ############################################################
-# Conv Downsample / Upsample
+# Conv Downsample  
 ############################################################
 class ConvDownsample(nn.Module):
     def __init__(self, in_ch, out_ch):
@@ -19,21 +19,7 @@ class ConvDownsample(nn.Module):
         B, C, H_out, W_out = x.shape
         x = x.permute(0, 2, 3, 1).view(B, H_out * W_out, C)
         return x, H_out, W_out
-
-
-class ConvUpsample(nn.Module):
-    def __init__(self, in_ch, out_ch):
-        super().__init__()
-        self.conv = nn.ConvTranspose2d(in_ch, out_ch, kernel_size=2, stride=2)
-
-    def forward(self, x, H, W):
-        B, L, C = x.shape
-        assert L == H * W, f"Expected L={H*W}, got L={L}"
-        x = x.view(B, H, W, C).permute(0, 3, 1, 2)   # (B, C, H, W)
-        x = self.conv(x)                                # (B, out_ch, H*2, W*2)
-        B, C, H_out, W_out = x.shape
-        x = x.permute(0, 2, 3, 1).view(B, H_out * W_out, C)
-        return x, H_out, W_out
+ 
 
 
 ############################################################
@@ -119,43 +105,82 @@ class DownSample(nn.Module):
 ############################################################
 # Upsample Decoder
 ############################################################
+class ConvUpsample(nn.Module):
+    def __init__(self, in_ch, out_ch):
+        super().__init__()
+        self.conv = nn.ConvTranspose2d(in_ch, out_ch, kernel_size=2, stride=2)
+
+    def forward(self, x, H, W):
+        B, L, C = x.shape
+        assert L == H * W, f"Expected L={H*W}, got L={L}"
+        x = x.view(B, H, W, C).permute(0, 3, 1, 2)   # (B, C, H, W)
+        x = self.conv(x)                                # (B, out_ch, H', W')
+        B, C, H_out, W_out = x.shape
+        x = x.permute(0, 2, 3, 1).view(B, H_out * W_out, C)
+        return x, H_out, W_out
+
+
+############################################################
+# UpSample — force skip spatial match
+############################################################
 class UpSample(nn.Module):
     def __init__(self, embed_dim, depths):
-        """
-        embed_dim: base encoder dim.
-        depths:    list of depths, same length as DownSample depths.
-        
-        Decoder starts from embed_dim * 2^len(depths) (bottom of encoder)
-        and halves dim each step, mirroring the encoder.
-        """
         super().__init__()
         self.upsamplers = nn.ModuleList()
         self.cells = nn.ModuleList()
-        self.skip_projs = nn.ModuleList()   # project concatenated skip+x back to dim
+        self.skip_projs = nn.ModuleList()
 
         n = len(depths)
-        dim = embed_dim * (2 ** n)          # start at bottom dim
+        dim = embed_dim * (2 ** n)
 
         for depth in depths:
             out_dim = dim // 2
             self.upsamplers.append(ConvUpsample(dim, out_dim))
-            # After skip concat, channel count doubles → project back to out_dim
             self.skip_projs.append(nn.Linear(out_dim * 2, out_dim))
             self.cells.append(VMRNNCell(out_dim, depth))
             dim = out_dim
+
+    @staticmethod
+    def _match_spatial(x, H_x, W_x, skip_x, H_skip, W_skip):
+        """Crop or pad x so its spatial dims match the skip tensor exactly."""
+        if H_x == H_skip and W_x == W_skip:
+            return x, H_skip, W_skip
+
+        B, L, C = x.shape
+        # Reshape to 2D spatial
+        x2d = x.view(B, H_x, W_x, C).permute(0, 3, 1, 2)  # (B, C, H_x, W_x)
+
+        # Crop if upsampled too large
+        x2d = x2d[:, :, :H_skip, :W_skip]
+
+        # Pad if upsampled too small
+        pad_h = max(H_skip - x2d.shape[2], 0)
+        pad_w = max(W_skip - x2d.shape[3], 0)
+        if pad_h > 0 or pad_w > 0:
+            x2d = F.pad(x2d, (0, pad_w, 0, pad_h))
+
+        x = x2d.permute(0, 2, 3, 1).contiguous().view(B, H_skip * W_skip, C)
+        return x, H_skip, W_skip
 
     def forward(self, x, H, W, skips, states):
         if states is None:
             states = [None] * len(self.cells)
         new_states = []
+
         for i, (up, proj, cell) in enumerate(
             zip(self.upsamplers, self.skip_projs, self.cells)
         ):
-            x, H, W = up(x, H, W)                           # upsample → out_dim
-            skip_x, _, _ = skips[-(i + 1)]                  # matching encoder level
-            x = proj(torch.cat([x, skip_x], dim=-1))        # fuse skip connection
+            x, H, W = up(x, H, W)
+
+            skip_x, H_skip, W_skip = skips[-(i + 1)]
+
+            # Force spatial dims to match skip exactly
+            x, H, W = self._match_spatial(x, H, W, skip_x, H_skip, W_skip)
+
+            x = proj(torch.cat([x, skip_x], dim=-1))
             x, state = cell(x, states[i])
             new_states.append(state)
+
         return new_states, x, H, W
 
 
