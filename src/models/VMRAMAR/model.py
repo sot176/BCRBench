@@ -41,8 +41,8 @@ class VMRAMaR(nn.Module):
         # --------------------------------------------------
         self.vmrnn = VMRNN(
             embed_dim=args.embed_dim,
-            depths_downsample=args.depths_downsample,
-            depths_upsample=args.depths_upsample,
+            depths_down=args.depths_downsample,
+            depths_up=args.depths_upsample,
             feature_resolution=args.feature_resolution
         )
 
