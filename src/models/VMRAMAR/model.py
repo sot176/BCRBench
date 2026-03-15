@@ -63,16 +63,15 @@ class VMRAMaR(nn.Module):
         self.ahl =  CumulativeProbabilityLayer(input_dim, max_followup=5)
 
     def forward(self, data, risk_factors=None):
-
-        x = data["images"] # (B,T,C, V,H,W)
+        x = data["images"]  # (B, T, C, V, H, W)
         B, T, C, V, H, W = x.shape
 
         # --------------------------------------------------
         # Image encoder
         # --------------------------------------------------
-
-        x = x.view(B * T * V, C, H, W)
-        feats = self.image_encoder(x) # (B*T*V, C_feat, Hf, Wf)
+        x = x.permute(0,1,3,2,4,5).contiguous()  # (B, T, V, C, H, W)
+        x = x.view(B*T*V, C, H, W)
+        feats = self.image_encoder(x)  # (B*T*V, C_feat, Hf, Wf)
 
         # --------------------------------------------------
         # Pad height and width to even for Swin Transformer
@@ -92,37 +91,39 @@ class VMRAMaR(nn.Module):
         # --------------------------------------------------
         # Image Aggregator: fuse views
         # --------------------------------------------------
-        visit_embeddings = self.image_aggregator(feats)  # (B, T, L, C)
-        
+        visit_embeddings = self.image_aggregator(feats)  # (B, T, C, H, W)
+
         # --------------------------------------------------
         # VMRNN temporal modeling
         # --------------------------------------------------
-
         states_down = None
         states_up = None
         outputs = []
 
         for t in range(T):
             xt = visit_embeddings[:, t]  # (B, C, H, W)
-            out, states_down, states_up = self.vmrnn(xt, states_down, states_up)
+            out, states_down, states_up = self.vmrnn(
+                xt, states_down, states_up, Hf_pad, Wf_pad
+            )
             outputs.append(out)
 
-        # Temporal pooling over T and spatial dims after VMRNN
         outputs = torch.stack(outputs, dim=1)  # (B, T, C, H, W)
+
+        # --------------------------------------------------
+        # Temporal pooling over T and spatial dims
+        # --------------------------------------------------
         temporal_feature = outputs.mean(dim=(1, 3, 4))  # (B, C)
 
         # --------------------------------------------------
         # Asymmetry features
         # --------------------------------------------------
-
         features = [temporal_feature]
         if self.use_asymmetry and V >= 4:
-            left = feats[:, :, [0, 2]]
-            right = feats[:, :, [1, 3]]
+            left = feats[:, :, [0, 2]]  # (B, T, 2, C, H, W)
+            right = feats[:, :, [1, 3]]  # (B, T, 2, C, H, W)
             asym = self.sad(left, right)
             asym_feature = self.lat(asym)
             features.append(asym_feature)
-            print("Asym feat shape", asym_feature.shape)
 
         holistic_embedding = torch.cat(features, dim=1)
 
