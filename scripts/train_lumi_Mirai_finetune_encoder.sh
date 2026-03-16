@@ -53,6 +53,7 @@ accelerate launch  main_train.py \
             --num_workers 7 \
             --learning_rate 5e-5 \
             --weight_decay 1e-4 \
+            --warmup_steps 0 \
             --model "Mirai" \
             --survival_analysis_setup \
             --lr_decay 0.5 \
