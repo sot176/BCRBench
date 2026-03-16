@@ -15,8 +15,8 @@ class LongitudinalAsymmetryTracker(nn.Module):
         self.feature_dim = 512
         
         # Use same latent dimensions as hybrid_asymmetry
-        self.latent_h = getattr(args, "latent_h", 5)   # was 64
-        self.latent_w = getattr(args, "latent_w", 5)   # was 52
+        self.latent_h = getattr(args, "latent_h", 64)
+        self.latent_w = getattr(args, "latent_w", 52)
         self.displacement_threshold = 0.4 * min(self.latent_h, self.latent_w)
         
         # Feature transformation with dropout

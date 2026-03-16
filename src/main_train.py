@@ -228,8 +228,8 @@ def parse_arguments():
         # Asymmetry module parameters
         parser.add_argument('--use_asymmetry', action='store_true',
                             help='Enable asymmetry module')
-        parser.add_argument('--latent_h', type=int, default=5)
-        parser.add_argument('--latent_w', type=int, default=5)
+        parser.add_argument('--latent_h', type=int, default=64)
+        parser.add_argument('--latent_w', type=int, default=52)
         parser.add_argument('--use_sad_bias', action='store_true')
         parser.add_argument('--use_lat_bn', action='store_true')
         parser.add_argument('--lat_dropout', type=float, default=0.1)

@@ -53,8 +53,8 @@ class VMRAMaR(nn.Module):
         if self.use_asymmetry:
             self.sad = SpatialAsymmetryDetector(args)
             self.lat = LongitudinalAsymmetryTracker(args)
-            latent_h = getattr(args, "latent_h", 5)
-            latent_w = getattr(args, "latent_w", 5)
+            latent_h = getattr(args, "latent_h", 64)
+            latent_w = getattr(args, "latent_w", 52)
             self.asym_proj = nn.Linear(latent_h * latent_w, 512)
         # --------------------------------------------------
         # Additive Hazard Layer
