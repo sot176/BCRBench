@@ -153,8 +153,8 @@ class VMRNNCell(nn.Module):
         Ct = Ft * (torch.tanh(Y) + Ct_prev_spatial)                  # (B, C, H, W)
         Ht = Ft * torch.tanh(Ct)                                     # (B, C, H, W)
 
-        Ht_flat = Ht.view(B, -1)                                     # (B, C*H*W)
-        Ct_flat = Ct.view(B, -1)                                     # (B, C*H*W)
+        Ht_flat = Ht.contiguous().view(B, -1)
+        Ct_flat = Ct.contiguous().view(B, -1)                                     # (B, C*H*W)
 
         return Ht_flat, (Ht_flat, Ct_flat)
 
