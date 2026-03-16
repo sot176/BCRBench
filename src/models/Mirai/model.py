@@ -23,8 +23,8 @@ class Mirai(nn.Module):
         if hasattr(args, "freeze_image_encoder") and args.freeze_image_encoder:
             for param in self.image_encoder.parameters():
                 param.requires_grad = False
-
-        self.image_repr_dim = self.image_encoder._model.args.img_only_dim
+        
+        self.image_repr_dim = 512
 
         if args.transformer_snapshot is not None:
             self.transformer = load_model(
