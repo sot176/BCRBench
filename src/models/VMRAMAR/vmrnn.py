@@ -192,10 +192,20 @@ class VSB(nn.Module):
         x = self.ln_1(x)
         if hx is not None:
             hx = self.ln_1(hx)
-            x  = self.linear(torch.cat([x, hx], dim=-1))
-        x = x.view(B, H, W, C)
-        x = self.drop_path(self.self_attention(x))   # SS2D takes (B,H,W,C)
-        x = x.view(B, L, C)
+            x = self.linear(torch.cat([x, hx], dim=-1))
+
+            # In temporal mode (H=1, W=1), treat the full sequence as a 1D spatial map
+            # Reshape L timesteps as (1, L) spatial grid for SS2D
+            if H == 1 and W == 1:
+                x = x.view(B, 1, L, C)          # treat T as width dimension
+                x = self.drop_path(self.self_attention(x))
+                x = x.view(B, L, C)
+            else:
+                assert L == H * W
+                x = x.view(B, H, W, C)
+                x = self.drop_path(self.self_attention(x))
+                x = x.view(B, L, C)
+
         return shortcut + x
 
 
