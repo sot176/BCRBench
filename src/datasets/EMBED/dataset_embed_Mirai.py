@@ -37,7 +37,7 @@ def extract_date_from_filename(filename):
 
 MAX_VIEWS = 2
 MAX_SIDES = 2
-MAX_TIME=20
+MAX_TIME=10
 
 class BreastCancerRiskDatasetEMBED_Mirai(Dataset):
     def __init__(self, csv_file, image_dir, mode, transforms=None, n_years=5):
@@ -163,9 +163,9 @@ class BreastCancerRiskDatasetEMBED_Mirai(Dataset):
         all_sides = [0, 0, 1, 1]  # Right=0, Left=1
         time_stamps = [0] * len(all_images)
 
-        time_seq = pad_to_length(time_stamps, MAX_TIME, len(all_images))
-        view_seq = pad_to_length(all_views, MAX_VIEWS, len(all_images))
-        side_seq = pad_to_length(all_sides, MAX_SIDES, len(all_images))
+        time_seq = pad_to_length(time_stamps, -1, len(all_images))
+        view_seq = pad_to_length(all_views,   -1, len(all_images))
+        side_seq = pad_to_length(all_sides,   -1, len(all_images))
         images = images.permute(1, 0, 2, 3)  # [4, 3, H, W] → [3, 4, H, W]
 
         if time_to_cancer == 0:

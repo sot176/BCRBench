@@ -24,17 +24,13 @@ class Mirai(nn.Module):
             for param in self.image_encoder.parameters():
                 param.requires_grad = False
         
-        self.image_repr_dim = 512
-
         if args.transformer_snapshot is not None:
             self.transformer = load_model(
                 args.transformer_snapshot, args, do_wrap_model=False
             )
         else:
-            args.precomputed_hidden_dim = self.image_repr_dim
             self.transformer = get_model_by_name('transformer', False, args)
 
-        args.img_only_dim = self.transformer.args.transfomer_hidden_dim
 
     def forward(self, data, batch=None):
         x = data["images"]
@@ -48,7 +44,6 @@ class Mirai(nn.Module):
 
         # 3. Reshape to (B, N, D) and slice to image-only repr dim
         img_x = img_x.view(B, N, -1)
-        img_x = img_x[:, :, :self.image_repr_dim]
 
         # 4. Transformer aggregates across views/timepoints
         logit, transformer_hidden, activ_dict = self.transformer(img_x, None, batch)
