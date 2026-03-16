@@ -35,7 +35,7 @@ class Mirai(nn.Module):
 
             # Fix 2 — replace fc since original was 612 (512 + 100 risk factor dim)
             self.transformer.fc = nn.Linear(
-                self.args.embed_dim,   
+                512,   
                 self.transformer.fc.out_features    # keep same num classes
             )
 
@@ -43,7 +43,7 @@ class Mirai(nn.Module):
             self.transformer.args.survival_analysis_setup = args.survival_analysis_setup
             if args.survival_analysis_setup and not hasattr(self.transformer, 'prob_of_failure_layer'):
                 self.transformer.prob_of_failure_layer = CumulativeProbabilityLayer(
-                    self.args.embed_dim,
+                    512,
                     max_followup=args.max_followup
                 )
         else:
