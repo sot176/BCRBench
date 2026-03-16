@@ -13,56 +13,54 @@ class Mirai(nn.Module):
         super(Mirai, self).__init__()
         self.args = args
 
-        self.image_encoder = extract_mirai_backbone(
+        if args.img_encoder_snapshot is not None:
+            self.image_encoder = extract_mirai_backbone(
             cfg["paths"]["mirai_path"]
         )
+        else:
+            self.image_encoder = get_model_by_name('custom_resnet', False, args)
 
         if hasattr(args, "freeze_image_encoder") and args.freeze_image_encoder:
             for param in self.image_encoder.parameters():
                 param.requires_grad = False
 
+        self.image_repr_dim = self.image_encoder._model.args.img_only_dim
+
         if args.transformer_snapshot is not None:
             self.transformer = load_model(
-                args.transformer_snapshot, AllImageTransformer, args, do_wrap_model=False
+                args.transformer_snapshot, args, do_wrap_model=False
             )
         else:
+            args.precomputed_hidden_dim = self.image_repr_dim
             self.transformer = get_model_by_name('transformer', False, args)
 
-    def forward(self, data, risk_factors=None, batch=None):
-        x = data['images']
-        batch = data
+        args.img_only_dim = self.transformer.args.transfomer_hidden_dim
 
+    def forward(self, x, batch=None):
         B, C, N, H, W = x.size()
 
-        # 1. Encode every view with the shared backbone
-        x = x.transpose(1, 2).contiguous()   # (B, N, C, H, W)
-        x = x.view(B * N, C, H, W)
-        img_x = self.image_encoder(x)         # (B*N, precomputed_hidden_dim, h, w)
+        # 1. Flatten batch and views for the encoder
+        x = x.transpose(1, 2).contiguous().view(B * N, C, H, W)
 
-        # 2. Reshape into (B, N, precomputed_hidden_dim) — no spatial pooling here.
-        #    AllImageTransformer.projection_layer expects flat per-image vectors,
-        #    but the pool in aggregate_and_classify expects (B, D, N, 1).
-        #    We match what the original does: pool spatial dims, keep N for the transformer.
-        img_x = nn.functional.adaptive_avg_pool2d(img_x, 1)  # (B*N, D, 1, 1)
-        img_x = img_x.flatten(1)                              # (B*N, D)
-        img_x = img_x.view(B, N, -1)                         # (B, N, D)
+        # 2. Encode — returns (logit, hidden, activ_dict), hidden is already flat
+        _, img_x, _ = self.image_encoder(x, None, batch)
 
-        # 3. Transformer aggregates across views/timepoints and classifies
-        #    Returns: logit, transformer_hidden (B, N, hidden_dim), activ_dict
-        logit, transformer_hidden, activ_dict = self.transformer(
-            img_x, risk_factors, batch
-        )
+        # 3. Reshape to (B, N, D) and slice to image-only repr dim
+        img_x = img_x.view(B, N, -1)
+        img_x = img_x[:, :, :self.image_repr_dim]
 
-        return {
-            'logit': logit,
-            'transformer_hidden': transformer_hidden,
-            'activ_dict': activ_dict,
-        }
+        # 4. Transformer aggregates across views/timepoints
+        logit, transformer_hidden, activ_dict = self.transformer(img_x, None, batch)
+
+        return logit, transformer_hidden, activ_dict
 
     def get_risk_heads(self, outputs, batch):
+        logit, _, _ = outputs
         return {
-            "logit_output": (outputs["logit"], batch["target"], batch["y_mask"])
+            "logit_output": (logit, batch["target"], batch["y_mask"])
         }
 
     def get_primary_risk_head(self, outputs):
-        return outputs["logit"]
+        logit, _, _ = outputs
+        return logit
+
