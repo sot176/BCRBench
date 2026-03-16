@@ -41,7 +41,7 @@ mkdir -p  /scratch/project_465002309/thrunsol/VMaR_Risk_prediction_test_results_
 export PYTHONPATH=$WORKING_DIR
 
 
-accelerate launch  main_test_mirai.py \
+accelerate launch  main_test.py \
   --csv_file /scratch/project_465002309/thrunsol/embed_datasets/combined_cases_with_followup_race.csv \
   --data_root /scratch/project_465002309/thrunsol/embed_datasets/risk_dataset_1664_2048 \
   --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/Train_Risk_VMRA_MaR-16747214_Model_VMRA-MaR_lr_5e-05_wd_0.0001_epochs_30_bs_2_2026-03-15-19-48 \
