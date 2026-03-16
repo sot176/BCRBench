@@ -84,7 +84,7 @@ def parse_arguments():
     parser.add_argument("--patience", default=15, type=int)
     parser.add_argument("--batch_size", default=12, type=int)
     parser.add_argument("--num_workers", default=2, type=int)
-    parser.add_argument("--schuffle", default=True, type=bool)
+    parser.add_argument("--shuffle", default=True, type=bool)
     parser.add_argument("--pin_memory", default=True, type=bool)
     parser.add_argument("--dataset", type=str)
     parser.add_argument("--lr_decay", default=0.5, type=float)
@@ -299,7 +299,7 @@ def main():
         data_root=args.data_root,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        shuffle=args.schuffle,
+        shuffle=args.shuffle,
         pin_memory=args.pin_memory,
         transforms=train_transform
     )
@@ -311,7 +311,7 @@ def main():
         data_root=args.data_root,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        shuffle=args.schuffle,
+        shuffle=args.shuffle,
         pin_memory=args.pin_memory,
         transforms=train_transform
     )
