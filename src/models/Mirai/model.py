@@ -40,7 +40,7 @@ class Mirai(nn.Module):
         x = x.transpose(1, 2).contiguous().view(B * N, C, H, W)
 
         # 2. Encode — returns (logit, hidden, activ_dict), hidden is already flat
-        _, img_x, _ = self.image_encoder(x, None, batch)
+        img_x = self.image_encoder(x)
 
         # 3. Reshape to (B, N, D) and slice to image-only repr dim
         img_x = img_x.view(B, N, -1)
