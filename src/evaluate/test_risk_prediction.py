@@ -88,6 +88,7 @@ def test_risk(
     all_preds, all_times, all_events, all_densities, all_cancers, all_races = [], [], [], [], [], []
 
     model_risk.eval()
+    base_model = accelerator.unwrap_model(model_risk)
 
     with torch.no_grad():
         progress_bar = tqdm(test_loader, desc="Testing", disable=not accelerator.is_main_process)
@@ -96,7 +97,6 @@ def test_risk(
             # Risk model forward
             outputs = model_risk(batch)
 
-            base_model = accelerator.unwrap_model(model_risk)
             primary_logits = base_model.get_primary_risk_head(outputs)
 
             # Gather results from all processes
@@ -194,4 +194,3 @@ def test_risk(
         with open("results.json", "w") as f:
             json.dump(results, f, indent=2, default=str)
 
-    return None

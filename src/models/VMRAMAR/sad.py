@@ -3,6 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .asymmetry_metrics import hybrid_asymmetry
 from models.Mirai.onconet.models.factory import RegisterModel
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 @RegisterModel("sad")
 class SpatialAsymmetryDetector(nn.Module):
@@ -14,8 +17,8 @@ class SpatialAsymmetryDetector(nn.Module):
         super(SpatialAsymmetryDetector, self).__init__()
         self.args = args
         self.feature_dim = 512
-        self.latent_h = getattr(args, "latent_h", 5)
-        self.latent_w = getattr(args, "latent_w", 5)
+        self.latent_h = getattr(args, "latent_h", 64)
+        self.latent_w = getattr(args, "latent_w", 52)
 
         # Optional bias term
         self.use_bias = getattr(args, "use_sad_bias", True)
