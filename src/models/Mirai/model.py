@@ -30,7 +30,13 @@ class Mirai(nn.Module):
             )
             self.transformer.args.use_risk_factors = False
             self.transformer.pool = self.transformer.pool.internal_pool
-
+            # fc was trained with 512 + 100 (risk factor dim) = 612 input features
+            # replace it to accept 512 only, but keep output dim the same
+            original_fc = self.transformer.fc
+            self.transformer.fc = nn.Linear(
+                self.transformer.args.hidden_dim,  # 512
+                original_fc.out_features           # keep same number of classes
+            )
         else:
             self.transformer = get_model_by_name('transformer', False, args)
 
@@ -39,7 +45,7 @@ class Mirai(nn.Module):
         x = data["images"]
         B, C, N, H, W = x.size()
         batch=data
-        
+
         # 1. Flatten views for the encoder
         x = x.transpose(1, 2).contiguous().view(B * N, C, H, W)
 
