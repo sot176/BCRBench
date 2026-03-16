@@ -36,9 +36,10 @@ class Mirai(nn.Module):
 
         args.img_only_dim = self.transformer.args.transfomer_hidden_dim
 
-    def forward(self, x, batch=None):
+    def forward(self, data, batch=None):
+        x = data["images"]
         B, C, N, H, W = x.size()
-
+        batch=data
         # 1. Flatten batch and views for the encoder
         x = x.transpose(1, 2).contiguous().view(B * N, C, H, W)
 
