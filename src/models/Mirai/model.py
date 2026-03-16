@@ -41,8 +41,7 @@ class Mirai(nn.Module):
 
             # Fix 3 — ensure survival layer exists with correct args
             self.transformer.args.survival_analysis_setup = args.survival_analysis_setup
-            if args.survival_analysis_setup and not hasattr(self.transformer, 'prob_of_failure_layer'):
-                self.transformer.prob_of_failure_layer = CumulativeProbabilityLayer(
+            self.transformer.prob_of_failure_layer = CumulativeProbabilityLayer(
                     512,
                     max_followup=args.max_followup
                 )
