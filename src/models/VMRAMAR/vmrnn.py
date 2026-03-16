@@ -7,28 +7,29 @@ import torch.nn.functional as F
 # Linear Projection layer — fuses Tt and Ht-1, reshapes to spatial
 ############################################################
 class LinearProjection(nn.Module):
-    """
-    LP(Tt, Ht-1): concatenate → linear → reshape to (B, C, H, W)
-    """
     def __init__(self, input_dim, hidden_dim, spatial_h, spatial_w):
         super().__init__()
-        self.spatial_h = spatial_h
-        self.spatial_w = spatial_w
+        self.spatial_h  = spatial_h
+        self.spatial_w  = spatial_w
         self.hidden_dim = hidden_dim
-        # input_dim: dim of Tt, hidden_dim: dim of Ht (may differ if first step)
-        self.proj = nn.Linear(input_dim + hidden_dim, hidden_dim * spatial_h * spatial_w)
+        hidden_flat_dim = hidden_dim * spatial_h * spatial_w   # full flattened size
 
-    def forward(self, Tt, Ht):
-        """
-        Tt:  (B, D_in)
-        Ht:  (B, hidden_dim * H * W)  — flattened hidden state
-        Returns: Xt (B, hidden_dim, H, W)
-        """
-        x = torch.cat([Tt, Ht], dim=-1)                              # (B, D_in + hidden_dim*H*W)
-        x = self.proj(x)                                              # (B, hidden_dim*H*W)
-        B = x.shape[0]
-        return x.view(B, self.hidden_dim, self.spatial_h, self.spatial_w)  # (B, C, H, W)
+        # input_dim: dim of Tt  (e.g. 512)
+        # hidden_flat_dim: dim of Ht_prev flattened (e.g. 512*8*8 = 32768)
+        self.proj = nn.Linear(
+            input_dim + hidden_flat_dim,               # was: input_dim + hidden_dim ← bug
+            hidden_flat_dim
+        )
 
+    def forward(self, Tt, Ht_prev):
+        """
+        Tt:     (B, input_dim)
+        Ht_prev:(B, hidden_dim * H * W)  — already flat
+        """
+        x  = torch.cat([Tt, Ht_prev], dim=-1)         # (B, input_dim + hidden_flat_dim)
+        x  = self.proj(x)                              # (B, hidden_flat_dim)
+        B  = x.shape[0]
+        return x.view(B, self.hidden_dim, self.spatial_h, self.spatial_w)
 
 ############################################################
 # VSS Block — approximates S6 directional scanning
@@ -196,8 +197,8 @@ class VMRNN(nn.Module):
         self,
         input_dim,                      # dim of Tt coming in (embed_dim after aggregator)
         hidden_dim=256,                 # spatial hidden state channels
-        spatial_h=8,                    # spatial H for hidden state grid
-        spatial_w=8,                    # spatial W for hidden state grid
+        spatial_h=4,                    # spatial H for hidden state grid
+        spatial_w=4,                    # spatial W for hidden state grid
         depths_down=(2, 2, 6),
         depths_up=(2, 2, 2),
     ):

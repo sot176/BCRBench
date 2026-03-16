@@ -222,8 +222,8 @@ def parse_arguments():
                             help='Window size')
         parser.add_argument('--embed_dim', type=int, default=512,
                             help='Embedding dimension')
-        parser.add_argument('--vmrnn_spatial_h', type=int, default=8)
-        parser.add_argument('--vmrnn_spatial_w', type=int, default=8)
+        parser.add_argument('--vmrnn_spatial_h', type=int, default=4)
+        parser.add_argument('--vmrnn_spatial_w', type=int, default=4)
 
         # Asymmetry module parameters
         parser.add_argument('--use_asymmetry', action='store_true',
