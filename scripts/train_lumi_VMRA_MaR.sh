@@ -50,14 +50,14 @@ accelerate launch  main_train.py \
             --batch_size 2 \
             --augmentations "True" \
             --num_workers 7 \
-            --learning_rate 5e-5 \
+            --learning_rate 1e-4 \
             --weight_decay 1e-4 \
             --model "VMRA-MaR" \
             --use_asymmetry \
             --use_sad_bias \
             --use_lat_bn \
             --lr_decay 0.5 \
-            --patience_lr_scheduler 3 \
+            --patience_lr_scheduler 5 \
             --num_epochs 30 \
             --patience 15 \
             --dataset "EMBED" \
