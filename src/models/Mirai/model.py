@@ -46,6 +46,8 @@ class Mirai(nn.Module):
                     512,
                     max_followup=args.max_followup
                 )
+            print("New fc shape:", self.transformer.fc.weight.shape)  # should be (2, 512) not (2, 612)
+
         else:
             self.transformer = get_model_by_name('transformer', False, args)
 
