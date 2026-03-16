@@ -384,13 +384,13 @@ class VMRNN(nn.Module):
         super().__init__()
         self.Downsample = DownSample(
             embed_dim=embed_dim,
-            depths_downsample=depths_downsample,
+            depths=depths_downsample,         
             feature_resolution=feature_resolution,
             **kwargs
         )
         self.Upsample = UpSample(
             embed_dim=embed_dim,
-            depths_upsample=depths_upsample,
+            depths=depths_upsample,           
             feature_resolution=feature_resolution,
             **kwargs
         )
