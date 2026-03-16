@@ -11,9 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import kornia.augmentation as K_A
 from kornia.constants import Resample
-from sklearn.utils.class_weight import compute_class_weight
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
+from utils.utils import RACE_TO_ID
 
 def pad_to_length(arr, pad_token, max_length):
     arr = arr[-max_length:]
@@ -165,6 +163,10 @@ class BreastCancerRiskDatasetEMBED_VMRA(Dataset):
 
         density = self.map_density(metadata["density"])
         cancer_type = self.map_cancer_type(metadata["path_severity"])
+        race_str = metadata["RACE_DESC"]
+        if not isinstance(race_str, str) or race_str.strip() == "":
+            race_str = "Unknown"
+        race_id = RACE_TO_ID.get(race_str, RACE_TO_ID["Unknown"])
 
         if time_to_cancer == 0:
             time_to_cancer = 1
@@ -207,6 +209,7 @@ class BreastCancerRiskDatasetEMBED_VMRA(Dataset):
             'time_seq': torch.tensor(time_seq, dtype=torch.long),
             'view_seq': torch.tensor(view_seq, dtype=torch.long),
             'side_seq': torch.tensor(side_seq, dtype=torch.long),
+            'race':  torch.tensor(race_id, dtype=torch.long),
         }
 
 
