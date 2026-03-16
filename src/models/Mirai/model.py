@@ -29,7 +29,16 @@ class Mirai(nn.Module):
                 args.transformer_snapshot, args, do_wrap_model=False
             )
             self.transformer.args.use_risk_factors = False
+            # Check 1 — what pool is currently loaded
+            print("Current pool:", self.transformer.pool)
 
+            # Check 2 — does it replace fc
+            print("Current pool replaces_fc:", self.transformer.pool.replaces_fc())
+
+            # Check 3 — does fc exist on the transformer
+            print("Has fc:", hasattr(self.transformer, 'fc'))
+            print("Has relu:", hasattr(self.transformer, 'relu'))
+            print("Has dropout:", hasattr(self.transformer, 'dropout'))
         else:
             self.transformer = get_model_by_name('transformer', False, args)
 
