@@ -39,7 +39,7 @@ class VMRAMaR(nn.Module):
         # --------------------------------------------------
         self.vmrnn = VMRNN(
             input_dim=args.embed_dim,                          # 512
-            hidden_dim=getattr(args, 'vmrnn_hidden_dim', 64),  # internal dim, not embed_dim//2
+            hidden_dim=getattr(args, 'vmrnn_hidden_dim', 256),  # internal dim
             spatial_h=getattr(args, 'vmrnn_spatial_h', 16),
             spatial_w=getattr(args, 'vmrnn_spatial_w', 16),
             depths_down=args.depths_downsample,                # [2,2,6,2]

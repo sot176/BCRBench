@@ -4,6 +4,7 @@ from .onconet.models.factory import get_model_by_name, load_model, RegisterModel
 from .onconet.models.hiddens_transfomer import AllImageTransformer
 from models.common_parts import extract_mirai_backbone
 from config.config import cfg
+from models.common_parts  import  CumulativeProbabilityLayer
 
 
 @RegisterModel("mirai_full")
@@ -28,15 +29,23 @@ class Mirai(nn.Module):
             self.transformer = load_model(
                 args.transformer_snapshot, args, do_wrap_model=False
             )
+            # Fix 1 — remove risk factor dependency from pool
             self.transformer.args.use_risk_factors = False
             self.transformer.pool = self.transformer.pool.internal_pool
-            # fc was trained with 512 + 100 (risk factor dim) = 612 input features
-            # replace it to accept 512 only, but keep output dim the same
-            original_fc = self.transformer.fc
+
+            # Fix 2 — replace fc since original was 612 (512 + 100 risk factor dim)
             self.transformer.fc = nn.Linear(
-                self.transformer.args.hidden_dim,  # 512
-                original_fc.out_features           # keep same number of classes
+                self.transformer.args.hidden_dim,   # 512
+                self.transformer.fc.out_features    # keep same num classes
             )
+
+            # Fix 3 — ensure survival layer exists with correct args
+            self.transformer.args.survival_analysis_setup = args.survival_analysis_setup
+            if args.survival_analysis_setup and not hasattr(self.transformer, 'prob_of_failure_layer'):
+                self.transformer.prob_of_failure_layer = CumulativeProbabilityLayer(
+                    self.transformer.args.hidden_dim,
+                    max_followup=args.max_followup
+                )
         else:
             self.transformer = get_model_by_name('transformer', False, args)
 
