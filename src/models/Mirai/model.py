@@ -29,16 +29,8 @@ class Mirai(nn.Module):
                 args.transformer_snapshot, args, do_wrap_model=False
             )
             self.transformer.args.use_risk_factors = False
-            # Check 1 — what pool is currently loaded
-            print("Current pool:", self.transformer.pool)
+            self.transformer.pool = self.transformer.pool.internal_pool
 
-            # Check 2 — does it replace fc
-            print("Current pool replaces_fc:", self.transformer.pool.replaces_fc())
-
-            # Check 3 — does fc exist on the transformer
-            print("Has fc:", hasattr(self.transformer, 'fc'))
-            print("Has relu:", hasattr(self.transformer, 'relu'))
-            print("Has dropout:", hasattr(self.transformer, 'dropout'))
         else:
             self.transformer = get_model_by_name('transformer', False, args)
 
@@ -47,17 +39,22 @@ class Mirai(nn.Module):
         x = data["images"]
         B, C, N, H, W = x.size()
         batch=data
-        # 1. Flatten batch and views for the encoder
+        
+        # 1. Flatten views for the encoder
         x = x.transpose(1, 2).contiguous().view(B * N, C, H, W)
 
-        # 2. Encode — returns (logit, hidden, activ_dict), hidden is already flat
-        img_x = self.image_encoder(x)
+        # 2. Encode
+        img_x = self.image_encoder(x)                                # (B*N, 512, h, w)
 
-        # 3. Reshape to (B, N, 512) and slice to image-only repr dim
-        img_x = nn.functional.adaptive_avg_pool2d(img_x, 1)
-        img_x = img_x.view(B, N, -1)
+        # 3. Pool spatial dims and reshape
+        img_x = nn.functional.adaptive_avg_pool2d(img_x, 1)         # (B*N, 512, 1, 1)
+        img_x = img_x.flatten(1)                                     # (B*N, 512)
+        img_x = img_x.view(B, N, -1)                                 # (B, N, 512)
+
         # 4. Transformer aggregates across views/timepoints
-        logit, transformer_hidden, activ_dict = self.transformer(img_x, None, batch)
+        logit, transformer_hidden, activ_dict = self.transformer(
+            img_x, None, batch
+        )
 
         return logit, transformer_hidden, activ_dict
 
