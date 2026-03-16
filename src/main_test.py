@@ -23,6 +23,7 @@ def parse_arguments():
     parser.add_argument("--early_stop", type=str, default="False")
     parser.add_argument("--best_model", type=str, default="False")
     parser.add_argument("--use_checkppoint", type=str, default="False")
+    parser.add_argument("--finetune_all", action="store_true")
 
     # Dataloader args
     parser.add_argument("--batch_size", default=20, type=int)
