@@ -295,44 +295,6 @@ class PatchExpanding(nn.Module):
         return x
 
 
-# ── DownSample ─────────────────────────────────────────────────────────────
-class DownSample(nn.Module):
-    def __init__(self, embed_dim, depths, feature_resolution,
-                 drop_path_rate=0.1, attn_drop=0., d_state=16):
-        super().__init__()
-        H, W = feature_resolution
-        dpr  = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]
-        self.layers     = nn.ModuleList()
-        self.downsample = nn.ModuleList()
-        dim = embed_dim
-
-        for i, depth in enumerate(depths):
-            res = (H // (2 ** i), W // (2 ** i))
-            self.layers.append(VMRNNCell(
-                dim, res, depth,
-                drop_path=dpr[sum(depths[:i]):sum(depths[:i+1])],
-                attn_drop=attn_drop, d_state=d_state
-            ))
-            if i < len(depths) - 1:
-                self.downsample.append(PatchMerging(res, dim))
-                dim *= 2
-            else:
-                self.downsample.append(nn.Identity())
-
-        self.out_dim = dim
-
-    def forward(self, x, states):
-        # x: (B, L, C)
-        if states is None:
-            states = [None] * len(self.layers)
-        new_states = []
-        skips      = []
-        for layer, down, state in zip(self.layers, self.downsample, states):
-            x, new_state = layer(x, state)
-            new_states.append(new_state)
-            skips.append(x)
-            x = down(x)
-        return new_states, skips, x
 
 class PatchInflated(nn.Module):
     """
@@ -430,11 +392,14 @@ class UpSample(nn.Module):
                 max(patches_resolution[0] // (2 ** (n - i)), 1),
                 max(patches_resolution[1] // (2 ** (n - i)), 1)
             )
-            dim = int(embed_dim * 2 ** (n - i))
+            # In temporal mode dim never changes — always embed_dim
+            dim = embed_dim if is_temporal else int(embed_dim * 2 ** (n - i))
+
             if is_temporal:
                 upsample = nn.Identity()
             else:
                 upsample = PatchExpanding(input_resolution=res, dim=dim)
+
             self.layers.append(VMRNNCell(
                 dim, res,
                 depth=depths[n - 1 - i],
