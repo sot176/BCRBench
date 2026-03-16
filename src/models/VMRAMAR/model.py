@@ -40,8 +40,8 @@ class VMRAMaR(nn.Module):
         self.vmrnn = VMRNN(
             input_dim=args.embed_dim,       # dim of aggregated embedding
             hidden_dim=args.embed_dim,
-            spatial_h=getattr(args, 'vmrnn_spatial_h', 4),
-            spatial_w=getattr(args, 'vmrnn_spatial_w', 4),
+            spatial_h=getattr(args, 'vmrnn_spatial_h', 16),
+            spatial_w=getattr(args, 'vmrnn_spatial_w', 16),
             depths_down=args.depths_downsample,
             depths_up=args.depths_upsample,
         )
