@@ -68,7 +68,14 @@ def test_risk(
     )
 
     checkpoint_risk = torch.load(path_model, map_location="cpu")
-    model_risk.load_state_dict({k.replace("module.", ""): v for k, v in checkpoint_risk.items()})
+
+    # Extract just the model weights from the full checkpoint
+    state_dict = checkpoint_risk["model"]
+
+    # Strip DDP "module." prefix if present
+    state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+
+    model_risk.load_state_dict(state_dict)
     model_risk.eval()
 
     # 3. Prepare models and dataloader with Accelerator
