@@ -18,6 +18,19 @@ def map_density( value):
     }
     return mapping.get(value, "NA")
 
+RACES = [
+    "Caucasian or White",
+    "African American  or Black",
+    "Asian",
+    "American Indian or Alaskan Native",
+    "Native Hawaiian or Other Pacific Islander",
+    "Multiple",
+    "Unknown",
+    "Unavailable or Unreported",
+]
+
+RACE_TO_ID = {r: i for i, r in enumerate(RACES)}
+ID_TO_RACE = {i: r for r, i in RACE_TO_ID.items()}
 
 
 def bootstrap_c_index(

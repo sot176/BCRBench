@@ -8,8 +8,6 @@ import os
 from utils import (
     create_logger,
     save_model_results_to_file,
-    print_results,
-    compute_auc_x_year_auc,
     bootstrap_c_index,
     bootstrap_auc_by_density,
     bootstrap_c_index_by_density,
@@ -17,6 +15,7 @@ from utils import (
     bootstrap_c_index_by_cancer_type,
     bootstrap_auc_by_cancer_type,
     get_censoring_dist,
+    bootstrap_auc_by_race, bootstrap_c_index_by_race, ID_TO_RACE
 )
 from config.config import cfg
 from models.model_factory import get_model
@@ -79,7 +78,7 @@ def test_risk(
     if accelerator.is_main_process:
         print("[INFO] Evaluating on test dataset...")
 
-    all_preds, all_times, all_events, all_densities, all_cancers = [], [], [], [], []
+    all_preds, all_times, all_events, all_densities, all_cancers, all_races = [], [], [], [], [], []
 
     model_risk.eval()
 
@@ -99,7 +98,10 @@ def test_risk(
             gathered_events = accelerator.gather(batch["event_observed"])
             gathered_densities = accelerator.gather(batch["density"])
             gathered_cancer_types = accelerator.gather(batch["cancer_type"])
-
+            if args.dataset in {"EMBED"}:
+                gathered_race = accelerator.gather(batch["race"])
+                all_races.append(gathered_race.cpu())
+            
             all_preds.append(gathered_preds.cpu())
             all_times.append(gathered_times.cpu())
             all_events.append(gathered_events.cpu())
@@ -117,8 +119,10 @@ def test_risk(
         event_observed = torch.cat(all_events).numpy()
         density_categories = torch.cat(all_densities).numpy()
         cancer_categories = torch.cat(all_cancers).numpy()
+        if args.dataset in {"EMBED"}:
+            race_ids = torch.cat(all_races).numpy()
+            race_categories = [ID_TO_RACE[int(r)] for r in race_ids]
 
-        # Compute censoring distribution
         censoring_dist = get_censoring_dist(event_times, event_observed)
 
         # Save predictions and labels
@@ -153,7 +157,15 @@ def test_risk(
             f"{year}": {"Mean": mean_auc, "95% CI": ci}
             for year, (mean_auc, ci) in auc_summary.items()
         }
-
+        if args.dataset in {"EMBED"}:
+            auc_by_race = bootstrap_auc_by_race(event_times, predictions, event_observed, race_categories)
+            c_index_by_race, c_index_scores_race = bootstrap_c_index_by_race(
+                event_times, predictions, event_observed, race_categories, censoring_dist,
+                save_json_path=out_dir
+            )
+        else:
+            auc_by_race = None
+            c_index_by_race = None
         results = {
             "C-index": {"Mean": mean_c_index, "95% CI": c_index_ci},
             "Yearly AUCs": auc_formatted,
@@ -161,6 +173,8 @@ def test_risk(
             "C index by density categories": c_index_by_density,
             "AUC by cancer categories": auc_by_cancer_types,
             "C index by cancer categories": c_index_by_cancer_types,
+            "AUC by race categories": auc_by_race,
+            "C index by race categories": c_index_by_race,
         }
 
         # Pretty print to console
