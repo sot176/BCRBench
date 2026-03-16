@@ -102,12 +102,11 @@ class VMRAMaR(nn.Module):
             outputs.append(out)                              # (B, hidden_dim)
 
         outputs = torch.stack(outputs, dim=1)            # (B, T, C)
-        temporal_feature = outputs.mean(dim=1)           # (B, C)
 
         # --------------------------------------------------
         # Temporal pooling over T and spatial dims
         # --------------------------------------------------
-        temporal_feature = outputs.mean(dim=(1, 3, 4))  # (B, C)
+        temporal_feature = outputs.mean(dim=1)           # (B, C)
 
         # --------------------------------------------------
         # Asymmetry features
