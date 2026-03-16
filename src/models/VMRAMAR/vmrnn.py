@@ -243,7 +243,7 @@ class VMRNN(nn.Module):
         self.out_proj = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
             nn.Flatten(),
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(hidden_dim, input_dim),    # ← projects back to embed_dim (e.g. 512)
         )
 
     @staticmethod
