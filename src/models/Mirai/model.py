@@ -28,6 +28,8 @@ class Mirai(nn.Module):
             self.transformer = load_model(
                 args.transformer_snapshot, args, do_wrap_model=False
             )
+            self.transformer.args.use_risk_factors = False
+
         else:
             self.transformer = get_model_by_name('transformer', False, args)
 
