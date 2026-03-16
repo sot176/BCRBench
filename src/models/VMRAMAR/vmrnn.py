@@ -435,32 +435,26 @@ class VMRNN(nn.Module):
                              drop_path_rate, attn_drop, d_state)
 
         # Project back to input_dim for the rest of the model
-        self.out_norm = nn.LayerNorm(self.down.out_dim)
+        self.out_norm = nn.LayerNorm(hidden_dim)          # final decoder output = hidden_dim
         self.out_proj = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
             nn.Flatten(),
-            nn.Linear(self.down.out_dim, input_dim),
+            nn.Linear(hidden_dim, input_dim),             # 64 → 512
         )
 
     def forward(self, Tt, states_down=None, states_up=None):
-        """
-        Tt: (B, input_dim)
-        Returns: out (B, input_dim), states_down, states_up
-        """
         B = Tt.shape[0]
         H, W = self.down.layers[0].input_resolution
 
-        # Project and tile to spatial grid
-        x = self.input_proj(Tt)                    # (B, hidden_dim)
-        x = x.unsqueeze(1).unsqueeze(1)            # (B, 1, 1, C)
-        x = x.expand(B, H, W, -1).contiguous()    # (B, H, W, C)
+        x = self.input_proj(Tt)                        # (B, hidden_dim)
+        x = x.unsqueeze(1).unsqueeze(1)
+        x = x.expand(B, H, W, -1).contiguous()        # (B, H, W, hidden_dim)
 
         states_down, skips, x = self.down(x, states_down)
         states_up,   x        = self.up(x, skips, states_up)
 
-        # Pool spatial → (B, C)
-        x = self.out_norm(x)
-        x = x.permute(0, 3, 1, 2)                 # (B, C, H, W)
-        out = self.out_proj(x)                     # (B, input_dim)
+        x = self.out_norm(x)                           # (B, H, W, hidden_dim) — correct shape now
+        x = x.permute(0, 3, 1, 2)                     # (B, hidden_dim, H, W)
+        out = self.out_proj(x)                         # (B, input_dim)
 
         return out, states_down, states_up
