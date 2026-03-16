@@ -38,10 +38,12 @@ class VMRAMaR(nn.Module):
         # VMRNN
         # --------------------------------------------------
         self.vmrnn = VMRNN(
-            embed_dim=args.embed_dim,
+            input_dim=args.embed_dim,       # dim of aggregated embedding
+            hidden_dim=args.embed_dim,
+            spatial_h=getattr(args, 'vmrnn_spatial_h', 8),
+            spatial_w=getattr(args, 'vmrnn_spatial_w', 8),
             depths_down=args.depths_downsample,
             depths_up=args.depths_upsample,
-            feature_resolution=args.feature_resolution
         )
 
         # --------------------------------------------------
@@ -86,6 +88,8 @@ class VMRAMaR(nn.Module):
         # --------------------------------------------------
         visit_embeddings = self.image_aggregator(feats)  # (B, T, C, H, W)
 
+        visit_embeddings_flat = visit_embeddings.mean(dim=(-2,-1))  # (B, T, C)
+
         # --------------------------------------------------
         # VMRNN temporal modeling
         # --------------------------------------------------
@@ -93,20 +97,12 @@ class VMRAMaR(nn.Module):
         states_up = None
         outputs = []
         for t in range(T):
-            xt = visit_embeddings[:, t]              # (B, C, H, W)
-            B, C, Hc, Wc = xt.shape
-            xt_flat = xt.view(B, Hc * Wc, C)        # (B, L, C)
+            Tt = visit_embeddings_flat[:, t]                 # (B, C)
+            out, states_down, states_up = self.vmrnn(Tt, states_down, states_up)
+            outputs.append(out)                              # (B, hidden_dim)
 
-            out, H_out, W_out, states_down, states_up = self.vmrnn(
-                xt_flat, states_down, states_up
-            )  # out: (B, L_out, C_out)
-
-            C_out = out.shape[2]
-            out = out.view(B, H_out, W_out, C_out).permute(0, 3, 1, 2)  # (B, C_out, H_out, W_out)
-            outputs.append(out)
-
-        outputs = torch.stack(outputs, dim=1)  # (B, T, C_out, H_out, W_out)
-
+        outputs = torch.stack(outputs, dim=1)            # (B, T, C)
+        temporal_feature = outputs.mean(dim=1)           # (B, C)
 
         # --------------------------------------------------
         # Temporal pooling over T and spatial dims

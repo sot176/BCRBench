@@ -1,10 +1,165 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from einops import rearrange
+
 
 ############################################################
-# Conv Downsample  
+# Linear Projection layer — fuses Tt and Ht-1, reshapes to spatial
+############################################################
+class LinearProjection(nn.Module):
+    """
+    LP(Tt, Ht-1): concatenate → linear → reshape to (B, C, H, W)
+    """
+    def __init__(self, input_dim, hidden_dim, spatial_h, spatial_w):
+        super().__init__()
+        self.spatial_h = spatial_h
+        self.spatial_w = spatial_w
+        self.hidden_dim = hidden_dim
+        # input_dim: dim of Tt, hidden_dim: dim of Ht (may differ if first step)
+        self.proj = nn.Linear(input_dim + hidden_dim, hidden_dim * spatial_h * spatial_w)
+
+    def forward(self, Tt, Ht):
+        """
+        Tt:  (B, D_in)
+        Ht:  (B, hidden_dim * H * W)  — flattened hidden state
+        Returns: Xt (B, hidden_dim, H, W)
+        """
+        x = torch.cat([Tt, Ht], dim=-1)                              # (B, D_in + hidden_dim*H*W)
+        x = self.proj(x)                                              # (B, hidden_dim*H*W)
+        B = x.shape[0]
+        return x.view(B, self.hidden_dim, self.spatial_h, self.spatial_w)  # (B, C, H, W)
+
+
+############################################################
+# VSS Block — approximates S6 directional scanning
+# Full Mamba requires custom CUDA kernels; this uses depthwise
+# conv + channel mixing as a tractable approximation
+############################################################
+class VSSBlock(nn.Module):
+    """
+    Approximation of the VSS Block from the paper:
+      Primary stream:   DWConv3x3 → SiLU → directional mixing
+      Secondary stream: SiLU(A)
+      Combine: A3 + B1, then sigmoid gate
+    """
+    def __init__(self, dim):
+        super().__init__()
+        # Primary stream
+        self.dw_conv = nn.Conv2d(dim, dim, kernel_size=3, padding=1, groups=dim)
+        self.norm = nn.LayerNorm(dim)
+
+        # Directional mixing — approximate 4-direction S6 with 4 depthwise convs
+        # with different asymmetric kernels to capture directional context
+        self.dir_convs = nn.ModuleList([
+            nn.Conv2d(dim, dim, kernel_size=(1, 3), padding=(0, 1), groups=dim),  # horizontal
+            nn.Conv2d(dim, dim, kernel_size=(3, 1), padding=(1, 0), groups=dim),  # vertical
+            nn.Conv2d(dim, dim, kernel_size=(1, 3), padding=(0, 1), groups=dim),  # horizontal flip
+            nn.Conv2d(dim, dim, kernel_size=(3, 1), padding=(1, 0), groups=dim),  # vertical flip
+        ])
+        self.merge_norm = nn.LayerNorm(dim)
+        self.merge_proj = nn.Linear(dim * 4, dim)
+
+    def forward(self, A):
+        """
+        A: (B, C, H, W)
+        Returns: Ft (B, C, H, W) — sigmoid gate, and Y (B, C, H, W)
+        """
+        # Primary stream: DWConv → SiLU → 4-direction scan → merge → LayerNorm
+        A1 = F.silu(self.dw_conv(A))                                 # (B, C, H, W)
+
+        # Directional scans (approximate S6 with asymmetric depthwise convs)
+        dir_feats = []
+        for i, conv in enumerate(self.dir_convs):
+            feat = A1
+            # Flip for reverse directions (dirs 2 and 3)
+            if i == 2:
+                feat = torch.flip(feat, dims=[-1])
+            elif i == 3:
+                feat = torch.flip(feat, dims=[-2])
+            feat = conv(feat)
+            if i == 2:
+                feat = torch.flip(feat, dims=[-1])
+            elif i == 3:
+                feat = torch.flip(feat, dims=[-2])
+            dir_feats.append(feat)
+
+        # Merge 4 directions → LayerNorm
+        merged = torch.cat(dir_feats, dim=1)                         # (B, 4C, H, W)
+        B, _, H, W = merged.shape
+        merged = merged.permute(0, 2, 3, 1)                          # (B, H, W, 4C)
+        A3 = self.merge_norm(self.merge_proj(merged))                # (B, H, W, C)
+        A3 = A3.permute(0, 3, 1, 2)                                  # (B, C, H, W)
+
+        # Secondary stream: SiLU(A)
+        B1 = F.silu(A)                                               # (B, C, H, W)
+
+        # Combine — paper eq (4): Y = A3 + B1
+        Y = A3 + B1                                                  # (B, C, H, W)
+
+        # Gate — paper eq: Ft = sigmoid(Y)
+        Ft = torch.sigmoid(Y)
+
+        return Ft, Y
+
+
+############################################################
+# VMRNN Cell — follows paper equations exactly
+############################################################
+class VMRNNCell(nn.Module):
+    """
+    Per paper:
+        Xt  = LP(Tt, Ht-1)           — linear projection + reshape
+        Ft  = VSS(Xt)                — gating signal
+        Ct  = Ft ⊙ (tanh(Y) + Ct-1) — cell update
+        Ht  = Ft ⊙ tanh(Ct)         — hidden update
+    """
+    def __init__(self, input_dim, hidden_dim, spatial_h, spatial_w):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.spatial_h  = spatial_h
+        self.spatial_w  = spatial_w
+        self.spatial_size = spatial_h * spatial_w
+
+        self.lp  = LinearProjection(input_dim, hidden_dim, spatial_h, spatial_w)
+        self.vss = VSSBlock(hidden_dim)
+
+    def forward(self, Tt, state):
+        """
+        Tt:    (B, input_dim)  — fused embedding for timestep t
+        state: None or (Ht, Ct) where each is (B, hidden_dim*H*W)
+        Returns:
+            Ht_flat: (B, hidden_dim*H*W)
+            (Ht_flat, Ct_flat)
+        """
+        B = Tt.shape[0]
+        hidden_size = self.hidden_dim * self.spatial_size
+
+        if state is None:
+            Ht_prev = torch.zeros(B, hidden_size, device=Tt.device, dtype=Tt.dtype)
+            Ct_prev = torch.zeros(B, hidden_size, device=Tt.device, dtype=Tt.dtype)
+        else:
+            Ht_prev, Ct_prev = state
+
+        Ct_prev_spatial = Ct_prev.view(B, self.hidden_dim, self.spatial_h, self.spatial_w)
+
+        # LP: fuse Tt and Ht-1, reshape to spatial
+        Xt = self.lp(Tt, Ht_prev)                                    # (B, C, H, W)
+
+        # VSS: get gate Ft and pre-gate Y
+        Ft, Y = self.vss(Xt)                                         # both (B, C, H, W)
+
+        # Cell and hidden state updates — paper equations
+        Ct = Ft * (torch.tanh(Y) + Ct_prev_spatial)                  # (B, C, H, W)
+        Ht = Ft * torch.tanh(Ct)                                     # (B, C, H, W)
+
+        Ht_flat = Ht.view(B, -1)                                     # (B, C*H*W)
+        Ct_flat = Ct.view(B, -1)                                     # (B, C*H*W)
+
+        return Ht_flat, (Ht_flat, Ct_flat)
+
+
+############################################################
+# Conv Downsample / Upsample (unchanged)
 ############################################################
 class ConvDownsample(nn.Module):
     def __init__(self, in_ch, out_ch):
@@ -12,208 +167,145 @@ class ConvDownsample(nn.Module):
         self.conv = nn.Conv2d(in_ch, out_ch, kernel_size=2, stride=2)
 
     def forward(self, x, H, W):
-        B, L, C = x.shape
-        assert L == H * W, f"Expected L={H*W}, got L={L}"
-        x = x.view(B, H, W, C).permute(0, 3, 1, 2)
+        B, C, H_in, W_in = x.shape
         x = self.conv(x)
-        B, C, H_out, W_out = x.shape
-        x = x.permute(0, 2, 3, 1).view(B, H_out * W_out, C)
-        return x, H_out, W_out
- 
+        return x, x.shape[2], x.shape[3]
 
 
-############################################################
-# VSB Block
-############################################################
-class VSB(nn.Module):
-    def __init__(self, hidden_dim, drop_path=0., norm_layer=nn.LayerNorm):
-        super().__init__()
-        self.norm = norm_layer(hidden_dim)
-        self.self_attention = nn.MultiheadAttention(
-            embed_dim=hidden_dim, num_heads=4, batch_first=True
-        )
-        self.drop_path = nn.Dropout(drop_path) if drop_path > 0 else nn.Identity()
-        self.linear = nn.Linear(hidden_dim * 2, hidden_dim)
-
-    def forward(self, x, hx=None):
-        shortcut = x
-        x = self.norm(x)
-        if hx is not None:
-            hx = self.norm(hx)
-            x = self.linear(torch.cat([x, hx], dim=-1))
-        x, _ = self.self_attention(x, x, x)
-        x = self.drop_path(x)
-        return shortcut + x
-
-
-############################################################
-# VMRNN Cell
-############################################################
-class VMRNNCell(nn.Module):
-    def __init__(self, hidden_dim, depth, drop_path=0., norm_layer=nn.LayerNorm):
-        super().__init__()
-        # Remove input_resolution — cells don't need it, shapes come at runtime
-        self.layers = nn.ModuleList([
-            VSB(hidden_dim, drop_path, norm_layer)
-            for _ in range(depth)
-        ])
-
-    def forward(self, xt, states):
-        if states is None:
-            hx = torch.zeros_like(xt)
-            cx = torch.zeros_like(xt)
-        else:
-            hx, cx = states
-        x = xt
-        for layer in self.layers:
-            x = layer(x, hx)
-        gate = torch.sigmoid(x)
-        cell = torch.tanh(x)
-        Ct = gate * (cx + cell)
-        Ht = gate * torch.tanh(Ct)
-        return Ht, (Ht, Ct)
-
-
-############################################################
-# Downsample Encoder
-############################################################
-class DownSample(nn.Module):
-    def __init__(self, embed_dim, depths):
-        super().__init__()
-        self.cells = nn.ModuleList()
-        self.downsamplers = nn.ModuleList()
-        dim = embed_dim
-        for depth in depths:
-            self.cells.append(VMRNNCell(dim, depth))
-            self.downsamplers.append(ConvDownsample(dim, dim * 2))
-            dim *= 2
-        self.out_dim = dim  # dim at the bottom of the encoder
-
-    def forward(self, x, H, W, states):
-        if states is None:
-            states = [None] * len(self.cells)
-        new_states = []
-        skips = []                          # save pre-downsample features for skip connections
-        for i, (cell, down) in enumerate(zip(self.cells, self.downsamplers)):
-            x, state = cell(x, states[i])
-            new_states.append(state)
-            skips.append((x, H, W))        # (B, L, C) before spatial reduction
-            x, H, W = down(x, H, W)
-        return new_states, skips, x, H, W
-
-
-############################################################
-# Upsample Decoder
-############################################################
 class ConvUpsample(nn.Module):
     def __init__(self, in_ch, out_ch):
         super().__init__()
         self.conv = nn.ConvTranspose2d(in_ch, out_ch, kernel_size=2, stride=2)
 
     def forward(self, x, H, W):
-        B, L, C = x.shape
-        assert L == H * W, f"Expected L={H*W}, got L={L}"
-        x = x.view(B, H, W, C).permute(0, 3, 1, 2)   # (B, C, H, W)
-        x = self.conv(x)                                # (B, out_ch, H', W')
-        B, C, H_out, W_out = x.shape
-        x = x.permute(0, 2, 3, 1).view(B, H_out * W_out, C)
-        return x, H_out, W_out
+        x = self.conv(x)
+        return x, x.shape[2], x.shape[3]
 
 
 ############################################################
-# UpSample — force skip spatial match
-############################################################
-class UpSample(nn.Module):
-    def __init__(self, embed_dim, depths):
-        super().__init__()
-        self.upsamplers = nn.ModuleList()
-        self.cells = nn.ModuleList()
-        self.skip_projs = nn.ModuleList()
-
-        n = len(depths)
-        dim = embed_dim * (2 ** n)
-
-        for depth in depths:
-            out_dim = dim // 2
-            self.upsamplers.append(ConvUpsample(dim, out_dim))
-            self.skip_projs.append(nn.Linear(out_dim * 2, out_dim))
-            self.cells.append(VMRNNCell(out_dim, depth))
-            dim = out_dim
-
-    @staticmethod
-    def _match_spatial(x, H_x, W_x, skip_x, H_skip, W_skip):
-        """Crop or pad x so its spatial dims match the skip tensor exactly."""
-        if H_x == H_skip and W_x == W_skip:
-            return x, H_skip, W_skip
-
-        B, L, C = x.shape
-        # Reshape to 2D spatial
-        x2d = x.view(B, H_x, W_x, C).permute(0, 3, 1, 2)  # (B, C, H_x, W_x)
-
-        # Crop if upsampled too large
-        x2d = x2d[:, :, :H_skip, :W_skip]
-
-        # Pad if upsampled too small
-        pad_h = max(H_skip - x2d.shape[2], 0)
-        pad_w = max(W_skip - x2d.shape[3], 0)
-        if pad_h > 0 or pad_w > 0:
-            x2d = F.pad(x2d, (0, pad_w, 0, pad_h))
-
-        x = x2d.permute(0, 2, 3, 1).contiguous().view(B, H_skip * W_skip, C)
-        return x, H_skip, W_skip
-
-    def forward(self, x, H, W, skips, states):
-        if states is None:
-            states = [None] * len(self.cells)
-        new_states = []
-
-        for i, (up, proj, cell) in enumerate(
-            zip(self.upsamplers, self.skip_projs, self.cells)
-        ):
-            x, H, W = up(x, H, W)
-
-            skip_x, H_skip, W_skip = skips[-(i + 1)]
-
-            # Force spatial dims to match skip exactly
-            x, H, W = self._match_spatial(x, H, W, skip_x, H_skip, W_skip)
-
-            x = proj(torch.cat([x, skip_x], dim=-1))
-            x, state = cell(x, states[i])
-            new_states.append(state)
-
-        return new_states, x, H, W
-
-
-############################################################
-# Full VMRNN
+# Full VMRNN — downsample + upsample with skip connections
+# Operates on spatial tensors (B, C, H, W) throughout
 ############################################################
 class VMRNN(nn.Module):
+    """
+    At each timestep t receives Tt: (B, input_dim).
+    Internally maintains spatial hidden/cell states at each scale.
+    Returns output embedding: (B, output_dim).
+    """
     def __init__(
         self,
-        embed_dim=512,
+        input_dim,                      # dim of Tt coming in (embed_dim after aggregator)
+        hidden_dim=256,                 # spatial hidden state channels
+        spatial_h=8,                    # spatial H for hidden state grid
+        spatial_w=8,                    # spatial W for hidden state grid
         depths_down=(2, 2, 6),
         depths_up=(2, 2, 2),
-        feature_resolution=(64, 52),
     ):
         super().__init__()
-        assert len(depths_down) == len(depths_up), \
-            "depths_down and depths_up must have the same length"
-        self.feature_resolution = feature_resolution
-        self.down = DownSample(embed_dim, depths_down)
-        self.up = UpSample(embed_dim, depths_up)
+        assert len(depths_down) == len(depths_up)
+        self.spatial_h  = spatial_h
+        self.spatial_w  = spatial_w
+        self.hidden_dim = hidden_dim
+        n_levels = len(depths_down)
 
-    def forward(self, x, states_down=None, states_up=None):
+        # ── Encoder cells + downsamplers ──────────────────────────────
+        self.down_cells   = nn.ModuleList()
+        self.downsamplers = nn.ModuleList()
+        dim = hidden_dim
+        # First cell takes input_dim as Tt, rest take previous hidden dim
+        cell_input_dims = []
+        self.scale_shapes = []  # (H, W) at each level
+        H, W = spatial_h, spatial_w
+        for i, depth in enumerate(depths_down):
+            in_d = input_dim if i == 0 else hidden_dim * (2 ** (i-1)) * (H * W)
+            cell_input_dims.append(in_d)
+            self.down_cells.append(VMRNNCell(input_dim, dim, H, W))
+            self.scale_shapes.append((H, W))
+            self.downsamplers.append(ConvDownsample(dim, dim * 2))
+            H, W = H // 2, W // 2
+            dim *= 2
+
+        # ── Decoder cells + upsamplers + skip projections ─────────────
+        self.up_cells     = nn.ModuleList()
+        self.upsamplers   = nn.ModuleList()
+        self.skip_projs   = nn.ModuleList()
+        for i, depth in enumerate(depths_up):
+            out_dim = dim // 2
+            self.upsamplers.append(ConvUpsample(dim, out_dim))
+            self.skip_projs.append(nn.Conv2d(out_dim * 2, out_dim, kernel_size=1))
+            self.up_cells.append(VMRNNCell(input_dim, out_dim,
+                                           self.scale_shapes[-(i+1)][0],
+                                           self.scale_shapes[-(i+1)][1]))
+            dim = out_dim
+
+        # ── Output projection: spatial hidden → 1D embedding ──────────
+        self.out_proj = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Flatten(),
+            nn.Linear(hidden_dim, hidden_dim),
+        )
+
+    @staticmethod
+    def _match_spatial(x, skip):
+        """Crop x to match skip's spatial dims if ConvTranspose2d overshoots."""
+        if x.shape[2:] != skip.shape[2:]:
+            x = x[:, :, :skip.shape[2], :skip.shape[3]]
+        return x
+
+    def forward(self, Tt, states_down=None, states_up=None):
         """
-        Args:
-            x:           (B, L, C)  where L = H*W
-            states_down: list of (Ht, Ct) per encoder level, or None
-            states_up:   list of (Ht, Ct) per decoder level, or None
+        Tt:          (B, input_dim)
+        states_down: list of (Ht, Ct) per encoder level, or None
+        states_up:   list of (Ht, Ct) per decoder level, or None
         Returns:
-            out:         (B, L, C)  — same spatial size as input
-            states_down: updated encoder states
-            states_up:   updated decoder states
+            out:         (B, hidden_dim) — pooled output embedding
+            states_down: updated
+            states_up:   updated
         """
-        H, W = self.feature_resolution
-        states_down, skips, x, H_bot, W_bot = self.down(x, H, W, states_down)
-        states_up, x, H_out, W_out = self.up(x, H_bot, W_bot, skips, states_up)
-        return x, H_out, W_out, states_down, states_up
+        n = len(self.down_cells)
+        if states_down is None:
+            states_down = [None] * n
+        if states_up is None:
+            states_up = [None] * n
+
+        new_states_down = []
+        new_states_up   = []
+        skips = []
+
+        # ── Encoder ───────────────────────────────────────────────────
+        x = None
+        H, W = self.spatial_h, self.spatial_w
+        for i, (cell, down) in enumerate(zip(self.down_cells, self.downsamplers)):
+            Ht_flat, state = cell(Tt, states_down[i])
+            new_states_down.append(state)
+            # Reshape hidden state to spatial for conv operations
+            x_spatial = Ht_flat.view(
+                Ht_flat.shape[0], self.down_cells[i].hidden_dim,
+                self.scale_shapes[i][0], self.scale_shapes[i][1]
+            )
+            skips.append(x_spatial)
+            x_spatial, H, W = down(x_spatial, H, W)
+            x = x_spatial
+
+        # ── Decoder ───────────────────────────────────────────────────
+        for i, (cell, up, proj) in enumerate(
+            zip(self.up_cells, self.upsamplers, self.skip_projs)
+        ):
+            x, H, W = up(x, H, W)
+            skip = skips[-(i + 1)]
+            x = self._match_spatial(x, skip)
+            x = proj(torch.cat([x, skip], dim=1))        # skip fusion
+
+            # Run up cell using Tt as input
+            B = x.shape[0]
+            x_flat = x.view(B, -1)
+            # Create a compatible Ht from x for the cell
+            Ht_flat, state = cell(Tt, states_up[i])
+            new_states_up.append(state)
+            # Add cell output to decoder features
+            x = x + Ht_flat.view_as(x)
+
+        # ── Output pool ───────────────────────────────────────────────
+        out = self.out_proj(x)                           # (B, hidden_dim)
+
+        return out, new_states_down, new_states_up
