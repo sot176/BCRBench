@@ -336,12 +336,14 @@ class DownSample(nn.Module):
                 drop_path=dpr[sum(depths[:i]):sum(depths[:i+1])],
                 attn_drop=attn_drop, d_state=d_state
             ))
-            self.downsample.append(
-                PatchMerging(dim) if i < len(depths) - 1 else nn.Identity()
-            )
-            dim = dim * 2 if i < len(depths) - 1 else dim
+            if i < len(depths) - 1:
+                self.downsample.append(PatchMerging(dim))
+                dim *= 2                          
+            else:
+                self.downsample.append(nn.Identity())
+                                                  
 
-        self.out_dim = dim
+        self.out_dim = dim                         
 
     def forward(self, x, states):
         """x: (B, H, W, C)"""
