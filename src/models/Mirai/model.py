@@ -42,12 +42,9 @@ class Mirai(nn.Module):
         # 2. Encode — returns (logit, hidden, activ_dict), hidden is already flat
         img_x = self.image_encoder(x)
 
-        # 3. Reshape to (B, N, D) and slice to image-only repr dim
-        print("img_x shape before pool:", img_x.shape)   
+        # 3. Reshape to (B, N, 512) and slice to image-only repr dim
         img_x = nn.functional.adaptive_avg_pool2d(img_x, 1)
-        print("img_x shape after pool:", img_x.shape)  # should be (B, N, 512)
         img_x = img_x.view(B, N, -1)
-        print("img x after view", img_x.shape)
         # 4. Transformer aggregates across views/timepoints
         logit, transformer_hidden, activ_dict = self.transformer(img_x, None, batch)
 
