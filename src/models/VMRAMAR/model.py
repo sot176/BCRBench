@@ -25,7 +25,7 @@ class VMRAMaR(nn.Module):
             cfg["paths"]["mirai_path"]
         )
 
-        if hasattr(self.args, "freeze_image_encoder") and self.args.freeze_image_encoder:
+        if getattr(self.args, "freeze_image_encoder", False):
             for param in self.image_encoder.parameters():
                 param.requires_grad = False
 
@@ -40,8 +40,8 @@ class VMRAMaR(nn.Module):
         self.vmrnn = VMRNN(
             input_dim=args.embed_dim,       # dim of aggregated embedding
             hidden_dim=args.embed_dim//2,
-            spatial_h=getattr(args, 'vmrnn_spatial_h', 8),
-            spatial_w=getattr(args, 'vmrnn_spatial_w', 8),
+            spatial_h=getattr(args, 'vmrnn_spatial_h', 16),
+            spatial_w=getattr(args, 'vmrnn_spatial_w', 16),
             depths_down=args.depths_downsample,
             depths_up=args.depths_upsample,
         )

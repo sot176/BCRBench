@@ -1,312 +1,464 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from functools import partial
+from timm.models.layers import DropPath
 
-
-############################################################
-# Linear Projection layer — fuses Tt and Ht-1, reshapes to spatial
-############################################################
-class LinearProjection(nn.Module):
-    def __init__(self, input_dim, hidden_dim, spatial_h, spatial_w):
-        super().__init__()
-        self.spatial_h  = spatial_h
-        self.spatial_w  = spatial_w
-        self.hidden_dim = hidden_dim
-        hidden_flat_dim = hidden_dim * spatial_h * spatial_w   # full flattened size
-
-        # input_dim: dim of Tt  (e.g. 512)
-        # hidden_flat_dim: dim of Ht_prev flattened (e.g. 512*8*8 = 32768)
-        self.proj = nn.Linear(
-            input_dim + hidden_flat_dim,               # was: input_dim + hidden_dim ← bug
-            hidden_flat_dim
-        )
-
-    def forward(self, Tt, Ht_prev):
-        """
-        Tt:     (B, input_dim)
-        Ht_prev:(B, hidden_dim * H * W)  — already flat
-        """
-        x  = torch.cat([Tt, Ht_prev], dim=-1)         # (B, input_dim + hidden_flat_dim)
-        x  = self.proj(x)                              # (B, hidden_flat_dim)
-        B  = x.shape[0]
-        return x.view(B, self.hidden_dim, self.spatial_h, self.spatial_w)
-
-############################################################
-# VSS Block — approximates S6 directional scanning
-# Full Mamba requires custom CUDA kernels; this uses depthwise
-# conv + channel mixing as a tractable approximation
-############################################################
-class VSSBlock(nn.Module):
+# ── Proper PyTorch selective scan fallback ─────────────────────────────────
+def selective_scan_ref(u, delta, A, B, C, D=None, z=None,
+                       delta_bias=None, delta_softplus=False,
+                       return_last_state=False):
     """
-    Approximation of the VSS Block from the paper:
-      Primary stream:   DWConv3x3 → SiLU → directional mixing
-      Secondary stream: SiLU(A)
-      Combine: A3 + B1, then sigmoid gate
+    Pure PyTorch S6 selective scan. Matches mamba_ssm signature exactly.
+    u, delta: (B, D, L)
+    A:        (D, N)
+    B, C:     (B, N, L)
+    D:        (D,)
+    z:        (B, D, L)
     """
-    def __init__(self, dim):
-        super().__init__()
-        # Primary stream
-        self.dw_conv = nn.Conv2d(dim, dim, kernel_size=3, padding=1, groups=dim)
-        self.norm = nn.LayerNorm(dim)
+    dtype_in = u.dtype
+    u     = u.float()
+    delta = delta.float()
 
-        # Directional mixing — approximate 4-direction S6 with 4 depthwise convs
-        # with different asymmetric kernels to capture directional context
-        self.dir_convs = nn.ModuleList([
-            nn.Conv2d(dim, dim, kernel_size=(1, 3), padding=(0, 1), groups=dim),  # horizontal
-            nn.Conv2d(dim, dim, kernel_size=(3, 1), padding=(1, 0), groups=dim),  # vertical
-            nn.Conv2d(dim, dim, kernel_size=(1, 3), padding=(0, 1), groups=dim),  # horizontal flip
-            nn.Conv2d(dim, dim, kernel_size=(3, 1), padding=(1, 0), groups=dim),  # vertical flip
-        ])
-        self.merge_norm = nn.LayerNorm(dim)
-        self.merge_proj = nn.Linear(dim * 4, dim)
+    if delta_bias is not None:
+        delta = delta + delta_bias.unsqueeze(-1).float()
+    if delta_softplus:
+        delta = F.softplus(delta)
 
-    def forward(self, A):
-        """
-        A: (B, C, H, W)
-        Returns: Ft (B, C, H, W) — sigmoid gate, and Y (B, C, H, W)
-        """
-        # Primary stream: DWConv → SiLU → 4-direction scan → merge → LayerNorm
-        A1 = F.silu(self.dw_conv(A))                                 # (B, C, H, W)
+    B_in = B.float()
+    C_in = C.float()
+    batch, d_model, L = u.shape
+    N = A.shape[1]
 
-        # Directional scans (approximate S6 with asymmetric depthwise convs)
-        dir_feats = []
-        for i, conv in enumerate(self.dir_convs):
-            feat = A1
-            # Flip for reverse directions (dirs 2 and 3)
-            if i == 2:
-                feat = torch.flip(feat, dims=[-1])
-            elif i == 3:
-                feat = torch.flip(feat, dims=[-2])
-            feat = conv(feat)
-            if i == 2:
-                feat = torch.flip(feat, dims=[-1])
-            elif i == 3:
-                feat = torch.flip(feat, dims=[-2])
-            dir_feats.append(feat)
+    # Discretize: deltaA (B,D,L,N), deltaB_u (B,D,L,N)
+    deltaA   = torch.exp(torch.einsum('bdl,dn->bdln', delta, A.float()))
+    if B_in.dim() == 3:
+        deltaB_u = torch.einsum('bdl,bnl,bdl->bdln', delta, B_in, u)
+    else:
+        deltaB_u = torch.einsum('bdl,bnl,bdl->bdln', delta, B_in[:, 0], u)
 
-        # Merge 4 directions → LayerNorm
-        merged = torch.cat(dir_feats, dim=1)                         # (B, 4C, H, W)
-        B, _, H, W = merged.shape
-        merged = merged.permute(0, 2, 3, 1)                          # (B, H, W, 4C)
-        A3 = self.merge_norm(self.merge_proj(merged))                # (B, H, W, C)
-        A3 = A3.permute(0, 3, 1, 2)                                  # (B, C, H, W)
-
-        # Secondary stream: SiLU(A)
-        B1 = F.silu(A)                                               # (B, C, H, W)
-
-        # Combine — paper eq (4): Y = A3 + B1
-        Y = A3 + B1                                                  # (B, C, H, W)
-
-        # Gate — paper eq: Ft = sigmoid(Y)
-        Ft = torch.sigmoid(Y)
-
-        return Ft, Y
-
-
-############################################################
-# VMRNN Cell — follows paper equations exactly
-############################################################
-class VMRNNCell(nn.Module):
-    """
-    Per paper:
-        Xt  = LP(Tt, Ht-1)           — linear projection + reshape
-        Ft  = VSS(Xt)                — gating signal
-        Ct  = Ft ⊙ (tanh(Y) + Ct-1) — cell update
-        Ht  = Ft ⊙ tanh(Ct)         — hidden update
-    """
-    def __init__(self, input_dim, hidden_dim, spatial_h, spatial_w):
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        self.spatial_h  = spatial_h
-        self.spatial_w  = spatial_w
-        self.spatial_size = spatial_h * spatial_w
-
-        self.lp  = LinearProjection(input_dim, hidden_dim, spatial_h, spatial_w)
-        self.vss = VSSBlock(hidden_dim)
-
-    def forward(self, Tt, state):
-        """
-        Tt:    (B, input_dim)  — fused embedding for timestep t
-        state: None or (Ht, Ct) where each is (B, hidden_dim*H*W)
-        Returns:
-            Ht_flat: (B, hidden_dim*H*W)
-            (Ht_flat, Ct_flat)
-        """
-        B = Tt.shape[0]
-        hidden_size = self.hidden_dim * self.spatial_size
-
-        if state is None:
-            Ht_prev = torch.zeros(B, hidden_size, device=Tt.device, dtype=Tt.dtype)
-            Ct_prev = torch.zeros(B, hidden_size, device=Tt.device, dtype=Tt.dtype)
+    # Sequential recurrence
+    x  = torch.zeros(batch, d_model, N, device=u.device, dtype=torch.float32)
+    ys = []
+    for i in range(L):
+        x = deltaA[:, :, i] * x + deltaB_u[:, :, i]
+        if C_in.dim() == 3:
+            y = torch.einsum('bdn,bn->bd', x, C_in[:, :, i])
         else:
-            Ht_prev, Ct_prev = state
+            y = torch.einsum('bdn,bn->bd', x, C_in[:, 0, :, i])
+        ys.append(y)
 
-        Ct_prev_spatial = Ct_prev.view(B, self.hidden_dim, self.spatial_h, self.spatial_w)
+    y = torch.stack(ys, dim=2)   # (B, D, L)
 
-        # LP: fuse Tt and Ht-1, reshape to spatial
-        Xt = self.lp(Tt, Ht_prev)                                    # (B, C, H, W)
+    if D is not None:
+        y = y + u * D.float().unsqueeze(-1)
+    if z is not None:
+        y = y * F.silu(z.float())
 
-        # VSS: get gate Ft and pre-gate Y
-        Ft, Y = self.vss(Xt)                                         # both (B, C, H, W)
-
-        # Cell and hidden state updates — paper equations
-        Ct = Ft * (torch.tanh(Y) + Ct_prev_spatial)                  # (B, C, H, W)
-        Ht = Ft * torch.tanh(Ct)                                     # (B, C, H, W)
-
-        Ht_flat = Ht.contiguous().view(B, -1)
-        Ct_flat = Ct.contiguous().view(B, -1)                                     # (B, C*H*W)
-
-        return Ht_flat, (Ht_flat, Ct_flat)
+    y = y.to(dtype_in)
+    return (y, x) if return_last_state else y
 
 
-############################################################
-# Conv Downsample / Upsample (unchanged)
-############################################################
-class ConvDownsample(nn.Module):
-    def __init__(self, in_ch, out_ch):
+try:
+    from mamba_ssm.ops.selective_scan_interface import selective_scan_ref as selective_scan_fn
+    MAMBA_AVAILABLE = True
+    print("✅ Using mamba_ssm GPU kernel")
+except ImportError:
+    selective_scan_fn = selective_scan_ref
+    MAMBA_AVAILABLE = False
+    print("⚠️  mamba_ssm not found — using pure PyTorch selective scan fallback")
+
+
+# ── SS2D — exact copy from their vmamba.py, uses selective_scan_fn above ──
+import math
+from einops import repeat
+
+class SS2D(nn.Module):
+    def __init__(self, d_model, d_state=16, d_conv=3, expand=2,
+                 dt_rank="auto", dt_min=0.001, dt_max=0.1,
+                 dt_init="random", dt_scale=1.0, dt_init_floor=1e-4,
+                 dropout=0., conv_bias=True, bias=False, **kwargs):
         super().__init__()
-        self.conv = nn.Conv2d(in_ch, out_ch, kernel_size=2, stride=2)
+        self.d_model  = d_model
+        self.d_state  = d_state
+        self.d_conv   = d_conv
+        self.expand   = expand
+        self.d_inner  = int(self.expand * self.d_model)
+        self.dt_rank  = math.ceil(self.d_model / 16) if dt_rank == "auto" else dt_rank
 
-    def forward(self, x, H, W):
-        B, C, H_in, W_in = x.shape
-        x = self.conv(x)
-        return x, x.shape[2], x.shape[3]
+        self.in_proj  = nn.Linear(self.d_model, self.d_inner * 2, bias=bias)
+        self.conv2d   = nn.Conv2d(self.d_inner, self.d_inner, groups=self.d_inner,
+                                  bias=conv_bias, kernel_size=d_conv,
+                                  padding=(d_conv - 1) // 2)
+        self.act      = nn.SiLU()
+
+        self.x_proj_weight = nn.Parameter(torch.stack([
+            nn.Linear(self.d_inner, self.dt_rank + self.d_state * 2, bias=False).weight
+            for _ in range(4)
+        ], dim=0))
+
+        self.dt_projs_weight = nn.Parameter(torch.stack([
+            self._dt_init(self.dt_rank, self.d_inner, dt_scale, dt_init,
+                          dt_min, dt_max, dt_init_floor).weight
+            for _ in range(4)
+        ], dim=0))
+        self.dt_projs_bias = nn.Parameter(torch.stack([
+            self._dt_init(self.dt_rank, self.d_inner, dt_scale, dt_init,
+                          dt_min, dt_max, dt_init_floor).bias
+            for _ in range(4)
+        ], dim=0))
+
+        self.A_logs = self._A_log_init(self.d_state, self.d_inner, copies=4, merge=True)
+        self.Ds     = self._D_init(self.d_inner, copies=4, merge=True)
+
+        self.out_norm = nn.LayerNorm(self.d_inner)
+        self.out_proj = nn.Linear(self.d_inner, self.d_model, bias=bias)
+        self.dropout  = nn.Dropout(dropout) if dropout > 0. else None
+
+    @staticmethod
+    def _dt_init(dt_rank, d_inner, dt_scale, dt_init, dt_min, dt_max, dt_init_floor):
+        dt_proj = nn.Linear(dt_rank, d_inner, bias=True)
+        dt_init_std = dt_rank ** -0.5 * dt_scale
+        if dt_init == "constant":
+            nn.init.constant_(dt_proj.weight, dt_init_std)
+        else:
+            nn.init.uniform_(dt_proj.weight, -dt_init_std, dt_init_std)
+        dt = torch.exp(
+            torch.rand(d_inner) * (math.log(dt_max) - math.log(dt_min)) + math.log(dt_min)
+        ).clamp(min=dt_init_floor)
+        inv_dt = dt + torch.log(-torch.expm1(-dt))
+        with torch.no_grad():
+            dt_proj.bias.copy_(inv_dt)
+        dt_proj.bias._no_reinit = True
+        return dt_proj
+
+    @staticmethod
+    def _A_log_init(d_state, d_inner, copies=1, merge=True):
+        A = repeat(torch.arange(1, d_state + 1, dtype=torch.float32),
+                   "n -> d n", d=d_inner).contiguous()
+        A_log = nn.Parameter(torch.log(A))
+        if copies > 1:
+            A_log = nn.Parameter(repeat(torch.log(A), "d n -> r d n", r=copies)
+                                 .flatten(0, 1).contiguous())
+        A_log._no_weight_decay = True
+        return A_log
+
+    @staticmethod
+    def _D_init(d_inner, copies=1, merge=True):
+        D = nn.Parameter(torch.ones(d_inner * copies))
+        D._no_weight_decay = True
+        return D
+
+    def forward_core(self, x):
+        B, C, H, W = x.shape
+        L = H * W
+        K = 4
+
+        x_hwwh = torch.stack([
+            x.view(B, -1, L),
+            torch.transpose(x, 2, 3).contiguous().view(B, -1, L)
+        ], dim=1).view(B, 2, -1, L)
+        xs = torch.cat([x_hwwh, torch.flip(x_hwwh, dims=[-1])], dim=1)  # (B,4,D,L)
+
+        x_dbl = torch.einsum("b k d l, k c d -> b k c l",
+                              xs.view(B, K, -1, L), self.x_proj_weight)
+        dts, Bs, Cs = torch.split(x_dbl,
+                                  [self.dt_rank, self.d_state, self.d_state], dim=2)
+        dts = torch.einsum("b k r l, k d r -> b k d l",
+                           dts.view(B, K, -1, L), self.dt_projs_weight)
+
+        xs  = xs.float().view(B, -1, L)
+        dts = dts.contiguous().float().view(B, -1, L)
+        Bs  = Bs.float().view(B, K, -1, L)
+        Cs  = Cs.float().view(B, K, -1, L)
+        Ds  = self.Ds.float().view(-1)
+        As  = -torch.exp(self.A_logs.float()).view(-1, self.d_state)
+        dt_bias = self.dt_projs_bias.float().view(-1)
+
+        out_y = selective_scan_fn(
+            xs, dts, As, Bs, Cs, Ds, z=None,
+            delta_bias=dt_bias, delta_softplus=True, return_last_state=False,
+        ).view(B, K, -1, L)
+
+        inv_y   = torch.flip(out_y[:, 2:4], dims=[-1]).view(B, 2, -1, L)
+        wh_y    = torch.transpose(out_y[:, 1].view(B, -1, W, H), 2, 3).contiguous().view(B, -1, L)
+        invwh_y = torch.transpose(inv_y[:, 1].view(B, -1, W, H), 2, 3).contiguous().view(B, -1, L)
+        y = out_y[:, 0] + inv_y[:, 0] + wh_y + invwh_y
+        y = torch.transpose(y, 1, 2).contiguous().view(B, H, W, -1)
+        y = self.out_norm(y).to(x.dtype)
+        return y
+
+    def forward(self, x):
+        B, H, W, C = x.shape
+        xz = self.in_proj(x)
+        x, z = xz.chunk(2, dim=-1)
+        x = x.permute(0, 3, 1, 2).contiguous()
+        x = self.act(self.conv2d(x))
+        y = self.forward_core(x)
+        y = y * F.silu(z)
+        out = self.out_proj(y)
+        if self.dropout is not None:
+            out = self.dropout(out)
+        return out
 
 
-class ConvUpsample(nn.Module):
-    def __init__(self, in_ch, out_ch):
+# ── VSB — their implementation, using SS2D ────────────────────────────────
+class VSB(nn.Module):
+    def __init__(self, hidden_dim, drop_path=0.,
+                 norm_layer=partial(nn.LayerNorm, eps=1e-6),
+                 attn_drop=0., d_state=16):
         super().__init__()
-        self.conv = nn.ConvTranspose2d(in_ch, out_ch, kernel_size=2, stride=2)
+        self.ln_1           = norm_layer(hidden_dim)
+        self.self_attention = SS2D(d_model=hidden_dim, dropout=attn_drop, d_state=d_state)
+        self.drop_path      = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.linear         = nn.Linear(hidden_dim * 2, hidden_dim)
 
-    def forward(self, x, H, W):
-        x = self.conv(x)
-        return x, x.shape[2], x.shape[3]
+    def forward(self, x, hx=None):
+        """
+        x:  (B, H, W, C)   — spatial format as SS2D expects
+        hx: (B, H, W, C)   — previous hidden state, same shape
+        """
+        shortcut = x
+        x = self.ln_1(x)
+        if hx is not None:
+            hx = self.ln_1(hx)
+            x  = self.linear(torch.cat([x, hx], dim=-1))
+        x = self.drop_path(self.self_attention(x))
+        return shortcut + x
 
 
-############################################################
-# Full VMRNN — downsample + upsample with skip connections
-# Operates on spatial tensors (B, C, H, W) throughout
-############################################################
-class VMRNN(nn.Module):
-    """
-    At each timestep t receives Tt: (B, input_dim).
-    Internally maintains spatial hidden/cell states at each scale.
-    Returns output embedding: (B, output_dim).
-    """
-    def __init__(
-        self,
-        input_dim,                      # dim of Tt coming in (embed_dim after aggregator)
-        hidden_dim=256,                 # spatial hidden state channels
-        spatial_h=4,                    # spatial H for hidden state grid
-        spatial_w=4,                    # spatial W for hidden state grid
-        depths_down=(2, 2, 6),
-        depths_up=(2, 2, 2),
-    ):
+# ── VMRNNCell — their implementation ─────────────────────────────────────
+class VMRNNCell(nn.Module):
+    def __init__(self, hidden_dim, input_resolution, depth,
+                 drop_path=0., attn_drop=0., d_state=16):
         super().__init__()
-        assert len(depths_down) == len(depths_up)
-        self.spatial_h  = spatial_h
-        self.spatial_w  = spatial_w
-        self.hidden_dim = hidden_dim
-        n_levels = len(depths_down)
+        self.hidden_dim       = hidden_dim
+        self.input_resolution = input_resolution   # (H, W)
+        self.vsbs = nn.ModuleList([
+            VSB(hidden_dim,
+                drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path,
+                attn_drop=attn_drop, d_state=d_state)
+            for i in range(depth)
+        ])
 
-        # ── Encoder cells + downsamplers ──────────────────────────────
-        self.down_cells   = nn.ModuleList()
-        self.downsamplers = nn.ModuleList()
-        dim = hidden_dim
-        # First cell takes input_dim as Tt, rest take previous hidden dim
-        cell_input_dims = []
-        self.scale_shapes = []  # (H, W) at each level
-        H, W = spatial_h, spatial_w
-        for i, depth in enumerate(depths_down):
-            in_d = input_dim if i == 0 else hidden_dim * (2 ** (i-1)) * (H * W)
-            cell_input_dims.append(in_d)
-            self.down_cells.append(VMRNNCell(input_dim, dim, H, W))
-            self.scale_shapes.append((H, W))
-            self.downsamplers.append(ConvDownsample(dim, dim * 2))
-            H, W = H // 2, W // 2
-            dim *= 2
+    def forward(self, xt, hidden_states):
+        """
+        xt:            (B, L, C)  where L = H*W
+        hidden_states: None or (Ht, Ct) each (B, L, C)
+        Returns:
+            Ht: (B, L, C)
+            (Ht, Ct)
+        """
+        H, W = self.input_resolution
+        B, L, C = xt.shape
 
-        # ── Decoder cells + upsamplers + skip projections ─────────────
-        self.up_cells     = nn.ModuleList()
-        self.upsamplers   = nn.ModuleList()
-        self.skip_projs   = nn.ModuleList()
-        for i, depth in enumerate(depths_up):
-            out_dim = dim // 2
-            self.upsamplers.append(ConvUpsample(dim, out_dim))
-            self.skip_projs.append(nn.Conv2d(out_dim * 2, out_dim, kernel_size=1))
-            self.up_cells.append(VMRNNCell(input_dim, out_dim,
-                                           self.scale_shapes[-(i+1)][0],
-                                           self.scale_shapes[-(i+1)][1]))
+        if hidden_states is None:
+            hx = torch.zeros_like(xt)
+            cx = torch.zeros_like(xt)
+        else:
+            hx, cx = hidden_states
+
+        # Reshape to spatial for SS2D
+        x  = xt.view(B, H, W, C)
+        hx_s = hx.view(B, H, W, C)
+
+        # First VSB fuses x with previous hidden state
+        x = self.vsbs[0](x, hx_s)
+        # Subsequent VSBs refine without hidden state
+        for vsb in self.vsbs[1:]:
+            x = vsb(x, None)
+
+        # Back to sequence
+        x = x.view(B, L, C)
+
+        # LSTM-style update
+        Ft = torch.sigmoid(x)
+        Ct = Ft * (cx + torch.tanh(x))
+        Ht = Ft * torch.tanh(Ct)
+
+        return Ht, (Ht, Ct)
+
+
+# ── DownSample / UpSample — their structure, spatial PatchMerging/Expanding ──
+class PatchMerging(nn.Module):
+    """Halves spatial resolution, doubles channels."""
+    def __init__(self, dim, norm_layer=nn.LayerNorm):
+        super().__init__()
+        self.norm      = norm_layer(4 * dim)
+        self.reduction = nn.Linear(4 * dim, 2 * dim, bias=False)
+
+    def forward(self, x):
+        B, H, W, C = x.shape
+        # Pad if odd
+        if H % 2 != 0 or W % 2 != 0:
+            x = F.pad(x, (0, 0, 0, W % 2, 0, H % 2))
+            _, H, W, _ = x.shape
+        x0 = x[:, 0::2, 0::2, :]
+        x1 = x[:, 1::2, 0::2, :]
+        x2 = x[:, 0::2, 1::2, :]
+        x3 = x[:, 1::2, 1::2, :]
+        x  = torch.cat([x0, x1, x2, x3], dim=-1)   # (B, H/2, W/2, 4C)
+        x  = self.norm(x)
+        x  = self.reduction(x)                       # (B, H/2, W/2, 2C)
+        return x
+
+
+class PatchExpanding(nn.Module):
+    """Doubles spatial resolution, halves channels."""
+    def __init__(self, dim, norm_layer=nn.LayerNorm):
+        super().__init__()
+        self.expand = nn.Linear(dim, 2 * dim, bias=False)
+        self.norm   = norm_layer(dim // 2)
+
+    def forward(self, x):
+        from einops import rearrange
+        B, H, W, C = x.shape
+        x = self.expand(x)                           # (B, H, W, 2C)
+        x = rearrange(x, 'b h w (p1 p2 c) -> b (h p1) (w p2) c',
+                      p1=2, p2=2, c=C // 2)          # (B, 2H, 2W, C/2)
+        x = self.norm(x)
+        return x
+
+
+class DownSample(nn.Module):
+    def __init__(self, embed_dim, depths, feature_resolution,
+                 drop_path_rate=0.1, attn_drop=0., d_state=16):
+        super().__init__()
+        H, W   = feature_resolution
+        dpr    = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]
+        self.layers     = nn.ModuleList()
+        self.downsample = nn.ModuleList()
+        dim = embed_dim
+        for i, depth in enumerate(depths):
+            res = (H // (2 ** i), W // (2 ** i))
+            self.layers.append(VMRNNCell(
+                dim, res, depth,
+                drop_path=dpr[sum(depths[:i]):sum(depths[:i+1])],
+                attn_drop=attn_drop, d_state=d_state
+            ))
+            self.downsample.append(
+                PatchMerging(dim) if i < len(depths) - 1 else nn.Identity()
+            )
+            dim = dim * 2 if i < len(depths) - 1 else dim
+
+        self.out_dim = dim
+
+    def forward(self, x, states):
+        """x: (B, H, W, C)"""
+        if states is None:
+            states = [None] * len(self.layers)
+        new_states = []
+        skips      = []
+        for layer, down, state in zip(self.layers, self.downsample, states):
+            B, H, W, C = x.shape
+            x_seq = x.view(B, H * W, C)
+            x_seq, new_state = layer(x_seq, state)
+            new_states.append(new_state)
+            x = x_seq.view(B, H, W, C)
+            skips.append(x)
+            x = down(x)
+        return new_states, skips, x
+
+
+class UpSample(nn.Module):
+    def __init__(self, embed_dim, depths, feature_resolution,
+                 drop_path_rate=0.1, attn_drop=0., d_state=16):
+        super().__init__()
+        H, W   = feature_resolution
+        n      = len(depths)
+        dpr    = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]
+        self.layers   = nn.ModuleList()
+        self.upsample = nn.ModuleList()
+        self.skip_fuse = nn.ModuleList()
+
+        # Start from bottom dim — matches DownSample's out_dim
+        # DownSample doubles dim at each level except last, so:
+        dim = embed_dim * (2 ** (n - 1))
+
+        for i, depth in enumerate(depths):
+            level = n - 1 - i
+            res   = (H // (2 ** level), W // (2 ** level))
+            self.layers.append(VMRNNCell(
+                dim, res, depth,
+                drop_path=dpr[sum(depths[:i]):sum(depths[:i+1])],
+                attn_drop=attn_drop, d_state=d_state
+            ))
+            self.upsample.append(
+                PatchExpanding(dim) if i < n - 1 else nn.Identity()
+            )
+            # After skip cat, fuse channels back to dim
+            self.skip_fuse.append(nn.Linear(dim * 2, dim))
+            out_dim = dim // 2 if i < n - 1 else dim
             dim = out_dim
 
-        # ── Output projection: spatial hidden → 1D embedding ──────────
+    def forward(self, x, skips, states):
+        """x: (B, H, W, C)"""
+        if states is None:
+            states = [None] * len(self.layers)
+        new_states = []
+        for i, (layer, up, fuse, state) in enumerate(
+            zip(self.layers, self.upsample, self.skip_fuse, states)
+        ):
+            # Fuse with skip from encoder
+            skip = skips[-(i + 1)]
+            if x.shape[1:3] != skip.shape[1:3]:
+                x = x[:, :skip.shape[1], :skip.shape[2], :]
+            x = fuse(torch.cat([x, skip], dim=-1))
+
+            B, H, W, C = x.shape
+            x_seq = x.view(B, H * W, C)
+            x_seq, new_state = layer(x_seq, state)
+            new_states.append(new_state)
+            x = x_seq.view(B, H, W, C)
+            x = up(x)
+        return new_states, x
+
+
+# ── Full VMRNN ─────────────────────────────────────────────────────────────
+class VMRNN(nn.Module):
+    def __init__(self, input_dim, hidden_dim=64,
+                 spatial_h=16, spatial_w=16,
+                 depths_down=(2, 2), depths_up=(2, 2),
+                 drop_path_rate=0.1, attn_drop=0., d_state=16):
+        super().__init__()
+        assert len(depths_down) == len(depths_up)
+        feature_resolution = (spatial_h, spatial_w)
+
+        # Project input embedding to spatial hidden dim
+        self.input_proj = nn.Linear(input_dim, hidden_dim)
+
+        self.down = DownSample(hidden_dim, depths_down, feature_resolution,
+                               drop_path_rate, attn_drop, d_state)
+        self.up   = UpSample(hidden_dim, depths_up, feature_resolution,
+                             drop_path_rate, attn_drop, d_state)
+
+        # Project back to input_dim for the rest of the model
+        self.out_norm = nn.LayerNorm(self.down.out_dim)
         self.out_proj = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
             nn.Flatten(),
-            nn.Linear(hidden_dim, input_dim),    # ← projects back to embed_dim (e.g. 512)
+            nn.Linear(self.down.out_dim, input_dim),
         )
-
-    @staticmethod
-    def _match_spatial(x, skip):
-        """Crop x to match skip's spatial dims if ConvTranspose2d overshoots."""
-        if x.shape[2:] != skip.shape[2:]:
-            x = x[:, :, :skip.shape[2], :skip.shape[3]]
-        return x
 
     def forward(self, Tt, states_down=None, states_up=None):
         """
-        Tt:          (B, input_dim)
-        states_down: list of (Ht, Ct) per encoder level, or None
-        states_up:   list of (Ht, Ct) per decoder level, or None
-        Returns:
-            out:         (B, hidden_dim) — pooled output embedding
-            states_down: updated
-            states_up:   updated
+        Tt: (B, input_dim)
+        Returns: out (B, input_dim), states_down, states_up
         """
-        n = len(self.down_cells)
-        if states_down is None:
-            states_down = [None] * n
-        if states_up is None:
-            states_up = [None] * n
+        B = Tt.shape[0]
+        H, W = self.down.layers[0].input_resolution
 
-        new_states_down = []
-        new_states_up   = []
-        skips = []
+        # Project and tile to spatial grid
+        x = self.input_proj(Tt)                    # (B, hidden_dim)
+        x = x.unsqueeze(1).unsqueeze(1)            # (B, 1, 1, C)
+        x = x.expand(B, H, W, -1).contiguous()    # (B, H, W, C)
 
-        # ── Encoder ───────────────────────────────────────────────────
-        x = None
-        H, W = self.spatial_h, self.spatial_w
-        for i, (cell, down) in enumerate(zip(self.down_cells, self.downsamplers)):
-            Ht_flat, state = cell(Tt, states_down[i])
-            new_states_down.append(state)
-            # Reshape hidden state to spatial for conv operations
-            x_spatial = Ht_flat.view(
-                Ht_flat.shape[0], self.down_cells[i].hidden_dim,
-                self.scale_shapes[i][0], self.scale_shapes[i][1]
-            )
-            skips.append(x_spatial)
-            x_spatial, H, W = down(x_spatial, H, W)
-            x = x_spatial
+        states_down, skips, x = self.down(x, states_down)
+        states_up,   x        = self.up(x, skips, states_up)
 
-        # ── Decoder ───────────────────────────────────────────────────
-        for i, (cell, up, proj) in enumerate(
-            zip(self.up_cells, self.upsamplers, self.skip_projs)
-        ):
-            x, H, W = up(x, H, W)
-            skip = skips[-(i + 1)]
-            x = self._match_spatial(x, skip)
-            x = proj(torch.cat([x, skip], dim=1))        # skip fusion
+        # Pool spatial → (B, C)
+        x = self.out_norm(x)
+        x = x.permute(0, 3, 1, 2)                 # (B, C, H, W)
+        out = self.out_proj(x)                     # (B, input_dim)
 
-            # Run up cell using Tt as input
-            B = x.shape[0]
-            x_flat = x.view(B, -1)
-            # Create a compatible Ht from x for the cell
-            Ht_flat, state = cell(Tt, states_up[i])
-            new_states_up.append(state)
-            # Add cell output to decoder features
-            x = x + Ht_flat.view_as(x)
-
-        # ── Output pool ───────────────────────────────────────────────
-        out = self.out_proj(x)                           # (B, hidden_dim)
-
-        return out, new_states_down, new_states_up
+        return out, states_down, states_up
