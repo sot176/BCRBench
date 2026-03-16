@@ -49,6 +49,7 @@ accelerate launch  main_test.py \
   --path_test_folder  /scratch/project_465002309/thrunsol/VMaR_Risk_prediction_test_results_1664_2048/embed \
   --model "VMRA-MaR" \
   --use_asymmetry \
+  --id_training 1 \
   --use_sad_bias \
   --use_lat_bn \
   --batch_size 1 \
