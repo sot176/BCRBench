@@ -38,12 +38,10 @@ class VMRAMaR(nn.Module):
         # VMRNN
         # --------------------------------------------------
         self.vmrnn = VMRNN(
-            input_dim=args.embed_dim,                          # 512
-            hidden_dim=getattr(args, 'vmrnn_hidden_dim', 256),  # internal dim
-            spatial_h=getattr(args, 'vmrnn_spatial_h', 16),
-            spatial_w=getattr(args, 'vmrnn_spatial_w', 16),
-            depths_down=args.depths_downsample,                # [2,2,6,2]
-            depths_up=args.depths_upsample,                    # [2,2,6,2]
+            embed_dim=args.embed_dim,                    # their arg name
+            depths_downsample=args.depths_downsample,    # their arg name  
+            depths_upsample=args.depths_upsample,        # their arg name
+            feature_resolution=(1, 1),                   # temporal mode — no spatial U-Net
         )
 
         # --------------------------------------------------
@@ -93,20 +91,15 @@ class VMRAMaR(nn.Module):
         # --------------------------------------------------
         # VMRNN temporal modeling
         # --------------------------------------------------
-        states_down = None
-        states_up = None
-        outputs = []
-        for t in range(T):
-            Tt = visit_embeddings_flat[:, t]                 # (B, C)
-            out, states_down, states_up = self.vmrnn(Tt, states_down, states_up)
-            outputs.append(out)                              # (B, hidden_dim)
-
-        outputs = torch.stack(outputs, dim=1)            # (B, T, C)
-
+        out, states_down, states_up = self.vmrnn(
+            visit_embeddings_flat,   # (B, T, C) — T is the sequence length
+            states_down=None,
+            states_up=None,
+        )
         # --------------------------------------------------
         # Temporal pooling over T and spatial dims
         # --------------------------------------------------
-        temporal_feature = outputs.mean(dim=1)           # (B, C)
+        temporal_feature = out.mean(dim=1)   # (B, C)
 
         # --------------------------------------------------
         # Asymmetry features

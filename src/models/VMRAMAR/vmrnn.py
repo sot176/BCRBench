@@ -379,51 +379,26 @@ class UpSample(nn.Module):
 
 # ── Full VMRNN — matches their interface exactly ───────────────────────────
 class VMRNN(nn.Module):
-    def __init__(self, input_dim, hidden_dim=64,
-                 spatial_h=16, spatial_w=16,
-                 depths_down=(2, 2, 6, 2),
-                 depths_up=(2, 2, 6, 2),
-                 drop_path_rate=0.1, attn_drop=0., d_state=16):
+    def __init__(self, embed_dim, depths_downsample, depths_upsample,
+                 feature_resolution=(1,1), **kwargs):
         super().__init__()
-        assert len(depths_down) == len(depths_up)
-        n_levels = len(depths_down)
-        assert min(spatial_h, spatial_w) >= 2 ** (n_levels - 1), (
-            f"spatial ({spatial_h}x{spatial_w}) too small for {n_levels} levels."
+        self.Downsample = DownSample(
+            embed_dim=embed_dim,
+            depths_downsample=depths_downsample,
+            feature_resolution=feature_resolution,
+            **kwargs
         )
-        feature_resolution = (spatial_h, spatial_w)
+        self.Upsample = UpSample(
+            embed_dim=embed_dim,
+            depths_upsample=depths_upsample,
+            feature_resolution=feature_resolution,
+            **kwargs
+        )
 
-        # Project input_dim → hidden_dim and tile to spatial grid
-        self.input_proj = nn.Linear(input_dim, hidden_dim)
-        self.spatial_h  = spatial_h
-        self.spatial_w  = spatial_w
-
-        self.down = DownSample(hidden_dim, depths_down, feature_resolution,
-                               drop_path_rate, attn_drop, d_state)
-        self.up   = UpSample(hidden_dim, depths_up, feature_resolution,
-                             drop_path_rate, attn_drop, d_state)
-
-        # Output: pool sequence → scalar embedding → project back to input_dim
-        self.out_norm = nn.LayerNorm(self.up.out_dim)
-        self.out_proj = nn.Linear(self.up.out_dim, input_dim)
-
-    def forward(self, Tt, states_down=None, states_up=None):
-        """
-        Tt: (B, input_dim)
-        Returns: out (B, input_dim), states_down, states_up
-        """
-        B = Tt.shape[0]
-        H, W = self.spatial_h, self.spatial_w
-
-        # Project and tile to sequence (B, H*W, hidden_dim)
-        x = self.input_proj(Tt)                        # (B, hidden_dim)
-        x = x.unsqueeze(1).expand(B, H * W, -1).contiguous()  # (B, L, hidden_dim)
-
-        states_down, skips, x = self.down(x, states_down)
-        states_up,   x        = self.up(x, skips, states_up)
-
-        # Pool sequence → embedding
-        x   = self.out_norm(x)                         # (B, L, out_dim)
-        out = x.mean(dim=1)                            # (B, out_dim)
-        out = self.out_proj(out)                       # (B, input_dim)
-
-        return out, states_down, states_up
+    def forward(self, features, states_down=None, states_up=None, **kwargs):
+        B = features.shape[0]
+        if features.dim() == 3 and self.Downsample.is_temporal:
+            features = features.view(B, -1, features.size(-1))
+        states_down, x = self.Downsample(features, states_down)
+        states_up, output = self.Upsample(x, states_up)
+        return output, states_down, states_up
