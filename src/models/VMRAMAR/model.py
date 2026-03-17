@@ -53,14 +53,16 @@ class VMRAMaR(nn.Module):
             self.lat = LongitudinalAsymmetryTracker(args)
             latent_h = getattr(args, "latent_h", 64)
             latent_w = getattr(args, "latent_w", 52)
-            self.asym_proj = nn.Linear(latent_h * latent_w, 512)
+            self.asym_proj = nn.Linear(latent_h * latent_w, 128)
+            self.asym_final_proj = nn.Linear(512, 128)  
+
         # --------------------------------------------------
         # Additive Hazard Layer
         # --------------------------------------------------
         input_dim = args.embed_dim
 
         if self.use_asymmetry:
-            input_dim += 512         # LAT always outputs 512 (feature_dim in lat.py)
+            input_dim += 128         
 
         self.ahl =  CumulativeProbabilityLayer(input_dim, max_followup=5)
 
@@ -86,7 +88,7 @@ class VMRAMaR(nn.Module):
         # --------------------------------------------------
         visit_embeddings = self.image_aggregator(feats)  # (B, T, C, H, W)
 
-        visit_embeddings_flat = visit_embeddings.mean(dim=(-2,-1))  # (B, T, C)
+        visit_embeddings_flat = visit_embeddings.flatten(2)  # (B, T, C)
 
         # --------------------------------------------------
         # VMRNN temporal modeling
@@ -117,13 +119,15 @@ class VMRAMaR(nn.Module):
             heatmaps = asym['heatmap']                           
             B_a, T_a, H_a, W_a = heatmaps.shape
             asym_features = heatmaps.view(B_a, T_a, H_a * W_a) # (B, T, H*W)
-            asym_features = self.asym_proj(asym_features)       # (B, T, 512)
+            asym_features = self.asym_proj(asym_features)       # (B, T, 128)
 
             asym_feature = self.lat(
                 asym_features,                  # (B, T, 512)
                 asym['asymmetry_coords'],       # (B, T, 2)
                 asym['heatmap']                 # (B, T, H, W)
             )
+            asym_feature = self.asym_final_proj(asym_feature)  # (B, asym_out_dim)
+
             features.append(asym_feature)
 
         holistic_embedding = torch.cat(features, dim=1)
