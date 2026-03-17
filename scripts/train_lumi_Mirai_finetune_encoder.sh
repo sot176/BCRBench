@@ -1,6 +1,6 @@
 #!/bin/bash -l
 
-#SBATCH --job-name=Train_Risk         # Job name
+#SBATCH --job-name=Train_Risk_Mirai_finetuned_encoder          # Job name
 #SBATCH --output=/scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/error_output_files/embed/%x-%j.out  # Output file with job name and ID
 #SBATCH --error=/scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/error_output_files/embed/%x-%j.err   # Error file with job name and ID
 #SBATCH --partition=standard-g
