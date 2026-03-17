@@ -29,23 +29,25 @@ class Mirai(nn.Module):
             self.transformer = load_model(
                 args.transformer_snapshot, args, do_wrap_model=False
             )
-            # Fix 1 — remove risk factor dependency from pool
             self.transformer.args.use_risk_factors = False
             self.transformer.pool = self.transformer.pool.internal_pool
 
-            # Fix 2 — replace fc since original was 612 (512 + 100 risk factor dim)
-            self.transformer.fc = nn.Linear(
-                512,   
-                self.transformer.fc.out_features    # keep same num classes
-            )
+            # Save old fc BEFORE replacing it
+            old_fc = self.transformer.fc  # still has shape (2, 612)
 
-            # Fix 3 — ensure survival layer exists with correct args
+            # Replace with new fc
+            self.transformer.fc = nn.Linear(512, old_fc.out_features)
+
+            # Copy pretrained weights, dropping the 100 risk factor dims
+            with torch.no_grad():
+                self.transformer.fc.weight.copy_(old_fc.weight[:, :512])  # (2, 512)
+                self.transformer.fc.bias.copy_(old_fc.bias)               # (2,)
+
             self.transformer.args.survival_analysis_setup = args.survival_analysis_setup
             self.transformer.prob_of_failure_layer = CumulativeProbabilityLayer(
-                    512,
-                    max_followup=args.max_followup
-                )
-            print("New fc shape:", self.transformer.fc.weight.shape)  # should be (2, 512) not (2, 612)
+                512,
+                max_followup=args.max_followup
+            )
 
         else:
             self.transformer = get_model_by_name('transformer', False, args)
