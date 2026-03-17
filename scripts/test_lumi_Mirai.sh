@@ -54,6 +54,7 @@ accelerate launch  main_test.py \
   --use_sad_bias \
   --use_lat_bn \
   --batch_size 1 \
+  --survival_analysis_setup \
   --num_workers 7 \
   --best_model "True" \
   --dataset "EMBED" \

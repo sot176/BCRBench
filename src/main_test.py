@@ -38,6 +38,8 @@ def parse_arguments():
     if temp_args.model == "Mirai" or temp_args.model == "VMRA-MaR":
         parser.add_argument('--img_encoder_snapshot', type=str, default=None,
                             help='Filename of image feature extractor snapshot for mirai_full models')
+        parser.add_argument('--survival_analysis_setup', action='store_true',  help='Whether to modify model, eval and training for survival analysis.') #
+
     # Other Optional Configs
         parser.add_argument('--num_images', type=int, default=1,
                         help='In multi image setting, the number of images per single sample.')
