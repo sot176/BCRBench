@@ -118,14 +118,22 @@ class VMRAMaR(nn.Module):
             right = feats[:, :, [1, 3]].mean(dim=2)   # (B, T, C, H, W)
 
             asym = self.sad(left, right)                
-            heatmaps = asym['heatmap']                           
+            heatmaps = asym['heatmap']    
+            if heatmaps.dim() == 3:
+                _, H_a, W_a = heatmaps.shape
+                heatmaps = heatmaps.view(B, T, H_a, W_a)  # (B, T, 5, 5)
+                     
             B_a, T_a, H_a, W_a = heatmaps.shape
             asym_features = heatmaps.view(B_a, T_a, H_a * W_a) # (B, T, H*W)
 
+            coords = asym['asymmetry_coords']              # may be (B*T, 2)
+            if coords.dim() == 2:
+                coords = coords.view(B, T, 2)             # (B, T, 2)
+
             asym_feature = self.lat(
-                asym_features,                  # (B, T, 512)
-                asym['asymmetry_coords'],       # (B, T, 2)
-                asym['heatmap']                 # (B, T, H, W)
+                asym_features,   # (B, T, 512)
+                coords,          # (B, T, 2)
+                heatmaps         # (B, T, 5, 5)
             )
 
             features.append(asym_feature)
