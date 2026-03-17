@@ -53,7 +53,7 @@ class VMRAMaR(nn.Module):
             self.lat = LongitudinalAsymmetryTracker(args)
             latent_h = getattr(args, "latent_h", 64)
             latent_w = getattr(args, "latent_w", 52)
-            self.asym_proj = nn.Linear(latent_h * latent_w, 128)
+            self.asym_proj = nn.Linear(latent_h * latent_w, 512)
             self.asym_final_proj = nn.Linear(512, 128)  
 
         # --------------------------------------------------
@@ -119,14 +119,14 @@ class VMRAMaR(nn.Module):
             heatmaps = asym['heatmap']                           
             B_a, T_a, H_a, W_a = heatmaps.shape
             asym_features = heatmaps.view(B_a, T_a, H_a * W_a) # (B, T, H*W)
-            asym_features = self.asym_proj(asym_features)       # (B, T, 128)
+            asym_features = self.asym_proj(asym_features)       # (B, T, 512)
 
             asym_feature = self.lat(
                 asym_features,                  # (B, T, 512)
                 asym['asymmetry_coords'],       # (B, T, 2)
                 asym['heatmap']                 # (B, T, H, W)
             )
-            asym_feature = self.asym_final_proj(asym_feature)  # (B, asym_out_dim)
+            asym_feature = self.asym_final_proj(asym_feature)  # (B, 128)
 
             features.append(asym_feature)
 
