@@ -60,7 +60,7 @@ accelerate launch  main_train.py \
             --patience_lr_scheduler 5 \
             --survival_analysis_setup \
             --num_epochs 30 \
-            --patience 15 \
+            --patience 20 \
             --dataset "EMBED" \
             --seed 2023
 
