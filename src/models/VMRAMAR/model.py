@@ -51,10 +51,9 @@ class VMRAMaR(nn.Module):
         if self.use_asymmetry:
             self.sad = SpatialAsymmetryDetector(args)
             self.lat = LongitudinalAsymmetryTracker(args)
-            latent_h = getattr(args, "latent_h", 64)
-            latent_w = getattr(args, "latent_w", 52)
+            latent_h = getattr(args, "latent_h", 5)
+            latent_w = getattr(args, "latent_w", 5)
             self.asym_proj = nn.Linear(latent_h * latent_w, 512)
-            self.asym_final_proj = nn.Linear(512, 128)  
 
         # --------------------------------------------------
         # Additive Hazard Layer
@@ -126,7 +125,6 @@ class VMRAMaR(nn.Module):
                 asym['asymmetry_coords'],       # (B, T, 2)
                 asym['heatmap']                 # (B, T, H, W)
             )
-            asym_feature = self.asym_final_proj(asym_feature)  # (B, 128)
 
             features.append(asym_feature)
 

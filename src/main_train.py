@@ -216,23 +216,17 @@ def parse_arguments():
         parser.add_argument('--depths_upsample', nargs='+', type=int,
                             default=[2, 2, 6, 2],
                             help='Depths for upsample blocks')
-        parser.add_argument('--patch_size', type=int, default=32,
-                            help='Patch size')
-        parser.add_argument('--window_size', type=int, default=64,
-                            help='Window size')
         parser.add_argument('--embed_dim', type=int, default=512,
                             help='Embedding dimension')
-        parser.add_argument('--vmrnn_spatial_h', type=int, default=16)
-        parser.add_argument('--vmrnn_spatial_w', type=int, default=16)
 
         # Asymmetry module parameters
         parser.add_argument('--use_asymmetry', action='store_true',
                             help='Enable asymmetry module')
-        parser.add_argument('--latent_h', type=int, default=64)
-        parser.add_argument('--latent_w', type=int, default=52)
+        parser.add_argument('--latent_h', type=int, default=5)
+        parser.add_argument('--latent_w', type=int, default=5)
         parser.add_argument('--use_sad_bias', action='store_true')
         parser.add_argument('--use_lat_bn', action='store_true')
-        parser.add_argument('--lat_dropout', type=float, default=0.1)
+        parser.add_argument('--lat_dropout', type=float, default=0.0)
         parser.add_argument('--initial_asym_mean', type=float, default=2000)
         parser.add_argument('--initial_asym_std', type=float, default=300)
         parser.add_argument("--asym_dim", type=int, default=0, help="Dimension of asymmetry features ")
