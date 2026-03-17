@@ -205,7 +205,7 @@ def parse_arguments():
                         help='Whether image will contain multiple slices. Slices could indicate different times, depths, or views')
     
         # Other Optional Configs
-        parser.add_argument('--num_images', type=int, default=1,
+        parser.add_argument('--num_images', type=int, default=4,
                         help='In multi image setting, the number of images per single sample.')
         parser.add_argument('--num_classes', type=int, default=2)
     

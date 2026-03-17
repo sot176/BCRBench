@@ -32,8 +32,10 @@ class VMRAMaR(nn.Module):
         # --------------------------------------------------
         # Image Aggregator
         # --------------------------------------------------
-        self.image_aggregator = ImageAggregator(args.embed_dim)
-
+        self.image_aggregator = ImageAggregator(
+            args.embed_dim,
+            num_views=getattr(args, 'num_images', 4)
+        )
         # --------------------------------------------------
         # VMRNN
         # --------------------------------------------------
@@ -85,22 +87,26 @@ class VMRAMaR(nn.Module):
         # --------------------------------------------------
         # Image Aggregator: fuse views
         # --------------------------------------------------
-        visit_embeddings = self.image_aggregator(feats)  # (B, T, C, H, W)
+        # ── Image aggregator: pool spatial first, then fuse views ─────────────
+        # Pool spatial dims before aggregator — it operates on embeddings not maps
+        feats_pooled = feats.mean(dim=(-2, -1))              # (B, T, V, C)
+        visit_embeddings = self.image_aggregator(feats_pooled)  # (B, T, C)
 
-        visit_embeddings_flat = visit_embeddings.flatten(2)  # (B, T, C)
+        # ── VMRNN: recurrent loop over timesteps ──────────────────────────────
+        # Per diagram: feed one T_t at a time, carry states across t
+        states_down = None
+        states_up   = None
+        outputs     = []
+        for t in range(T):
+            Tt = visit_embeddings[:, t:t+1, :]              # (B, 1, C) — single timestep
+            out, states_down, states_up = self.vmrnn(
+                Tt, states_down=states_down, states_up=states_up
+            )
+            outputs.append(out)                              # (B, 1, C)
 
-        # --------------------------------------------------
-        # VMRNN temporal modeling
-        # --------------------------------------------------
-        out, states_down, states_up = self.vmrnn(
-            visit_embeddings_flat,   # (B, T, C) — T is the sequence length
-            states_down=None,
-            states_up=None,
-        )
-        # --------------------------------------------------
-        # Temporal pooling over T and spatial dims
-        # --------------------------------------------------
-        temporal_feature = out.mean(dim=1)   # (B, C)
+        outputs = torch.cat(outputs, dim=1)                  # (B, T, C)
+        temporal_feature = outputs.mean(dim=1)               # (B, C)
+
 
         # --------------------------------------------------
         # Asymmetry features

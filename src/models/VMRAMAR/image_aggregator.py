@@ -4,42 +4,34 @@ import torch.nn as nn
 
 class ImageAggregator(nn.Module):
     """
-    Per the diagram: split CC/MLO → FC per view → cross-view attention → FC out.
-    Input:  (B, T, V, C, H, W)
-    Output: (B, T, C, H, W)  — one fused spatial map per visit
+    Per diagram: split CC/MLO → separate FC per view → attention → FC → T_t
+    Input:  (B, T, V, C)  — pooled embeddings, V views
+    Output: (B, T, C)     — one fused embedding per visit
     """
-    def __init__(self, dim):
+    def __init__(self, dim, num_views=4):
         super().__init__()
         # Separate FC per view (diagram shows split → FC → FC)
-        self.cc_fc  = nn.Linear(dim, dim)
-        self.mlo_fc = nn.Linear(dim, dim)
-        # Cross-view attention
-        self.attn = nn.MultiheadAttention(dim, num_heads=4, batch_first=True)
-        self.out  = nn.Linear(dim, dim)
+        self.view_fcs = nn.ModuleList([
+            nn.Linear(dim, dim) for _ in range(num_views)
+        ])
+        self.attn   = nn.MultiheadAttention(dim, num_heads=4, batch_first=True)
+        self.out_fc = nn.Linear(dim, dim)
 
     def forward(self, x):
-        # x: (B, T, V, C, H, W)
-        B, T, V, C, H, W = x.shape
+        # x: (B, T, V, C)
+        B, T, V, C = x.shape
 
-        # Global pool spatial dims first — aggregation is over embeddings
-        x_pooled = x.mean(dim=(-2, -1))           # (B, T, V, C)
+        # Apply separate FC to each view
+        view_feats = torch.stack([
+            self.view_fcs[v](x[:, :, v, :]) for v in range(V)
+        ], dim=2)                                    # (B, T, V, C)
 
-        # Split CC (views 0,1) and MLO (views 2,3), average each pair
-        cc  = x_pooled[:, :, :V//2].mean(dim=2)   # (B, T, C)
-        mlo = x_pooled[:, :, V//2:].mean(dim=2)   # (B, T, C)
-
-        # Per-view FC
-        cc  = self.cc_fc(cc)                       # (B, T, C)
-        mlo = self.mlo_fc(mlo)                     # (B, T, C)
-
-        # Stack as sequence for cross-view attention
-        views = torch.stack([cc, mlo], dim=2)      # (B, T, 2, C)
+        # Attention over views at each timestep
         BT = B * T
-        views = views.view(BT, 2, C)
-        views, _ = self.attn(views, views, views)  # (BT, 2, C)
-        views = views.mean(dim=1).view(B, T, C)    # (B, T, C)
-        out = self.out(views)                      # (B, T, C)
+        view_feats = view_feats.view(BT, V, C)
+        attn_out, _ = self.attn(view_feats, view_feats, view_feats)  # (BT, V, C)
 
-        # Broadcast back to spatial dims for VMRNN
-        out = out.unsqueeze(-1).unsqueeze(-1).expand(B, T, C, H, W)
-        return out                                 # (B, T, C, H, W)
+        # Mean pool views → single embedding per visit
+        fused = attn_out.mean(dim=1)                # (BT, C)
+        fused = self.out_fc(fused)                  # (BT, C)
+        return fused.view(B, T, C)                  # (B, T, C)
