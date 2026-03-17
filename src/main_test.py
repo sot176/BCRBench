@@ -41,13 +41,15 @@ def parse_arguments():
     # Other Optional Configs
         parser.add_argument('--num_images', type=int, default=1,
                         help='In multi image setting, the number of images per single sample.')
-    
+        parser.add_argument('--transformer_snapshot', type=str, default=None,
+                            help='Filename of transformer snapshot for mirai_full models')
         # VMRNN architecture parameters
+         # VMRNN architecture parameters
         parser.add_argument('--depths_downsample', nargs='+', type=int,
-                            default=[2, 2, 6],
+                            default=[2, 2, 6, 2],
                             help='Depths for downsample blocks')
         parser.add_argument('--depths_upsample', nargs='+', type=int,
-                            default=[2, 2, 2],
+                            default=[2, 2, 6, 2],
                             help='Depths for upsample blocks')
         parser.add_argument('--patch_size', type=int, default=32,
                             help='Patch size')
@@ -55,15 +57,14 @@ def parse_arguments():
                             help='Window size')
         parser.add_argument('--embed_dim', type=int, default=512,
                             help='Embedding dimension')
-        parser.add_argument('--feature_resolution', nargs=2, type=int,
-                            default=[64, 52],
-                            help='Feature map resolution (H W)')
+        parser.add_argument('--vmrnn_spatial_h', type=int, default=16)
+        parser.add_argument('--vmrnn_spatial_w', type=int, default=16)
 
         # Asymmetry module parameters
         parser.add_argument('--use_asymmetry', action='store_true',
                             help='Enable asymmetry module')
-        parser.add_argument('--latent_h', type=int, default=5)
-        parser.add_argument('--latent_w', type=int, default=5)
+        parser.add_argument('--latent_h', type=int, default=64)
+        parser.add_argument('--latent_w', type=int, default=52)
         parser.add_argument('--use_sad_bias', action='store_true')
         parser.add_argument('--use_lat_bn', action='store_true')
         parser.add_argument('--lat_dropout', type=float, default=0.1)

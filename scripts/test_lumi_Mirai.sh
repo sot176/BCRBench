@@ -46,6 +46,7 @@ accelerate launch  main_test.py \
   --data_root /scratch/project_465002309/thrunsol/embed_datasets/risk_dataset_1664_2048 \
   --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/Train_Risk-16772949_Model_Mirai_lr_5e-05_wd_0.0001_epochs_30_bs_6_2026-03-16-19-29 \
   --img_encoder_snapshot /scratch/project_465002309/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_MIRAI_Base_May20_2019.p \
+  --transformer_snapshot /scratch/project_465002309/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_cancer_MIRAI_Transformer_Jan13_2020.p \
   --path_test_folder  /scratch/project_465002309/thrunsol/Mirai_Risk_prediction_test_results_1664_2048/embed/finetuned_model \
   --model "Mirai" \
   --use_asymmetry \
