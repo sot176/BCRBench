@@ -194,17 +194,17 @@ class VSB(nn.Module):
             hx = self.ln_1(hx)
             x = self.linear(torch.cat([x, hx], dim=-1))
 
-            # In temporal mode (H=1, W=1), treat the full sequence as a 1D spatial map
-            # Reshape L timesteps as (1, L) spatial grid for SS2D
-            if H == 1 and W == 1:
-                x = x.view(B, 1, L, C)          # treat T as width dimension
-                x = self.drop_path(self.self_attention(x))
-                x = x.view(B, L, C)
-            else:
-                assert L == H * W
-                x = x.view(B, H, W, C)
-                x = self.drop_path(self.self_attention(x))
-                x = x.view(B, L, C)
+        # In temporal mode (H=1, W=1), treat the full sequence as a 1D spatial map
+        # Reshape L timesteps as (1, L) spatial grid for SS2D
+        if H == 1 and W == 1:
+            x = x.view(B, 1, L, C)          # treat T as width dimension
+            x = self.drop_path(self.self_attention(x))
+            x = x.view(B, L, C)
+        else:
+            assert L == H * W
+            x = x.view(B, H, W, C)
+            x = self.drop_path(self.self_attention(x))
+            x = x.view(B, L, C)
 
         return shortcut + x
 
@@ -416,7 +416,7 @@ class UpSample(nn.Module):
             x, new_state = layer(x, state)
             new_states.append(new_state)
             x = up(x)
-        x = torch.sigmoid(self.Unembed(x))   # sigmoid + Unembed — matches their code
+        x = self.Unembed(x)
         return new_states, x
 
 
