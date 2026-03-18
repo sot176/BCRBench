@@ -188,6 +188,7 @@ class VSB(nn.Module):
     def forward(self, x, hx=None):
         H, W = self.input_resolution
         B, L, C = x.shape
+
         if not (H == 1 or W == 1):
             assert L == H * W, f"Input feature has wrong size. Got L={L}, expected {H*W}."
 
@@ -199,10 +200,17 @@ class VSB(nn.Module):
             x  = torch.cat((x, hx), dim=-1)
             x  = self.linear(x)
 
-        # Their exact reshape — always H*W, works for (1,1) since L=1
-        x = x.view(B, H, W, C)
-        x = self.drop_path(self.self_attention(x))
-        x = x.view(B, H * W, C)
+        # Temporal mode: H=1, W=1 but L=T (multiple timesteps)
+        # Treat as (B, 1, T, C) spatial grid so SS2D processes all timesteps
+        if H == 1 and W == 1:
+            x = x.view(B, 1, L, C)                      # (B, 1, T, C)
+            x = self.drop_path(self.self_attention(x))   # SS2D over T as width
+            x = x.view(B, L, C)
+        else:
+            x = x.view(B, H, W, C)
+            x = self.drop_path(self.self_attention(x))
+            x = x.view(B, H * W, C)
+
         return shortcut + x
 
 
