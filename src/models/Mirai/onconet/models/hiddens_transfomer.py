@@ -14,7 +14,6 @@ MAX_TIME = 10
 MAX_VIEWS = 2
 MAX_SIDES = 2
 
-
 @RegisterModel("transformer")
 class AllImageTransformer(nn.Module):
     def __init__(self, args):
@@ -48,10 +47,10 @@ class AllImageTransformer(nn.Module):
 
         if args.survival_analysis_setup:
             if args.pred_both_sides:
-                self.prob_of_failure_layer_l = CumulativeProbabilityLayer(args.hidden_dim, max_followup=args.max_followup)
-                self.prob_of_failure_layer_r = CumulativeProbabilityLayer(args.hidden_dim, max_followup=args.max_followup)
+                self.prob_of_failure_layer_l = CumulativeProbabilityLayer(args.hidden_dim, args, max_followup=args.max_followup)
+                self.prob_of_failure_layer_r = CumulativeProbabilityLayer(args.hidden_dim, args, max_followup=args.max_followup)
             else:
-                self.prob_of_failure_layer = CumulativeProbabilityLayer(args.hidden_dim, max_followup=args.max_followup)
+                self.prob_of_failure_layer = CumulativeProbabilityLayer(args.hidden_dim, args, max_followup=args.max_followup)
 
     def mask_input(self, x, view_seq):
         B, N, _ = x.size()
@@ -242,5 +241,3 @@ class MultiHead_Attention(nn.Module):
         output = self.aggregate_fc(h)
 
         return output
-
-
