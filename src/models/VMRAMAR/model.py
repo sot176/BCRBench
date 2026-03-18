@@ -45,7 +45,10 @@ class VMRAMaR(nn.Module):
             depths_upsample=args.depths_upsample,        # their arg name
             feature_resolution=(1, 1),                   # temporal mode — no spatial U-Net
         )
-
+        self.vmrnn_out_proj = nn.Sequential(
+            nn.Linear(args.embed_dim, args.embed_dim),
+            nn.LayerNorm(args.embed_dim)
+        )
         # --------------------------------------------------
         # Asymmetry modules
         # --------------------------------------------------
@@ -94,19 +97,12 @@ class VMRAMaR(nn.Module):
 
         # ── VMRNN: recurrent loop over timesteps ──────────────────────────────
         # Per diagram: feed one T_t at a time, carry states across t
-        states_down = None
-        states_up   = None
-        outputs     = []
-        for t in range(T):
-            Tt = visit_embeddings[:, t:t+1, :]              # (B, 1, C) — single timestep
-            out, states_down, states_up = self.vmrnn(
-                Tt, states_down=states_down, states_up=states_up
-            )
-            outputs.append(out)                              # (B, 1, C)
-
-        outputs = torch.cat(outputs, dim=1)                  # (B, T, C)
-        temporal_feature = outputs.mean(dim=1)               # (B, C)
-
+        out, states_down, states_up = self.vmrnn(
+            visit_embeddings,        # (B, T, C) — full sequence, not one at a time
+            states_down=None,
+            states_up=None,
+        )                            # out: (B, T, C)
+        temporal_feature = self.vmrnn_out_proj(out.mean(dim=1))
 
         # --------------------------------------------------
         # Asymmetry features

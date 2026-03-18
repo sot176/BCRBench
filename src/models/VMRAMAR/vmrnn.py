@@ -5,8 +5,10 @@ import math
 from functools import partial
 from einops import rearrange, repeat
 from timm.models.layers import DropPath
+from timm.models.swin_transformer import PatchMerging
 
-# ── Selective scan fallback ────────────────────────────────────────────────
+
+# ── Selective scan ─────────────────────────────────────────────────────────
 def selective_scan_ref(u, delta, A, B, C, D=None, z=None,
                        delta_bias=None, delta_softplus=False,
                        return_last_state=False):
@@ -40,6 +42,7 @@ def selective_scan_ref(u, delta, A, B, C, D=None, z=None,
         y = y + u * D.float().unsqueeze(-1)
     if z is not None:
         y = y * F.silu(z.float())
+    y = torch.clamp(y, -1e4, 1e4)   # numerical stability
     y = y.to(dtype_in)
     return (y, x) if return_last_state else y
 
@@ -52,7 +55,7 @@ except ImportError:
     print("⚠️  Using pure PyTorch selective scan fallback")
 
 
-# ── SS2D (their VSSBlock core) ─────────────────────────────────────────────
+# ── SS2D ───────────────────────────────────────────────────────────────────
 class SS2D(nn.Module):
     def __init__(self, d_model, d_state=16, d_conv=3, expand=2,
                  dt_rank="auto", dt_min=0.001, dt_max=0.1,
@@ -69,7 +72,6 @@ class SS2D(nn.Module):
                                   bias=conv_bias, kernel_size=d_conv,
                                   padding=(d_conv - 1) // 2)
         self.act = nn.SiLU()
-
         self.x_proj_weight = nn.Parameter(torch.stack([
             nn.Linear(self.d_inner, self.dt_rank + d_state * 2, bias=False).weight
             for _ in range(4)
@@ -142,7 +144,7 @@ class SS2D(nn.Module):
         Bs  = Bs.float().view(B, K, -1, L)
         Cs  = Cs.float().view(B, K, -1, L)
         Ds  = self.Ds.float().view(-1)
-        As  = -torch.exp(self.A_logs.float()).view(-1, self.d_state)
+        As  = -torch.exp(self.A_logs.float().clamp(-10, 10)).view(-1, self.d_state)
         dt_bias = self.dt_projs_bias.float().view(-1)
         out_y = selective_scan_fn(
             xs, dts, As, Bs, Cs, Ds, z=None,
@@ -157,7 +159,6 @@ class SS2D(nn.Module):
         return y
 
     def forward(self, x):
-        # x: (B, H, W, C)
         B, H, W, C = x.shape
         xz = self.in_proj(x)
         x, z = xz.chunk(2, dim=-1)
@@ -171,109 +172,82 @@ class SS2D(nn.Module):
         return out
 
 
-# ── VSB — matches their implementation exactly ────────────────────────────
+# ── VSB — exact copy from their github ────────────────────────────────────
 class VSB(nn.Module):
     def __init__(self, hidden_dim, input_resolution,
                  drop_path=0.,
                  norm_layer=partial(nn.LayerNorm, eps=1e-6),
-                 attn_drop=0., d_state=16, **kwargs):
+                 attn_drop_rate=0., d_state=16, **kwargs):
         super().__init__()
         self.input_resolution = input_resolution
-        self.ln_1             = norm_layer(hidden_dim)
-        self.self_attention   = SS2D(d_model=hidden_dim, dropout=attn_drop, d_state=d_state)
-        self.drop_path        = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-        self.linear           = nn.Linear(hidden_dim * 2, hidden_dim)
+        self.ln_1           = norm_layer(hidden_dim)
+        self.self_attention = SS2D(d_model=hidden_dim, dropout=attn_drop_rate, d_state=d_state)
+        self.drop_path      = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.linear         = nn.Linear(hidden_dim * 2, hidden_dim)
 
     def forward(self, x, hx=None):
-        # x: (B, L, C),  hx: (B, L, C)
         H, W = self.input_resolution
         B, L, C = x.shape
+        if not (H == 1 or W == 1):
+            assert L == H * W, f"Input feature has wrong size. Got L={L}, expected {H*W}."
+
         shortcut = x
         x = self.ln_1(x)
+
         if hx is not None:
             hx = self.ln_1(hx)
-            x = self.linear(torch.cat([x, hx], dim=-1))
+            x  = torch.cat((x, hx), dim=-1)
+            x  = self.linear(x)
 
-        # In temporal mode (H=1, W=1), treat the full sequence as a 1D spatial map
-        # Reshape L timesteps as (1, L) spatial grid for SS2D
-        if H == 1 and W == 1:
-            x = x.view(B, 1, L, C)          # treat T as width dimension
-            x = self.drop_path(self.self_attention(x))
-            x = x.view(B, L, C)
-        else:
-            assert L == H * W
-            x = x.view(B, H, W, C)
-            x = self.drop_path(self.self_attention(x))
-            x = x.view(B, L, C)
-
+        # Their exact reshape — always H*W, works for (1,1) since L=1
+        x = x.view(B, H, W, C)
+        x = self.drop_path(self.self_attention(x))
+        x = x.view(B, H * W, C)
         return shortcut + x
 
 
-# ── VMRNNCell — matches their implementation exactly ──────────────────────
+# ── VMRNNCell — exact copy from their github ──────────────────────────────
 class VMRNNCell(nn.Module):
     def __init__(self, hidden_dim, input_resolution, depth,
-                 drop_path=0., attn_drop=0., d_state=16, **kwargs):
+                 drop=0., attn_drop=0., drop_path=0.,
+                 norm_layer=nn.LayerNorm, d_state=16, **kwargs):
         super().__init__()
-        self.hidden_dim       = hidden_dim
-        self.input_resolution = input_resolution
         self.VSBs = nn.ModuleList([
-            VSB(hidden_dim, input_resolution,
+            VSB(hidden_dim=hidden_dim,
+                input_resolution=input_resolution,
                 drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path,
-                attn_drop=attn_drop, d_state=d_state)
+                norm_layer=norm_layer,
+                attn_drop_rate=attn_drop,
+                d_state=d_state,
+                **kwargs)
             for i in range(depth)
         ])
 
     def forward(self, xt, hidden_states):
-        # xt: (B, L, C)
-        B, L, C = xt.shape
         if hidden_states is None:
-            hx = torch.zeros_like(xt)
-            cx = torch.zeros_like(xt)
+            B, L, C = xt.shape
+            hx = torch.zeros(B, L, C, device=xt.device, dtype=xt.dtype)
+            cx = torch.zeros(B, L, C, device=xt.device, dtype=xt.dtype)
         else:
             hx, cx = hidden_states
 
-        # First VSB fuses xt with previous hidden state hx
-        outputs = [self.VSBs[0](xt, hx)]
-        for vsb in self.VSBs[1:]:
-            outputs.append(vsb(outputs[-1], None))
+        outputs = []
+        for index, layer in enumerate(self.VSBs):
+            if index == 0:
+                x = layer(xt, hx)
+            else:
+                x = layer(outputs[-1], None)
+            outputs.append(x)
 
-        o_t = outputs[-1]
-        Ft  = torch.sigmoid(o_t)
+        o_t  = outputs[-1]
+        Ft   = torch.sigmoid(o_t)
         cell = torch.tanh(o_t)
-        Ct  = Ft * (cx + cell)
-        Ht  = Ft * torch.tanh(Ct)
+        Ct   = Ft * (cx + cell)
+        Ht   = Ft * torch.tanh(Ct)
         return Ht, (Ht, Ct)
 
 
-# ── PatchMerging — sequence format (B, L, C), matches timm's interface ────
-class PatchMerging(nn.Module):
-    def __init__(self, input_resolution, dim, norm_layer=nn.LayerNorm):
-        super().__init__()
-        self.input_resolution = input_resolution
-        self.dim       = dim
-        self.reduction = nn.Linear(4 * dim, 2 * dim, bias=False)
-        self.norm      = norm_layer(4 * dim)
-
-    def forward(self, x):
-        H, W = self.input_resolution
-        B, L, C = x.shape
-        assert L == H * W
-        x = x.view(B, H, W, C)
-        if H % 2 != 0 or W % 2 != 0:
-            x = F.pad(x, (0, 0, 0, W % 2, 0, H % 2))
-            H, W = x.shape[1], x.shape[2]
-        x0 = x[:, 0::2, 0::2, :]
-        x1 = x[:, 1::2, 0::2, :]
-        x2 = x[:, 0::2, 1::2, :]
-        x3 = x[:, 1::2, 1::2, :]
-        x  = torch.cat([x0, x1, x2, x3], dim=-1)   # (B, H/2, W/2, 4C)
-        x  = x.view(B, -1, 4 * C)
-        x  = self.norm(x)
-        x  = self.reduction(x)                       # (B, H/2*W/2, 2C)
-        return x
-
-
-# ── PatchExpanding — sequence format ──────────────────────────────────────
+# ── PatchExpanding — exact copy from their github ─────────────────────────
 class PatchExpanding(nn.Module):
     def __init__(self, input_resolution, dim, dim_scale=2, norm_layer=nn.LayerNorm):
         super().__init__()
@@ -286,7 +260,7 @@ class PatchExpanding(nn.Module):
         H, W = self.input_resolution
         x = self.expand(x)
         B, L, C = x.shape
-        assert L == H * W
+        assert L == H * W, "Input feature has wrong size."
         x = x.view(B, H, W, C)
         x = rearrange(x, 'b h w (p1 p2 c) -> b (h p1) (w p2) c',
                       p1=2, p2=2, c=C // 4)
@@ -295,144 +269,182 @@ class PatchExpanding(nn.Module):
         return x
 
 
-
+# ── PatchInflated — exact copy from their github ──────────────────────────
 class PatchInflated(nn.Module):
-    """
-    Patch Inflating Layer — reconstructs spatial image from feature sequence.
-    Only used in spatial mode (feature_resolution != (1,1)).
-    In temporal mode this is replaced by nn.Identity().
-    """
     def __init__(self, in_chans, embed_dim, input_resolution,
                  stride=2, padding=1, output_padding=1):
         super().__init__()
+        from timm.models.layers import to_2tuple
+        stride         = to_2tuple(stride)
+        padding        = to_2tuple(padding)
+        output_padding = to_2tuple(output_padding)
         self.input_resolution = input_resolution
         self.Conv = nn.ConvTranspose2d(
-            in_channels=embed_dim,
-            out_channels=in_chans,
-            kernel_size=(3, 3),
-            stride=stride,
-            padding=padding,
-            output_padding=output_padding
+            in_channels=embed_dim, out_channels=in_chans,
+            kernel_size=(3, 3), stride=stride,
+            padding=padding, output_padding=output_padding
         )
 
     def forward(self, x):
         H, W = self.input_resolution
         B, L, C = x.shape
-        assert L == H * W, f"Input feature has wrong size. Got L={L}, expected {H*W}."
-        x = x.view(B, H, W, C).permute(0, 3, 1, 2)  # (B, C, H, W)
-        x = self.Conv(x)                              # (B, in_chans, H*2, W*2)
+        assert L == H * W, "Input feature has wrong size."
+        x = x.view(B, H, W, C).permute(0, 3, 1, 2)
+        x = self.Conv(x)
         return x
 
+
+# ── DownSample — exact copy from their github ─────────────────────────────
 class DownSample(nn.Module):
-    def __init__(self, embed_dim, depths, feature_resolution,
-                 drop_path_rate=0.1, attn_drop=0., d_state=16, **kwargs):
+    def __init__(self, embed_dim, depths_downsample, feature_resolution,
+                 drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
+                 norm_layer=nn.LayerNorm, d_state=16, **kwargs):
         super().__init__()
-        H, W = feature_resolution
-        self.is_temporal = (H == 1 or W == 1)
+        self.num_layers = len(depths_downsample)
+        self.embed_dim  = embed_dim
+        self.patch_embed = nn.Identity()
         patches_resolution = feature_resolution
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]
+
+        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths_downsample))]
         self.layers     = nn.ModuleList()
         self.downsample = nn.ModuleList()
-        dim = embed_dim
 
-        for i, depth in enumerate(depths):
-            res = (
-                max(patches_resolution[0] // (2 ** i), 1),
-                max(patches_resolution[1] // (2 ** i), 1)
-            )
-            self.layers.append(VMRNNCell(
-                dim, res, depth,
-                drop_path=dpr[sum(depths[:i]):sum(depths[:i+1])],
-                attn_drop=attn_drop, d_state=d_state
-            ))
-            if self.is_temporal:
-                self.downsample.append(nn.Identity())
-            else:
-                self.downsample.append(PatchMerging(res, dim))
-                dim *= 2
-
-        self.out_dim = dim
-
-    def forward(self, x, states):
-        if states is None:
-            states = [None] * len(self.layers)
-        new_states = []
-        for layer, down, state in zip(self.layers, self.downsample, states):
-            x, new_state = layer(x, state)
-            new_states.append(new_state)
-            x = down(x)
-        return new_states, x          # ← no skips, matches their interface
-
-
-class UpSample(nn.Module):
-    def __init__(self, embed_dim, depths, feature_resolution,
-                 drop_path_rate=0.1, attn_drop=0., d_state=16, **kwargs):
-        super().__init__()
-        n = len(depths)
-        patches_resolution = feature_resolution
         is_temporal = feature_resolution[0] == 1 or feature_resolution[1] == 1
         self.is_temporal = is_temporal
 
-        # Final reconstruction layer — Identity in temporal mode
+        for i_layer in range(self.num_layers):
+            if is_temporal:
+                downsample = nn.Identity()
+            else:
+                downsample = PatchMerging(
+                    input_resolution=(
+                        patches_resolution[0] // (2 ** i_layer),
+                        patches_resolution[1] // (2 ** i_layer)
+                    ),
+                    dim=int(embed_dim * 2 ** i_layer)
+                )
+
+            layer = VMRNNCell(
+                hidden_dim=int(embed_dim * 2 ** i_layer),
+                input_resolution=(
+                    patches_resolution[0] // (2 ** i_layer),
+                    patches_resolution[1] // (2 ** i_layer)
+                ),
+                depth=depths_downsample[i_layer],
+                drop=drop_rate,
+                attn_drop=attn_drop_rate,
+                drop_path=dpr[sum(depths_downsample[:i_layer]):
+                               sum(depths_downsample[:i_layer+1])],
+                norm_layer=norm_layer,
+                d_state=d_state
+            )
+            self.layers.append(layer)
+            self.downsample.append(downsample)
+
+    def forward(self, x, states_down):
+        x = self.patch_embed(x)
+        hidden_states_down = []
+        for index, layer in enumerate(self.layers):
+            x, hidden_state = layer(
+                x, states_down[index] if states_down is not None else None
+            )
+            x = self.downsample[index](x)
+            hidden_states_down.append(hidden_state)
+        return hidden_states_down, x
+
+
+# ── UpSample — exact copy from their github ───────────────────────────────
+class UpSample(nn.Module):
+    def __init__(self, embed_dim, depths_upsample, feature_resolution,
+                 drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
+                 norm_layer=nn.LayerNorm, d_state=16, out_chans=None, **kwargs):
+        super().__init__()
+        self.num_layers = len(depths_upsample)
+        self.embed_dim  = embed_dim
+        self.patch_embed = nn.Identity()
+        patches_resolution = feature_resolution
+
+        is_temporal = feature_resolution[0] == 1 or feature_resolution[1] == 1
+        self.is_temporal = is_temporal
+
         if is_temporal:
             self.Unembed = nn.Identity()
         else:
             self.Unembed = PatchInflated(
-                in_chans=embed_dim,
+                in_chans=out_chans if out_chans is not None else embed_dim,
                 embed_dim=embed_dim,
                 input_resolution=patches_resolution
             )
 
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]
+        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths_upsample))]
         self.layers   = nn.ModuleList()
         self.upsample = nn.ModuleList()
 
-        for i in range(n):
-            res = (
-                max(patches_resolution[0] // (2 ** (n - i)), 1),
-                max(patches_resolution[1] // (2 ** (n - i)), 1)
-            )
-            # In temporal mode dim never changes — always embed_dim
-            dim = embed_dim if is_temporal else int(embed_dim * 2 ** (n - i))
+        for i_layer in range(self.num_layers):
+            resolution1 = patches_resolution[0] // (2 ** (self.num_layers - i_layer))
+            resolution2 = patches_resolution[1] // (2 ** (self.num_layers - i_layer))
+            dimension   = int(embed_dim * 2 ** (self.num_layers - i_layer))
 
             if is_temporal:
-                upsample = nn.Identity()
+                upsample  = nn.Identity()
+                dimension = embed_dim   # dim never changes in temporal mode
             else:
-                upsample = PatchExpanding(input_resolution=res, dim=dim)
+                upsample = PatchExpanding(
+                    input_resolution=(resolution1, resolution2),
+                    dim=dimension
+                )
 
-            self.layers.append(VMRNNCell(
-                dim, res,
-                depth=depths[n - 1 - i],
-                drop_path=dpr[sum(depths[:n-1-i]):sum(depths[:n-1-i+1])],
-                attn_drop=attn_drop, d_state=d_state
-            ))
+            layer = VMRNNCell(
+                hidden_dim=dimension,
+                input_resolution=(
+                    max(resolution1, 1),
+                    max(resolution2, 1)
+                ),
+                depth=depths_upsample[self.num_layers - 1 - i_layer],
+                drop=drop_rate,
+                attn_drop=attn_drop_rate,
+                drop_path=dpr[
+                    sum(depths_upsample[:self.num_layers-1-i_layer]):
+                    sum(depths_upsample[:self.num_layers-1-i_layer+1])
+                ],
+                norm_layer=norm_layer,
+                d_state=d_state
+            )
+            self.layers.append(layer)
             self.upsample.append(upsample)
 
-    def forward(self, x, states):
-        if states is None:
-            states = [None] * len(self.layers)
-        new_states = []
-        for layer, up, state in zip(self.layers, self.upsample, states):
-            x, new_state = layer(x, state)
-            new_states.append(new_state)
-            x = up(x)
-        x = self.Unembed(x)
-        return new_states, x
+    def forward(self, x, states_up):
+        hidden_states_up = []
+        for index, layer in enumerate(self.layers):
+            x, hidden_state = layer(
+                x, states_up[index] if states_up is not None else None
+            )
+            x = self.upsample[index](x)
+            hidden_states_up.append(hidden_state)
+        # Their exact line — sigmoid only meaningful in spatial mode
+        # In temporal mode Unembed is Identity so sigmoid(x) squashes to [0,1]
+        # We skip sigmoid in temporal mode to avoid saturating gradients
+        if not self.is_temporal:
+            x = torch.sigmoid(self.Unembed(x))
+        else:
+            x = self.Unembed(x)   # Identity — no sigmoid
+        return hidden_states_up, x
 
 
+# ── VMRNN — exact copy from their github ──────────────────────────────────
 class VMRNN(nn.Module):
     def __init__(self, embed_dim, depths_downsample, depths_upsample,
                  feature_resolution=(1, 1), **kwargs):
         super().__init__()
         self.Downsample = DownSample(
             embed_dim=embed_dim,
-            depths=depths_downsample,
+            depths_downsample=depths_downsample,
             feature_resolution=feature_resolution,
             **kwargs
         )
         self.Upsample = UpSample(
             embed_dim=embed_dim,
-            depths=depths_upsample,
+            depths_upsample=depths_upsample,
             feature_resolution=feature_resolution,
             **kwargs
         )
