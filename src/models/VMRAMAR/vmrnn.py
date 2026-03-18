@@ -389,15 +389,14 @@ class UpSample(nn.Module):
         for i_layer in range(self.num_layers):
             resolution1 = max(patches_resolution[0] // (2 ** (self.num_layers - i_layer)), 1)
             resolution2 = max(patches_resolution[1] // (2 ** (self.num_layers - i_layer)), 1)
-            dimension   = int(embed_dim * 2 ** (self.num_layers - i_layer))
-
+             
             if is_temporal:
                 upsample  = nn.Identity()
                 dimension = embed_dim   # dim never changes in temporal mode
             else:
                 upsample = PatchExpanding(
                     input_resolution=(resolution1, resolution2),
-                    dim=dimension
+                    dimension  = int(embed_dim * 2 ** (self.num_layers - i_layer))
                 )
 
             layer = VMRNNCell(
