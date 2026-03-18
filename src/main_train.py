@@ -123,7 +123,6 @@ def parse_arguments():
         parser.add_argument('--margin', type=float, default=2)
         parser.add_argument('--use_poe', action='store_true', help='Enable POE functionality')
         parser.add_argument('--no_poe', action='store_false', dest='use_poe')
-
         parser.add_argument('--use_sto', action='store_true', help='Enable stochastic sampling in POE')
         parser.add_argument('--no_sto', action='store_false', dest='use_sto')
         
@@ -136,7 +135,6 @@ def parse_arguments():
                             help='Filename of image feature extractor snapshot for mirai_full models')
         parser.add_argument('--transformer_snapshot', type=str, default=None,
                             help='Filename of transformer snapshot for mirai_full models')
-        parser.add_argument('--state_dict_path', type=str, default=None, help='filename of model snapshot to load[default: None]')
         parser.add_argument('--snapshot', type=str, default=None, help='filename of model snapshot to load[default: None]')
         parser.add_argument('--calibrator_snapshot', type=str, default=None, help='filename of calibrator. Produced for a single model on development set using Platt Scaling')
         parser.add_argument('--patch_snapshot', type=str, default=None, help='filename of patch model snapshot to load. Only used for aggregator type models [default: None]')
@@ -145,22 +143,15 @@ def parse_arguments():
         parser.add_argument('--freeze_image_encoder',   action='store_true',
                             help='Whether to freeze image encoder during training')
 
-        # Annotation / Auxiliary supervision
-        parser.add_argument('--use_region_annotation', action='store_true', 
-                            help='Include cancer region annotation loss')
-        
         # Model Architecture / Hyperparameters
         parser.add_argument('--transfomer_hidden_dim', type=int, default=512, help='start hidden dim for transformer')
         parser.add_argument('--precomputed_hidden_dim', type=int, default=512, help='dimension of precomputed hiddens from image encoder')
         parser.add_argument('--use_precomputed_hiddens', action='store_true', default=False, help='Whether to only use hiddens from a pretrained model.')
-        parser.add_argument('--input_dim', type=int, default=512, help='Input dim for 2stage models. [default:512]')
-        parser.add_argument('--num_layers', type=int, default=1)
+        parser.add_argument('--num_layers', type=int, default=3)
         parser.add_argument('--num_heads', type=int, default=8, help='Num heads for transformer')
         parser.add_argument('--dropout', type=float, default=0.1)
         parser.add_argument('--num_chan', type=int, default=3, help='Number of channels in img. [default:3]')
-        parser.add_argument('--img_only_dim', type=int, default=512,
-                    help='Input dimension for image-only features in the image encoder')
-        
+
         # resnet-specific
         parser.add_argument('--model_name', type=str, default='mirai_full', help="Form of model, i.e resnet18, aggregator, revnet, etc.")
         parser.add_argument('--block_layout', type=str, nargs='+', default=["BasicBlock,2", "BasicBlock,2", "BasicBlock,2", "BasicBlock,2"], help='Layout of blocks for a ResNet model. Must be a list of length 4. Each of the 4 elements is a string of form "block_name,num_repeats-block_name,num_repeats-...". [default: resnet18 layout]')
@@ -177,33 +168,15 @@ def parse_arguments():
         # risk factors
         parser.add_argument('--use_risk_factors',type=bool, default=False, help='Whether to feed risk factors into last FC of model.') #
         parser.add_argument('--pred_risk_factors', type=bool,default=False, help='Whether to predict value of all RF from image.') #
-        parser.add_argument('--pred_risk_factors_lambda',  type=float, default=0.25,  help='lambda to weigh the risk factor prediction.')
-        parser.add_argument('--use_pred_risk_factors_at_test',type=bool, default=False, help='Whether to use predicted risk factor values at test time.') #
-        parser.add_argument('--use_pred_risk_factors_if_unk',type=bool, default=False, help='Whether to use predicted risk factor values at test time only if rf is unk.') #
         parser.add_argument('--pred_both_sides', type=bool,default=False, help='Simulatenously pred both sides for multi-img model')
         parser.add_argument('--predict_birads',  type=bool,default=False, help='Wether to predict birads label for negative mammos in risk dataset objects. Note, preds, probs, and labels converted to binary (cancer vs negative) after prediction for logging purposes')
         parser.add_argument('--pred_missing_mammos',type=bool, default=False, help='Whether to predict missing images when doing image dropout.') #
         parser.add_argument('--also_pred_given_mammos',type=bool, default=False, help='Whether to predict given images.') #
-        parser.add_argument('--metadata_path', type=str, default=None, help='path of metadata csv.')
         
         #survival analysis setup
         parser.add_argument('--survival_analysis_setup', action='store_true',  help='Whether to modify model, eval and training for survival analysis.') #
-        parser.add_argument('--make_probs_indep', action='store_true',  help='Make surival model produce indepedent probablities.') #
-        parser.add_argument('--mask_mechanism', default='default', help='How to mask for survival objective. options [default, indep, slice, linear].') #
-        parser.add_argument('--eval_survival_on_risk', action='store_true', default=False, help='Port over survival model to risk model.') #
         parser.add_argument('--max_followup', type=int, default=5, help='Max followup to predict over')
-        parser.add_argument('--eval_risk_survival', action='store_true', default=False, help='Port over risk model to survival model.') #
         
-        # device
-        parser.add_argument('--is_ccds_server', action='store_true', default=False, help='Change all paths accordingly.')
-        parser.add_argument('--cuda', action='store_true', default=False, help='enable the gpu')
-        parser.add_argument('--num_gpus', type=int, default=1, help='Num GPUs to use in data_parallel.')
-        parser.add_argument('--num_shards', type=int, default=1, help='Num GPUs to shard a single model.')
-        parser.add_argument('--data_parallel', action='store_true', default=False, help='spread batch size across all available gpus. Set to false when using model parallelism. The combo of model and data parallelism may result in unexpected behavior')
-        parser.add_argument('--model_parallel', action='store_true', default=False, help='spread single model across num_shards. Note must have num_shards > 1 to take effect and only support in specific models. So far supported in all models that extend Resnet-base, i.e resnet-[n], nonlocal-resnet[n], custom-resnet models')
-        parser.add_argument('--multi_image', action='store_true', default=False,
-                        help='Whether image will contain multiple slices. Slices could indicate different times, depths, or views')
-    
         # Other Optional Configs
         parser.add_argument('--num_images', type=int, default=4,
                         help='In multi image setting, the number of images per single sample.')
