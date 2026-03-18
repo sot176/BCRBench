@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from .onconet.models.factory import get_model_by_name, load_model, RegisterModel
 from .onconet.models.hiddens_transfomer import AllImageTransformer
-from models.common_parts import extract_mirai_backbone
+from models.common_parts import extract_mirai_backbone_full
 from config.config import cfg
 from models.common_parts  import  CumulativeProbabilityLayer
 
@@ -15,7 +15,7 @@ class Mirai(nn.Module):
         self.args = args
 
         if args.img_encoder_snapshot is not None:
-            self.image_encoder = load_model(args.img_encoder_snapshot, args, do_wrap_model=False)
+            self.image_encoder = extract_mirai_backbone_full(cfg["paths"]["mirai_path"])
         else:
             self.image_encoder = get_model_by_name('custom_resnet', False, args)
 

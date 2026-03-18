@@ -1,6 +1,7 @@
 import torch
 
 import sys
+
 def extract_mirai_backbone(path):
     sys.path.append('../')
     import models.Mirai.onconet as current_onconet
@@ -25,6 +26,30 @@ def extract_mirai_backbone(path):
         break
     
     return torch.nn.Sequential(*embedding)
+
+
+def extract_mirai_backbone_full(path):
+    sys.path.append('../')
+    import models.Mirai.onconet as current_onconet
+
+    # Patch legacy import paths (for old checkpoints)
+    sys.modules['onconet'] = current_onconet
+    sys.modules['onconet.models'] = current_onconet.models
+    sys.modules['onconet.utils'] = current_onconet.utils
+    sys.modules['onconet.models.custom_resnet'] = current_onconet.models.custom_resnet
+    sys.modules['onconet.utils.risk_factors'] = current_onconet.utils.risk_factors
+    
+    # first pull mirai onto the CPU to avoid putting the whole transformer on the gpu
+    mirai = torch.load(path, map_location='cpu', weights_only=False)
+    layers = []
+    for child in mirai.children():
+        layers.append(child)
+
+    # Flatten the hierarchy into nn.Sequential
+    backbone = torch.nn.Sequential(*layers)
+    return backbone
+    
+
 
 # Torch by default adds data elements to tensors, but we need numpy arrays because our functions are
 # written to uint16, which is not supported by torch
