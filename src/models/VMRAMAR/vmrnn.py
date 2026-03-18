@@ -334,10 +334,7 @@ class DownSample(nn.Module):
 
             layer = VMRNNCell(
                 hidden_dim=hidden_dim_layer,
-                input_resolution=(
-                    patches_resolution[0] // (2 ** i_layer),
-                    patches_resolution[1] // (2 ** i_layer)
-                ),
+                input_resolution=res,
                 depth=depths_downsample[i_layer],
                 drop=drop_rate,
                 attn_drop=attn_drop_rate,
