@@ -321,14 +321,15 @@ class DownSample(nn.Module):
         self.is_temporal = is_temporal
 
         for i_layer in range(self.num_layers):
+            res = (
+                max(patches_resolution[0] // (2 ** i_layer), 1),  # add max(...,1)
+                max(patches_resolution[1] // (2 ** i_layer), 1)   # add max(...,1)
+            )
             if is_temporal:
                 downsample = nn.Identity()
             else:
                 downsample = PatchMerging(
-                    input_resolution=(
-                        patches_resolution[0] // (2 ** i_layer),
-                        patches_resolution[1] // (2 ** i_layer)
-                    ),
+                    input_resolution=res,
                     dim=int(embed_dim * 2 ** i_layer)
                 )
 
@@ -389,8 +390,8 @@ class UpSample(nn.Module):
         self.upsample = nn.ModuleList()
 
         for i_layer in range(self.num_layers):
-            resolution1 = patches_resolution[0] // (2 ** (self.num_layers - i_layer))
-            resolution2 = patches_resolution[1] // (2 ** (self.num_layers - i_layer))
+            resolution1 = max(patches_resolution[0] // (2 ** (self.num_layers - i_layer)), 1)
+            resolution2 = max(patches_resolution[1] // (2 ** (self.num_layers - i_layer)), 1)
             dimension   = int(embed_dim * 2 ** (self.num_layers - i_layer))
 
             if is_temporal:
