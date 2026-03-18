@@ -25,6 +25,7 @@ class Mirai(nn.Module):
         
         self.transformer = AllImageTransformer(args)
 
+        args.img_only_dim = self.transformer.args.transfomer_hidden_dim
 
     def forward(self, batch):
         x = batch["images"]
