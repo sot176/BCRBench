@@ -9,7 +9,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=56
 #SBATCH --mem=480G
-#SBATCH --time=01:59:00               # Run time (hh:mm:ss)
+#SBATCH --time=12:59:00               # Run time (hh:mm:ss)
 #SBATCH --account=project_465002309     # Project for billing
 
 
