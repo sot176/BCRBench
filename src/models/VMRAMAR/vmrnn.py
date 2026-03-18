@@ -323,15 +323,17 @@ class DownSample(nn.Module):
                 max(patches_resolution[1] // (2 ** i_layer), 1)   # add max(...,1)
             )
             if is_temporal:
-                downsample = nn.Identity()
+                downsample  = nn.Identity()
+                hidden_dim_layer = embed_dim          # never scale in temporal mode
             else:
-                downsample = PatchMerging(
+                downsample  = PatchMerging(
                     input_resolution=res,
                     dim=int(embed_dim * 2 ** i_layer)
                 )
+                hidden_dim_layer = int(embed_dim * 2 ** i_layer)
 
             layer = VMRNNCell(
-                hidden_dim=int(embed_dim * 2 ** i_layer),
+                hidden_dim=hidden_dim_layer,
                 input_resolution=(
                     patches_resolution[0] // (2 ** i_layer),
                     patches_resolution[1] // (2 ** i_layer)
