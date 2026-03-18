@@ -34,6 +34,7 @@ class LongitudinalAsymmetryTracker(nn.Module):
         self.use_bn = getattr(args, "use_lat_bn", True)
         if self.use_bn:
             self.bn = nn.BatchNorm1d(self.feature_dim)
+        self.out_norm = nn.LayerNorm(self.feature_dim)
 
     def compute_displacement(self, coords1, coords2, scale_factors):
         """
@@ -90,6 +91,6 @@ class LongitudinalAsymmetryTracker(nn.Module):
         
         # Use same normalization as LocalizedDifModel
         fused_features = weighted_features.sum(dim=1)
-        normalized_features = (fused_features - self.initial_asym_mean) / self.initial_asym_std
+        normalized_features = self.out_norm(fused_features)
         
         return normalized_features 
