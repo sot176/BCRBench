@@ -27,7 +27,7 @@ class LongitudinalAsymmetryTracker(nn.Module):
             nn.Linear(self.feature_dim, self.feature_dim),
         )
 
-        self.use_bn = getattr(args, "use_lat_bn", True)
+        self.use_bn = getattr(args, "use_lat_bn", False)
         if self.use_bn:
             self.bn = nn.BatchNorm1d(self.feature_dim)
 

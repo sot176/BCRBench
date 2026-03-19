@@ -55,8 +55,6 @@ accelerate launch --mixed_precision=bf16  main_train.py \
             --weight_decay 1e-4 \
             --model "VMRA-MaR" \
             --use_asymmetry \
-            --use_sad_bias \
-            --use_lat_bn \
             --lr_decay 0.5 \
             --patience_lr_scheduler 5 \
             --num_epochs 30 \

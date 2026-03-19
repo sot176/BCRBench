@@ -69,11 +69,11 @@ class SpatialAsymmetryDetector(nn.Module):
         self.latent_h    = getattr(args, "latent_h", 5)
         self.latent_w    = getattr(args, "latent_w", 5)
 
-        self.use_bias = getattr(args, "use_sad_bias", True)
+        self.use_bias = getattr(args, "use_sad_bias", False)
         if self.use_bias:
             self.bias = nn.Parameter(torch.zeros(1, self.feature_dim, 1, 1))
 
-        self.use_bn = getattr(args, "use_sad_bn", True)
+        self.use_bn = getattr(args, "use_sad_bn", False)
         if self.use_bn:
             self.bn = nn.BatchNorm2d(self.feature_dim)
 
