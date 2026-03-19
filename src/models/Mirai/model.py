@@ -15,7 +15,7 @@ class Mirai(nn.Module):
         self.args = args
 
         self.image_encoder = extract_mirai_backbone(cfg["paths"]["mirai_path"])
-       
+
         if hasattr(args, "freeze_image_encoder") and args.freeze_image_encoder:
             for param in self.image_encoder.parameters():
                 param.requires_grad = False
@@ -33,8 +33,9 @@ class Mirai(nn.Module):
 
         # 2. Encode
         img_x = self.image_encoder(x)
+        img_x = nn.functional.adaptive_avg_pool2d(img_x, 1) 
+        img_x = img_x.flatten(1)
         img_x = img_x.view(B, N, -1)
-        img_x = img_x[:,:,: self.image_repr_dim]
 
         # 4. Transformer aggregates across views/timepoints
         logit, transformer_hidden, activ_dict = self.transformer(
