@@ -45,10 +45,6 @@ class VMRAMaR(nn.Module):
             depths_upsample=args.depths_upsample,
             feature_resolution=(1, 1),          # temporal mode
         )
-        self.vmrnn_out_proj = nn.Sequential(
-            nn.Linear(args.embed_dim, args.embed_dim),
-            nn.LayerNorm(args.embed_dim),
-        )
 
         # ── 4. Asymmetry modules ──────────────────────────────────────
         self.use_asymmetry = getattr(args, "use_asymmetry", False)
@@ -84,7 +80,7 @@ class VMRAMaR(nn.Module):
 
         # ── Temporal modeling ─────────────────────────────────────────
         out, _, _ = self.vmrnn(visit_embeddings)       # (B, T, C)
-        temporal_feature = self.vmrnn_out_proj(out.mean(dim=1))  # (B, C)
+        temporal_feature = out.mean(dim=1) # (B, C)
 
         # ── Asymmetry features ────────────────────────────────────────
         features = [temporal_feature]
