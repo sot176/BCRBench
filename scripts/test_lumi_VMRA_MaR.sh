@@ -44,7 +44,7 @@ export PYTHONPATH=$WORKING_DIR
 accelerate launch  main_test.py \
   --csv_file /scratch/project_465002309/thrunsol/embed_datasets/combined_cases_with_followup_race.csv \
   --data_root /scratch/project_465002309/thrunsol/embed_datasets/risk_dataset_1664_2048 \
-  --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/Train_Risk_VMRA_MaR-16772948_Model_VMRA-MaR_lr_5e-05_wd_0.0001_epochs_30_bs_2_2026-03-16-19-29 \
+  --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/Train_Risk_VMRA_MaR-16821853_Model_VMRA-MaR_lr_5e-05_wd_0.0001_epochs_30_bs_2_2026-03-18-18-28 \
   --img_encoder_snapshot /scratch/project_465002309/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_MIRAI_Base_May20_2019.p \
   --path_test_folder  /scratch/project_465002309/thrunsol/VMaR_Risk_prediction_test_results_1664_2048/embed \
   --model "VMRA-MaR" \
