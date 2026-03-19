@@ -14,11 +14,8 @@ class Mirai(nn.Module):
         super(Mirai, self).__init__()
         self.args = args
 
-        if args.img_encoder_snapshot is not None:
-            self.image_encoder = extract_mirai_backbone_full(cfg["paths"]["mirai_path"])
-        else:
-            self.image_encoder = get_model_by_name('custom_resnet', False, args)
-
+        self.image_encoder = extract_mirai_backbone_full(cfg["paths"]["mirai_path"])
+       
         if hasattr(args, "freeze_image_encoder") and args.freeze_image_encoder:
             for param in self.image_encoder.parameters():
                 param.requires_grad = False
