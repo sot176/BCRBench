@@ -41,13 +41,8 @@ def extract_mirai_backbone_full(path):
     
     # first pull mirai onto the CPU to avoid putting the whole transformer on the gpu
     mirai = torch.load(path, map_location='cpu', weights_only=False)
-    layers = []
-    for child in mirai.children():
-        layers.append(child)
-
-    # Flatten the hierarchy into nn.Sequential
-    backbone = torch.nn.Sequential(*layers)
-    return backbone
+    
+    return mirai
     
 
 
