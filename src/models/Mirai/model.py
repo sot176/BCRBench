@@ -35,7 +35,7 @@ class Mirai(nn.Module):
         x = x.transpose(1, 2).contiguous().view(B * N, C, H, W)
 
         # 2. Encode
-        _, img_x, _ = self.image_encoder(x, None, batch)
+        img_x = self.image_encoder(x)
         img_x = img_x.view(B, N, -1)
         img_x = img_x[:,:,: self.image_repr_dim]
 
