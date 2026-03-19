@@ -47,10 +47,10 @@ class AllImageTransformer(nn.Module):
 
         if args.survival_analysis_setup:
             if args.pred_both_sides:
-                self.prob_of_failure_layer_l = CumulativeProbabilityLayer(args.hidden_dim, args, max_followup=args.max_followup)
-                self.prob_of_failure_layer_r = CumulativeProbabilityLayer(args.hidden_dim, args, max_followup=args.max_followup)
+                self.prob_of_failure_layer_l = CumulativeProbabilityLayer(args.hidden_dim,  max_followup=args.max_followup)
+                self.prob_of_failure_layer_r = CumulativeProbabilityLayer(args.hidden_dim,   max_followup=args.max_followup)
             else:
-                self.prob_of_failure_layer = CumulativeProbabilityLayer(args.hidden_dim, args, max_followup=args.max_followup)
+                self.prob_of_failure_layer = CumulativeProbabilityLayer(args.hidden_dim,   max_followup=args.max_followup)
 
     def mask_input(self, x, view_seq):
         B, N, _ = x.size()
