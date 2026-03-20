@@ -51,6 +51,8 @@ class VMRAMaR(nn.Module):
                 self.image_encoder._model.args               = non_trained_encoder._model.args
         else:
             self.image_encoder = get_model_by_name("custom_resnet", False, args)
+        
+        self.image_repr_dim = self.image_encoder._model.args.img_only_dim
 
         # ── 2. Image aggregator ───────────────────────────────────────
         num_views = getattr(args, "num_images", 4)
