@@ -175,7 +175,8 @@ def parse_arguments():
         #survival analysis setup
         parser.add_argument('--survival_analysis_setup', action='store_true',  help='Whether to modify model, eval and training for survival analysis.') 
         parser.add_argument('--max_followup', type=int, default=5, help='Max followup to predict over')
-        
+        parser.add_argument('--state_dict_path', type=str, default=None,
+                        help='filename of model snapshot to load[default: None]')
         # Other Optional Configs
         parser.add_argument('--num_images', type=int, default=4,
                         help='In multi image setting, the number of images per single sample.')
