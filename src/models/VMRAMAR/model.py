@@ -71,57 +71,33 @@ class VMRAMaR(nn.Module):
 
     # ── forward ───────────────────────────────────────────────────────
 
-    def forward(self, data, risk_factors=None):
-        x = data["images"]                              # (B, T, C, V, H, W)
+    def forward(self, batch):
+        x = batch["images"]                              # (B, C, N, H, W)
         B, T, C, V, H, W = x.shape
 
         # ── Encode all images ─────────────────────────────────────────
-        x = x.permute(0, 1, 3, 2, 4, 5).contiguous()  # (B, T, V, C, H, W)
-        x = x.view(B * T * V, C, H, W)
-        feats = self.image_encoder(x)                  # (B·T·V, C_feat, Hf, Wf)
-        _, C_feat, Hf, Wf = feats.shape
-        feats = feats.view(B, T, V, C_feat, Hf, Wf)   # (B, T, V, C, Hf, Wf)
+        _, img_feats, _ = self.image_encoder(x, None, batch)
+        img_feats = img_feats.view(B, T, V, -1)
+        img_feats = img_feats[:, :, :, :self.image_repr_dim]
 
-        # ── Aggregate views ───────────────────────────────────────────
-        feats_pooled     = feats.mean(dim=(-2, -1))    # (B, T, V, C)
-        visit_embeddings = self.image_aggregator(feats_pooled)  # (B, T, C)
-
-        # ── Temporal modeling ─────────────────────────────────────────
-        out, _, _ = self.vmrnn(visit_embeddings)       # (B, T, C)
-        temporal_feature = out.mean(dim=1) # (B, C)
+        fused_feats = img_feats.mean(dim=2)
 
         # ── Asymmetry features ────────────────────────────────────────
-        features = [temporal_feature]
-        if self.use_asymmetry and V >= 2:
-            # Views: 0=left CC, 1=right CC, 2=left MLO, 3=right MLO
-            left  = feats[:, :, [0, 2]].mean(dim=2)   # (B, T, C, Hf, Wf)
-            right = feats[:, :, [1, 3]].mean(dim=2)   # (B, T, C, Hf, Wf)
-
-            asym     = self.sad(left, right)
-            heatmaps = asym["heatmap"]
-            if heatmaps.dim() == 3:
-                _, H_a, W_a = heatmaps.shape
-                heatmaps = heatmaps.view(B, T, H_a, W_a)
-
-            coords = asym["asymmetry_coords"]
-            if coords.dim() == 2:
-                coords = coords.view(B, T, 2)
-
-            B_a, T_a, H_a, W_a = heatmaps.shape
-            asym_features = self.asym_proj(
-                heatmaps.view(B_a, T_a, H_a * W_a)    # (B, T, 25)
-            )                                           # (B, T, 512)
-            asym_feature = self.lat(
-                asym_features,   # (B, T, 512)
-                coords,          # (B, T, 2)
-                heatmaps,        # (B, T, H_a, W_a)
-            )                    # (B, 512)
-            features.append(asym_feature)
-
-        holistic_embedding = torch.cat(features, dim=1)
+        if self.use_asymmetry:
+            left_feats = img_feats[:, :, 0, :]
+            right_feats = img_feats[:, :, 1, :]
+            aligned_right_feats = self.sad(right_feats)
+            asym_feats = torch.abs(left_feats - aligned_right_feats)
+            asym_feature = self.lat(asym_feats)
+            # Temporal pooling (mean over time)
+            temporal_feature = fused_feats.mean(dim=1)
+            combined_feats = torch.cat([temporal_feature, asym_feature], dim=1)
+        else:
+            # Just average over time dimension
+            combined_feats = fused_feats.mean(dim=1)
 
         # ── Risk prediction ───────────────────────────────────────────
-        risk = self.ahl(holistic_embedding)
+        risk = self.ahl(combined_feats)
         return {"logit": risk}
 
     # ── loss helpers ──────────────────────────────────────────────────
