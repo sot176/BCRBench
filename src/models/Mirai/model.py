@@ -1,5 +1,17 @@
 import torch
 import torch.nn as nn
+import sys
+
+# ── Register onconet aliases BEFORE any import from factory ──────────
+from . import onconet as _onconet
+sys.modules.setdefault("onconet", _onconet)
+for _key in list(sys.modules.keys()):
+    if _key.startswith("models.Mirai.onconet"):
+        sys.modules.setdefault(
+            _key.replace("models.Mirai.onconet", "onconet"),
+            sys.modules[_key]
+        )
+
 from .onconet.models.factory import get_model_by_name, load_model, RegisterModel
 from .onconet.models.hiddens_transfomer import AllImageTransformer
 from models.common_parts import extract_mirai_backbone_full, extract_mirai_backbone
