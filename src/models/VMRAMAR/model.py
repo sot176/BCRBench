@@ -84,6 +84,7 @@ class VMRAMaR(nn.Module):
     def forward(self, batch):
         x = batch["images"]                              # (B, C, N, H, W)
         B, T, C, V, H, W = x.shape
+        x = x.view(B * T * V, C, H, W)
 
         # ── Encode all images ─────────────────────────────────────────
         _, img_feats, _ = self.image_encoder(x, None, batch)
