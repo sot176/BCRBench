@@ -158,7 +158,7 @@ def parse_arguments():
         parser.add_argument('--num_groups', type=int, default=1, help='Num groups per conv in Resnet blocks.')
         parser.add_argument('--pool_name', type=str, default='GlobalMaxPool', help='Pooling mechanism')
         parser.add_argument('--deep_risk_factor_pool', action='store_true',  help='make risk factor pool use several layers to fuse image and rf info')
-        parser.add_argument('--replace_snapshot_pool', action='store_true',  help='Use detached models')
+        parser.add_argument('--replace_snapshot_pool', type=bool, default=True,  help='Use detached models')
         parser.add_argument('--pretrained_on_imagenet', action='store_true',  help='Pretrain the model on imagenet. Only relevant for default models like VGG, resnet etc')
         parser.add_argument('--pretrained_imagenet_model_name', type=str, default='resnet18', help='Name of pretrained model to load for custom resnets.')
         parser.add_argument('--make_fc', action='store_true',  help='Replace last linear layer with convolutional layer')
