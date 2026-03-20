@@ -227,7 +227,7 @@ def parse_arguments():
         f"_epochs_{args.num_epochs}_bs_{args.batch_size}_{datetime.now().strftime('%Y-%m-%d-%H-%M')}/"
     )
      # --- Mirai-specific post-processing ---
-    if args.model == "Mirai":
+    if args.model == "Mirai" or  args.model == "VMRA-MaR":
         # Convert block layout strings into nested tuples/lists
         args.block_layout = parse_block_layout(args.block_layout)
 
