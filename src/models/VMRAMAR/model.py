@@ -99,7 +99,7 @@ class VMRAMaR(nn.Module):
         if self.use_asymmetry:
             left_feats = img_feats[:, :, 0, :]
             right_feats = img_feats[:, :, 1, :]
-            aligned_right_feats = self.sad(right_feats)
+            aligned_right_feats = self.sad(left_feats, right_feats)
             asym_feats = torch.abs(left_feats - aligned_right_feats)
             asym_feature = self.lat(asym_feats)
             # Temporal pooling (mean over time)
