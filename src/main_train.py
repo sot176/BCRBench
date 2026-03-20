@@ -172,6 +172,9 @@ def parse_arguments():
         parser.add_argument('--pred_missing_mammos',type=bool, default=False, help='Whether to predict missing images when doing image dropout.') 
         parser.add_argument('--also_pred_given_mammos',type=bool, default=False, help='Whether to predict given images.') 
         
+        # regularization
+        parser.add_argument('--use_region_annotation', action='store_true', default=False, help='Wether to add a loss factoring in the collected cancer region annotations .')
+
         #survival analysis setup
         parser.add_argument('--survival_analysis_setup', action='store_true',  help='Whether to modify model, eval and training for survival analysis.') 
         parser.add_argument('--max_followup', type=int, default=5, help='Max followup to predict over')
