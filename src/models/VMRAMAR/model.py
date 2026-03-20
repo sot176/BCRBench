@@ -6,8 +6,9 @@ from .vmrnn import VMRNN
 from .image_aggregator import ImageAggregator
 from .sad import SpatialAsymmetryDetector
 from .lat import LongitudinalAsymmetryTracker
-from models.common_parts import CumulativeProbabilityLayer, extract_mirai_backbone
+from models.common_parts import CumulativeProbabilityLayer
 from config.config import cfg
+from models.Mirai.onconet.models.factory import get_model_by_name, load_model
 
 
 class VMRAMaR(nn.Module):
@@ -27,12 +28,19 @@ class VMRAMaR(nn.Module):
         self.args = args
 
         # ── 1. Image encoder ──────────────────────────────────────────
-        sys.path.append(cfg["paths"]["asymMirai_master_onconet"])
-        self.image_encoder = extract_mirai_backbone(cfg["paths"]["mirai_path"])
-
-        if getattr(args, "freeze_image_encoder", False):
-            for param in self.image_encoder.parameters():
-                param.requires_grad = False
+        if args.img_encoder_snapshot is not None:
+                self.image_encoder = load_model(
+                    args.img_encoder_snapshot, args, do_wrap_model=False
+                )
+                if getattr(args, "replace_snapshot_pool", True):
+                    non_trained_encoder = get_model_by_name("custom_resnet", False, args)
+                    # Replace pool, fc, and prob_of_failure_layer — all depend on hidden dim
+                    self.image_encoder._model.pool               = non_trained_encoder._model.pool
+                    self.image_encoder._model.fc                 = non_trained_encoder._model.fc
+                    self.image_encoder._model.prob_of_failure_layer = non_trained_encoder._model.prob_of_failure_layer
+                    self.image_encoder._model.args               = non_trained_encoder._model.args
+        else:
+            self.image_encoder = get_model_by_name("custom_resnet", False, args)
 
         # ── 2. Image aggregator ───────────────────────────────────────
         num_views = getattr(args, "num_images", 4)
