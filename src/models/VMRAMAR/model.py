@@ -8,6 +8,15 @@ from .sad import SpatialAsymmetryDetector
 from .lat import LongitudinalAsymmetryTracker
 from models.common_parts import CumulativeProbabilityLayer
 from config.config import cfg
+from . import onconet as _onconet
+sys.modules.setdefault("onconet", _onconet)
+for _key in list(sys.modules.keys()):
+    if _key.startswith("models.Mirai.onconet"):
+        sys.modules.setdefault(
+            _key.replace("models.Mirai.onconet", "onconet"),
+            sys.modules[_key]
+        )
+        
 from models.Mirai.onconet.models.factory import get_model_by_name, load_model
 
 
