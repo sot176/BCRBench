@@ -215,6 +215,8 @@ def parse_arguments():
         parser.add_argument('--initial_asym_mean', type=float, default=2000)
         parser.add_argument('--initial_asym_std', type=float, default=300)
         parser.add_argument("--asym_dim", type=int, default=0, help="Dimension of asymmetry features ")
+        parser.add_argument('--drop_last', action='store_true')   
+
 
     # -------------------
     # Parse final args
@@ -279,7 +281,8 @@ def main():
         num_workers=args.num_workers,
         shuffle=args.shuffle,
         pin_memory=args.pin_memory,
-        transforms=train_transform
+        transforms=train_transform,
+        drop_last=args.drop_last
     )
     validation_loader = get_dataset_and_loader(
         dataset_name=args.dataset,
@@ -291,7 +294,9 @@ def main():
         num_workers=args.num_workers,
         shuffle=args.shuffle,
         pin_memory=args.pin_memory,
-        transforms=train_transform
+        transforms=train_transform,
+        drop_last=args.drop_last
+
     )
 
     # Setup the path to save the model and the logger.
