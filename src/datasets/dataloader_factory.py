@@ -15,7 +15,7 @@ def get_dataset_and_loader(dataset_name: str, model_name: str, split: str,
                            csv_file: str, data_root: str,
                            batch_size: int, num_workers: int,
                            shuffle: bool, pin_memory: bool,
-                           transforms=None):
+                           transforms=None, drop_last=False):
     """
     Returns a dataset and dataloader based on dataset_name and model_name.
     Mirrors the get_model factory style.
@@ -60,7 +60,7 @@ def get_dataset_and_loader(dataset_name: str, model_name: str, split: str,
         batch_size=batch_size,
         num_workers=num_workers,
         shuffle=shuffle if split == "train" else False,
-        pin_memory=pin_memory
+        pin_memory=pin_memory, drop_last=drop_last
     )
 
     return loader
