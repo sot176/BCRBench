@@ -149,6 +149,7 @@ def parse_arguments():
         parser.add_argument('--num_heads', type=int, default=8, help='Num heads for transformer')
         parser.add_argument('--dropout', type=float, default=0.1)
         parser.add_argument('--num_chan', type=int, default=3, help='Number of channels in img. [default:3]')
+        parser.add_argument('--multi_image',type=bool, default=True, help='Whether image will contain multiple slices. Slices could indicate different times, depths, or views')  
 
         # resnet-specific
         parser.add_argument('--model_name', type=str, default='mirai_full', help="Form of model, i.e resnet18, aggregator, revnet, etc.")
@@ -164,15 +165,15 @@ def parse_arguments():
         parser.add_argument('--replace_bn_with_gn', action='store_true', help='Use group normalization instead of batch norm.')
 
         # Risk factors
-        parser.add_argument('--use_risk_factors',type=bool, default=False, help='Whether to feed risk factors into last FC of model.') #
-        parser.add_argument('--pred_risk_factors', type=bool,default=False, help='Whether to predict value of all RF from image.') #
+        parser.add_argument('--use_risk_factors',type=bool, default=False, help='Whether to feed risk factors into last FC of model.') 
+        parser.add_argument('--pred_risk_factors', type=bool,default=False, help='Whether to predict value of all RF from image.') 
         parser.add_argument('--pred_both_sides', type=bool,default=False, help='Simulatenously pred both sides for multi-img model')
         parser.add_argument('--predict_birads',  type=bool,default=False, help='Wether to predict birads label for negative mammos in risk dataset objects. Note, preds, probs, and labels converted to binary (cancer vs negative) after prediction for logging purposes')
-        parser.add_argument('--pred_missing_mammos',type=bool, default=False, help='Whether to predict missing images when doing image dropout.') #
-        parser.add_argument('--also_pred_given_mammos',type=bool, default=False, help='Whether to predict given images.') #
+        parser.add_argument('--pred_missing_mammos',type=bool, default=False, help='Whether to predict missing images when doing image dropout.') 
+        parser.add_argument('--also_pred_given_mammos',type=bool, default=False, help='Whether to predict given images.') 
         
         #survival analysis setup
-        parser.add_argument('--survival_analysis_setup', action='store_true',  help='Whether to modify model, eval and training for survival analysis.') #
+        parser.add_argument('--survival_analysis_setup', action='store_true',  help='Whether to modify model, eval and training for survival analysis.') 
         parser.add_argument('--max_followup', type=int, default=5, help='Max followup to predict over')
         
         # Other Optional Configs
