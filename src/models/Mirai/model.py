@@ -25,11 +25,15 @@ class Mirai(nn.Module):
         super().__init__()
         self.args = args
 
-        # ── Image encoder ─────────────────────────────────────────────
         if args.img_encoder_snapshot is not None:
             self.image_encoder = load_model(
                 args.img_encoder_snapshot, args, do_wrap_model=False
             )
+            # Replace RiskFactorPool with GlobalMaxPool — matches their replace_snapshot_pool logic
+            if getattr(args, "replace_snapshot_pool", True):
+                non_trained_encoder = get_model_by_name("custom_resnet", False, args)
+                self.image_encoder._model.pool = non_trained_encoder._model.pool
+                self.image_encoder._model.args = non_trained_encoder._model.args
         else:
             self.image_encoder = get_model_by_name("custom_resnet", False, args)
 
