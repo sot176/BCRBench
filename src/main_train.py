@@ -145,7 +145,7 @@ def parse_arguments():
 
         parser.add_argument('--transfomer_hidden_dim', type=int, default=512, help='start hidden dim for transformer')
         parser.add_argument('--use_precomputed_hiddens', action='store_true', default=False, help='Whether to only use hiddens from a pretrained model.')
-        parser.add_argument('--num_layers', type=int, default=4)
+        parser.add_argument('--num_layers', type=int, default=1)
         parser.add_argument('--num_heads', type=int, default=8, help='Num heads for transformer')
         parser.add_argument('--dropout', type=float, default=0.1)
         parser.add_argument('--num_chan', type=int, default=3, help='Number of channels in img. [default:3]')
