@@ -136,18 +136,16 @@ def parse_arguments():
         parser.add_argument('--transformer_snapshot', type=str, default=None,
                             help='Filename of transformer snapshot for mirai_full models')
         parser.add_argument('--snapshot', type=str, default=None, help='filename of model snapshot to load[default: None]')
-        parser.add_argument('--calibrator_snapshot', type=str, default=None, help='filename of calibrator. Produced for a single model on development set using Platt Scaling')
-        parser.add_argument('--patch_snapshot', type=str, default=None, help='filename of patch model snapshot to load. Only used for aggregator type models [default: None]')
-    
+
         # Training / Fine-tuning options
         parser.add_argument('--freeze_image_encoder',   action='store_true',
                             help='Whether to freeze image encoder during training')
 
-        # Model Architecture / Hyperparameters
+        # Transformer architecture
+
         parser.add_argument('--transfomer_hidden_dim', type=int, default=512, help='start hidden dim for transformer')
-        parser.add_argument('--precomputed_hidden_dim', type=int, default=512, help='dimension of precomputed hiddens from image encoder')
         parser.add_argument('--use_precomputed_hiddens', action='store_true', default=False, help='Whether to only use hiddens from a pretrained model.')
-        parser.add_argument('--num_layers', type=int, default=3)
+        parser.add_argument('--num_layers', type=int, default=4)
         parser.add_argument('--num_heads', type=int, default=8, help='Num heads for transformer')
         parser.add_argument('--dropout', type=float, default=0.1)
         parser.add_argument('--num_chan', type=int, default=3, help='Number of channels in img. [default:3]')
@@ -165,7 +163,7 @@ def parse_arguments():
         parser.add_argument('--make_fc', action='store_true',  help='Replace last linear layer with convolutional layer')
         parser.add_argument('--replace_bn_with_gn', action='store_true', help='Use group normalization instead of batch norm.')
 
-        # risk factors
+        # Risk factors
         parser.add_argument('--use_risk_factors',type=bool, default=False, help='Whether to feed risk factors into last FC of model.') #
         parser.add_argument('--pred_risk_factors', type=bool,default=False, help='Whether to predict value of all RF from image.') #
         parser.add_argument('--pred_both_sides', type=bool,default=False, help='Simulatenously pred both sides for multi-img model')
