@@ -51,8 +51,8 @@ accelerate launch --mixed_precision=bf16  main_train.py \
             --augmentations "True" \
             --num_workers 7 \
             --learning_rate 1e-4 \
-            --warmup_steps 0 \
             --weight_decay 1e-4 \
+            --warmup_steps 0 \
             --model "VMRA-MaR" \
             --use_asymmetry \
             --lr_decay 0.5 \

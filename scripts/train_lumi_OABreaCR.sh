@@ -50,8 +50,8 @@ accelerate launch  main_train.py \
             --batch_size 12 \
             --augmentations "True" \
             --num_workers 7 \
-            --learning_rate 5e-5 \
-            --weight_decay 1e-6 \
+            --learning_rate 1e-4 \
+            --weight_decay 1e-4 \
             --model "OA-BreaCR" \
             --use_sto \
             --use_poe \
