@@ -126,10 +126,10 @@ class VMRAMaR(nn.Module):
 
             # Pass all three to LongitudinalAsymmetryTracker
             asym_feature = self.lat(asym_feature, asym_coords, asym_maps)
-
+            print("asym feat shape", asym_feature.shape)
             # Temporal pooling
             temporal_feature = fused_feats.view(B, T, -1).mean(dim=1)
-
+            print("temporal feautre", temporal_feature.shape)
             # Combine features
             combined_feats = torch.cat([temporal_feature, asym_feature], dim=1)
         else:
