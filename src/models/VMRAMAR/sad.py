@@ -17,8 +17,14 @@ def hybrid_asymmetry(left, right, latent_h=5, latent_w=5, flexible=False, topk=N
         dif = F.max_pool2d(dif, (kernel_h, kernel_w), stride=(1, 1))
     else:
         dif = F.max_pool2d(dif, (kernel_h, kernel_w), stride=(kernel_h, kernel_w))
-
+    print("fdiff shape", dif.shape)
+    
     dif = torch.norm(dif, dim=-3)  # (B, H_out, W_out)
+    # Ensure dif is 3D
+    if dif.dim() == 2:  # shape (B, N)
+        dif = dif.unsqueeze(-1)  # (B, N, 1)
+    elif dif.dim() == 1:  # shape (B,)
+        dif = dif.unsqueeze(-1).unsqueeze(-1)  # (B, 1, 1)
 
     # Ensure there’s always at least one H_out, W_out
     B, H_out, W_out = dif.shape
