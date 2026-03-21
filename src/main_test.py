@@ -9,6 +9,27 @@ from evaluate import test_risk
 from datasets import get_dataset_and_loader
 
 
+def parse_block_layout(raw_block_layout):
+    """
+    Convert CLI strings like ['BasicBlock,2', 'BasicBlock,2', ...]
+    into a proper nested list of tuples:
+    [
+        [('BasicBlock', 2)],
+        [('BasicBlock', 2)],
+        [('BasicBlock', 2)],
+        [('BasicBlock', 2)]
+    ]
+    Each stage is a list of (block_name, num_repeats) tuples.
+    """
+    block_layout = []
+    for stage_str in raw_block_layout:
+        stage_blocks = []
+        for block_spec in stage_str.split('-'):
+            name, repeats = block_spec.split(',')
+            stage_blocks.append((name, int(repeats)))
+        block_layout.append(stage_blocks)
+    return block_layout
+
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--csv_file", type=str, required=True)
@@ -121,8 +142,15 @@ def parse_arguments():
         parser.add_argument('--initial_asym_mean', type=float, default=2000)
         parser.add_argument('--initial_asym_std', type=float, default=300)
         parser.add_argument("--asym_dim", type=int, default=0, help="Dimension of asymmetry features ")
- 
-    return parser.parse_args()
+    
+    args = parser.parse_args()
+
+    # --- Mirai-specific post-processing ---
+    if args.model == "Mirai" or  args.model == "VMRA-MaR":
+        # Convert block layout strings into nested tuples/lists
+        args.block_layout = parse_block_layout(args.block_layout)
+
+    return args
 
 
 
