@@ -113,10 +113,6 @@ class VMRAMaR(nn.Module):
             left_feats = img_feats[:, :, 0, :, :, :]   # [B, T, C, H, W]
             right_feats = img_feats[:, :, 1, :, :, :]  # [B, T, C, H, W]
 
-            # Merge batch and temporal dims for SAD module
-            left_feats = left_feats.view(B * T, C_feat, H_feat, W_feat)
-            right_feats = right_feats.view(B * T, C_feat, H_feat, W_feat)
-
             # Apply SAD alignment
             sad_out = self.sad(left_feats, right_feats)
             asym_values = sad_out["asymmetry_values"]#.view(B, T, -1)   # (B, T, 1)
