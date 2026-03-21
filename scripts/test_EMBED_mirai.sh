@@ -43,7 +43,7 @@ set -xv  # Print commands for debugging
 export PYTHONPATH=$WORKING_DIR
 
 accelerate launch  main_test.py \
-  --csv_file /scratch/project_465002309/thrunsol/embed_datasets/combined_cases_with_followup_race.csv \
+  --csv_file /scratch/project_465002309/thrunsol/embed_datasets/combined_cases_with_follow_up_races_new.csv \
   --data_root /scratch/project_465002309/thrunsol/embed_datasets/risk_dataset_1664_2048 \
   --model_name mirai_full  \
   --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/Train_Risk_Mirai_frozen_encoder-16900900_Model_Mirai_lr_5e-05_wd_0.0001_epochs_30_bs_6_2026-03-20-19-19 \
