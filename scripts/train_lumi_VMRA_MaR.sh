@@ -54,7 +54,6 @@ accelerate launch --mixed_precision=bf16  main_train.py \
             --weight_decay 1e-4 \
             --model "VMRA-MaR" \
             --survival_analysis_setup \
-            --drop_last \
             --use_asymmetry \
             --lr_decay 0.5 \
             --patience_lr_scheduler 5 \
