@@ -119,8 +119,12 @@ class VMRAMaR(nn.Module):
 
             # Apply SAD alignment
             sad_out = self.sad(left_feats, right_feats)
-            asym_feats = sad_out["asymmetry_values"]  # shape (B*T,)
-            asym_feature = self.lat(asym_feats.view(B, T, -1))
+            asym_values = sad_out["asymmetry_values"]    
+            asym_coords = sad_out["asymmetry_coords"]    
+            asym_maps   = sad_out["heatmap"]             
+
+            # Pass all three to LongitudinalAsymmetryTracker
+            asym_feature = self.lat(asym_values, asym_coords, asym_maps)
 
             # Temporal pooling
             temporal_feature = fused_feats.view(B, T, -1).mean(dim=1)
