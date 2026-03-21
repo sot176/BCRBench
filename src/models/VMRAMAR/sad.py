@@ -25,7 +25,10 @@ def hybrid_asymmetry(
 
     kernel_h = max(dif.shape[-2] // latent_h, 1)
     kernel_w = max(dif.shape[-1] // latent_w, 1)
-
+    print("dif shape:", dif.shape)
+    print("dif dim:", dif.dim())
+    print("kernel:", kernel_h, kernel_w)
+    print("numel:", dif.numel())
     if flexible:
         dif = F.max_pool2d(dif, (kernel_h, kernel_w), stride=(1, 1))
     else:
