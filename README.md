@@ -74,11 +74,7 @@ To use the models and dataset classes in this repository, the datasets must be o
 <details>
 <summary><b>Values for Cancer types</b></summary>
 
-<style>
-  details table {
-    font-size: 9px;
-  }
-</style>
+<small>
 
 The column names listed below correspond to the original dataset CSV files.
 
@@ -94,7 +90,7 @@ The column names listed below correspond to the original dataset CSV files.
 | CSAW-CC | x_type        | 1 | In situ only (non-invasive) |
 | CSAW-CC | x_type        | 2 | Invasive ≤ 15 mm |
 | CSAW-CC | x_type        | 3 | Invasive > 15 mm |
-
+<small>
 </details>
 
 
