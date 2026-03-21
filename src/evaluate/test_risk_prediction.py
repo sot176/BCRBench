@@ -23,13 +23,31 @@ from models.model_factory import get_model
 
 def to_json_safe(obj):
     if isinstance(obj, dict):
-        return {str(k): to_json_safe(v) for k, v in obj.items()}
-    elif isinstance(obj, (list, tuple)):
-        return [to_json_safe(v) for v in obj]
-    elif isinstance(obj, (np.integer, np.int64)):
+        new_dict = {}
+        for k, v in obj.items():
+            # Convert keys safely
+            if isinstance(k, np.integer):
+                k = int(k)
+            elif isinstance(k, np.floating):
+                k = float(k)
+            elif not isinstance(k, (str, int, float, bool, type(None))):
+                k = str(k)  # fallback ONLY if needed
+
+            new_dict[k] = to_json_safe(v)
+        return new_dict
+
+    elif isinstance(obj, (np.integer,)):
         return int(obj)
-    elif isinstance(obj, (np.floating, np.float64)):
+
+    elif isinstance(obj, (np.floating,)):
         return float(obj)
+
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+
+    elif isinstance(obj, list):
+        return [to_json_safe(x) for x in obj]
+
     else:
         return obj
 
