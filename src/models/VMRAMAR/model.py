@@ -125,7 +125,7 @@ class VMRAMaR(nn.Module):
             asym_feature = asym_feature.view(B, T, -1)             # (B, T, 512)
 
             # Pass all three to LongitudinalAsymmetryTracker
-            asym_feature = self.lat(asym_values, asym_coords, asym_maps)
+            asym_feature = self.lat(asym_feature, asym_coords, asym_maps)
 
             # Temporal pooling
             temporal_feature = fused_feats.view(B, T, -1).mean(dim=1)
