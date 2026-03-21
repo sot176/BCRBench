@@ -58,14 +58,14 @@ To use the models and dataset classes in this repository, the datasets must be o
 | ----------------------------- | --------------------------------------------------------------------------- |
 | `patient_id`                  | Unique ID for each patient                                                  |
 | `exam_id`                     | Unique ID for each exam (one per timepoint)                                 |
-| `ImageLateralityFinal`        | `L` for left breast, `R` for right breast                                   |
+| `ImageLaterality`        | `L` for left breast, `R` for right breast                                   |
 | `view`                        | Mammogram view (e.g., CC, MLO)                                             |
 | `diagnosed_date_year`         | Year of breast cancer diagnosis (empty if cancer-free)                      |
 | `study_date_year`             | Year the mammogram was taken                                                |
 | `Time_to_Cancer_Years`       | Years until cancer diagnosis (empty if cancer-free)                         |
 | `years_last_followup`         | Years from this exam until the last follow-up for the patient               |
-| `density` / `libra_percentdensity` | Breast density. In EMBED, categorical (1–5). In CSAW-CC, continuous 0–100, which can be grouped into categories. |
-| `path_severity` / `x_type`   | Cancer type. In EMBED, use `path_severity` (0–6). In CSAW-CC, use `x_type` (1–3). |
+| `density`  | Breast density. In EMBED, categorical (1–5). In CSAW-CC, continuous 0–100, which can be grouped into categories. |
+| `cancer_type`   | Cancer type. In EMBED, use `path_severity` (0–6). In CSAW-CC, use `x_type` (1–3). |
 | `race`                        | Patient race (optional, leave empty if not available)                       |
 </div>
 </details>
@@ -74,6 +74,8 @@ To use the models and dataset classes in this repository, the datasets must be o
 <details>
 <summary><b>Values for Cancer types</b></summary>
 <div style="font-size: 12px">
+
+The column names listed below correspond to the original dataset CSV files.
 
 | Dataset | Column | Values | Meaning |
 | ------- | ------ | ------ | ------- |
@@ -94,14 +96,15 @@ To use the models and dataset classes in this repository, the datasets must be o
 <details>
 <summary><b>Values for Breast density</b></summary>
 <div style="font-size: 12px">
+The column names listed below correspond to the original dataset CSV files.
 
 | Dataset | Column | Values / Range | Meaning |
 | ------- | ------ | -------------- | ------- |
-| EMBED   | density | 1 | Almost entirely fat (BIRADS A) |
-| EMBED   | density | 2 | Scattered fibroglandular densities (BIRADS B) |
-| EMBED   | density | 3 | Heterogeneously dense (BIRADS C) |
-| EMBED   | density | 4 | Extremely dense (BIRADS D) |
-| EMBED   | density | 5 | Normal male |
+| EMBED   | tissueden | 1 | Almost entirely fat (BIRADS A) |
+| EMBED   | tissueden | 2 | Scattered fibroglandular densities (BIRADS B) |
+| EMBED   | tissueden | 3 | Heterogeneously dense (BIRADS C) |
+| EMBED   | tissueden | 4 | Extremely dense (BIRADS D) |
+| EMBED   | tissueden | 5 | Normal male |
 | CSAW-CC | libra_percentdensity | 0–100 | Percentage breast density. Can be binned into categories (e.g., low, medium, high). |
 </div>
 </details>
@@ -110,8 +113,9 @@ To use the models and dataset classes in this repository, the datasets must be o
 <details>
 <summary><b>Example: Cancer-Free Patient</b></summary>
 <div style="font-size: 12px">
-| patient_id | exam_id | ImageLateralityFinal | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | path_severity | race   |
-| ---------- | ------- | ------------------ | ---- | ----------------- | --------------- | ------------------ | ----------------- | ------- | ------------- | ------ |
+
+| patient_id | exam_id | ImageLaterality | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | path_severity | race   |
+| :--------: | :-----: | :-------------: | :--: | :-----------------: | :-------------: | :------------------: | :-----------------: | :-----: | :-----------: | :--: |
 | 10093833      | 6488770689649000   | L                  | CC   |                   | 2015            |                    | 3                 |1       |             | Caucasian or White  |
 | 10093833      | 6488770689649000   | L                  | MLO   |                   | 2015            |                    | 3                 |1       |             | Caucasian or White  |
 | 10093833      | 6488770689649000   | R                  | CC   |                   | 2015            |                    | 3                 |1       |             | Caucasian or White  |
@@ -129,8 +133,8 @@ To use the models and dataset classes in this repository, the datasets must be o
 <summary><b>Example: Cancer Patient</b></summary>
 <div style="font-size: 12px">
 
-| patient_id | exam_id | ImageLateralityFinal | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | path_severity | race   |
-| ---------- | ------- | ------------------ | ---- | ----------------- | --------------- | ------------------ | ----------------- | ------- | ------------- | ------ |
+| patient_id | exam_id | ImageLaterality | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | path_severity | race   |
+| :--------: | :-----: | :-------------: | :--: | :-----------------: | :-------------: | :------------------: | :-----------------: | :-----: | :-----------: | :--: |
 | 11513410      | 1147087669482550   | L                  | CC   | 2020              | 2016            | 4                  | 4                 | 3      | 1             | Caucasian or White  |
 | 11513410      | 1147087669482550   | L                  | MLO   | 2020              | 2016            | 4                  | 4                 | 3       | 1             | Caucasian or White  |
 | 11513410      | 1147087669482550   | R                  | CC   | 2020              | 2016            | 4                  | 4                 | 3      | 1             | Caucasian or White  |
