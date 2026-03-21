@@ -45,9 +45,9 @@ class VMRAMaR(nn.Module):
             if getattr(args, "replace_snapshot_pool", True):
                 non_trained_encoder = get_model_by_name("custom_resnet", False, args)
                 # Replace pool, fc, and prob_of_failure_layer — all depend on hidden dim
-                self.image_encoder._model.pool               = non_trained_encoder._model.pool
-                self.image_encoder._model.fc                 = non_trained_encoder._model.fc
-                self.image_encoder._model.prob_of_failure_layer = non_trained_encoder._model.prob_of_failure_layer
+                self.image_encoder._model.pool = nn.Identity()
+                self.image_encoder._model.fc = nn.Identity()
+                self.image_encoder._model.prob_of_failure_layer = nn.Identity()
                 self.image_encoder._model.args               = non_trained_encoder._model.args
         else:
             self.image_encoder = get_model_by_name("custom_resnet", False, args)
