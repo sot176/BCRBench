@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import kornia.augmentation as K_A
 from kornia.constants import Resample
 from sklearn.utils.class_weight import compute_class_weight
+from  utils import RACE_TO_ID
 
 def imgunit16(img):
     mammogram_scaled = (
@@ -217,6 +218,18 @@ class BreastCancerRiskDatasetEMBED_ImgFeatAlign(Dataset):
         density = matching_row["density"].values[0]
         density = self.map_density(density)
         cancer_type =  self.map_cancer_type(matching_row["path_severity"].values[0])
+        race_col = matching_row.get("RACE_DESC")
+
+        if race_col is None or len(matching_row) == 0:
+            race_str = "Unknown"
+        else:
+            race = race_col.values[0]
+            if not isinstance(race, str) or race.strip() == "":
+                race_str = "Unknown"
+            else:
+                race_str = race.strip()
+
+        race_id = RACE_TO_ID.get(race_str, RACE_TO_ID["Unknown"])
 
         if time_to_cancer == 0:
             time_to_cancer = 1
@@ -288,6 +301,7 @@ class BreastCancerRiskDatasetEMBED_ImgFeatAlign(Dataset):
             'target_prior': target_prior,
             'density': density,
             'cancer_type': cancer_type,
+            'race':  torch.tensor(race_id, dtype=torch.long),
 
         }
         return data

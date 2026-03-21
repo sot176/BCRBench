@@ -8,7 +8,7 @@ from collections import defaultdict
 import random
 from datetime import datetime
 import numpy as np
-
+from  utils import RACE_TO_ID
 
 def imgunit16(img):
     mammogram_scaled = (
@@ -207,6 +207,11 @@ class BreastCancerRiskDatasetEMBED_LMVNet(Dataset):
         time_to_cancer = current_metadata["Time_to_Cancer_Years"]
         density = self.map_density(current_metadata["density"])
         cancer_type =  self.map_cancer_type(current_metadata["path_severity"])
+        race_str =  current_metadata.get("RACE_DESC", "")
+        if not isinstance(race_str, str) or race_str.strip() == "":
+            race_str = "Unknown"
+
+        race_id = RACE_TO_ID.get(race_str, RACE_TO_ID["Unknown"])
 
         if time_to_cancer == 0:
             time_to_cancer = 1
@@ -252,6 +257,7 @@ class BreastCancerRiskDatasetEMBED_LMVNet(Dataset):
             'density': density,
             'patient_id': patient_id,
             'cancer_type': cancer_type,
+            'race':  torch.tensor(race_id, dtype=torch.long),
         }
 
         return data
