@@ -39,10 +39,15 @@ def hybrid_asymmetry(
 
         # y at the winning x position → consistent (B,) shape
         # Ensure y_argmin is at least 2D
-        if y_argmin.dim() == 1:  # H_out = 1
-            best_y = y_argmin
+        if y_argmin.dim() == 1 or y_argmin.shape[1] == 1:  # handle H_out=1 or B=1
+            best_y = y_argmin.view(-1)
         else:
             best_y = y_argmin[torch.arange(y_argmin.shape[0], device=y_argmin.device), x_argmin]
+
+        # ensure x_argmin is also 1D
+        x_argmin = x_argmin.view(-1)
+        best_y   = best_y.view(-1)
+        
         return max_asym, {
             "y_argmin": best_y.detach(),
             "x_argmin": x_argmin.detach(),
