@@ -1,6 +1,8 @@
 # Breast Cancer Risk Prediction Models
 
-Unified repository implementing state-of-the-art image-based breast cancer risk prediction models. This project aims to simplify training and evaluation of multiple models using a single, unified pipeline, supporting both single- and multi-timepoint mammogram analysis.
+Unified repository implementing state-of-the-art image-based breast cancer risk prediction models. This project aims to simplify training and evaluation of multiple models using a single, unified pipeline, supporting both single- and multi-timepoint mammogram analysis. 
+
+We aim to encourage further research by providing a single, unified repository where all image-based breast cancer risk prediction models can be collected, compared, and extended. By centralizing these implementations, we hope to accelerate progress in the field and make it easier for researchers to benchmark and build upon existing methods.
 
 ## Table of Contents
 1. 📘 [Overview](#overview)  
@@ -13,10 +15,23 @@ Unified repository implementing state-of-the-art image-based breast cancer risk 
 8. 📝 [License](#license) 
 
 ## Overview
- 
+This repository provides implementations of several recent breast cancer risk prediction models, allowing users to:
+
+- Train models end-to-end on mammogram datasets.
+
+- Evaluate models with unified metrics.
+
+- Experiment with single-view, multi-view, and longitudinal mammogram data.
 
 ## Models Implemented
 
+| Model            | Conference/Journal      | Input Views & Timepoints                     | Key Idea                                                           |
+| ---------------- | --------------------- | -------------------------------------------- | ------------------------------------------------------------------ |
+| **[Mirai](https://doi.org/10.1126/scitranslmed.aba4373)**        | Sci. Transl. Med.          | 4 screening mammograms (single timepoint)    | Learns risk using all 4 views from one visit.                      |
+| **[VMRA-MAR](https://doi.org/10.1007/978-3-032-05182-0_64)**     | MICCAI 2025             | 4 screening mammograms (multiple timepoints) | Extends Mirai to longitudinal mammograms.                          |
+| **[OA-BReaCR](https://doi.org/10.1007/978-3-031-72378-0_15)**    | MICCAI 2024             | 1 view of 1 breast, 2 timepoints             | Focuses on single-view longitudinal features.                      |
+| **[ImgFeatAlign](https://doi.org/10.1007/978-3-032-04937-7_47)** | MICCAI 2025             | 1 view of 1 breast                           | Explicit feature alignment for better longitudinal comparison.     |
+| **[LMV-Net]()**      | submitted to MICCAI 2026  | Both views of 1 breast, 2 timepoints         | Multi-view longitudinal model leveraging both views of one breast. |
 
 ## Comparison of Models
  
