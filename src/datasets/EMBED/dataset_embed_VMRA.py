@@ -163,7 +163,7 @@ class BreastCancerRiskDatasetEMBED_VMRA(Dataset):
 
         density = self.map_density(metadata["density"])
         cancer_type = self.map_cancer_type(metadata["path_severity"])
-        race_str = metadata["RACE_DESC"]
+        race_str = metadata.get("RACE_DESC", "")
         if not isinstance(race_str, str) or race_str.strip() == "":
             race_str = "Unknown"
         race_id = RACE_TO_ID.get(race_str, RACE_TO_ID["Unknown"])
