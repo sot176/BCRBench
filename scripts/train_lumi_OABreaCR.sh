@@ -42,7 +42,7 @@ set -xv  # Print commands for debugging
 export PYTHONPATH=$WORKING_DIR
 
 accelerate launch  main_train.py \
-            --csv_file /scratch/project_465002309/thrunsol/embed_datasets/combined_cases_with_followup.csv \
+            --csv_file /scratch/project_465002309/thrunsol/embed_datasets/combined_cases_with_follow_up_races_new.csv \
             --data_root /scratch/project_465002309/thrunsol/embed_datasets/risk_dataset_1664_2048 \
             --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/$SLURM_JOB_NAME-$SLURM_JOB_ID \
             --id_training 1 \
