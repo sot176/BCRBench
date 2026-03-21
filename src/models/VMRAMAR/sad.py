@@ -98,7 +98,18 @@ class SpatialAsymmetryDetector(nn.Module):
                 bias_params=self.bias if self.use_bias else None,
             )
             asym_values.append(max_asym)
-            asym_coords.append(torch.stack([other["x_argmin"], other["y_argmin"]], dim=1))
+
+            # --- SAFE stacking of coordinates ---
+            x_arg = other["x_argmin"]
+            y_arg = other["y_argmin"]
+
+            # Ensure shape (B, 1) for concatenation
+            if x_arg.dim() == 1:
+                x_arg = x_arg.unsqueeze(1)
+            if y_arg.dim() == 1:
+                y_arg = y_arg.unsqueeze(1)
+
+            asym_coords.append(torch.cat([x_arg, y_arg], dim=1))
             asym_maps.append(other["heatmap"])
 
         return {
