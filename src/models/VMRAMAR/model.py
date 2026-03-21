@@ -45,9 +45,9 @@ class VMRAMaR(nn.Module):
             if getattr(args, "replace_snapshot_pool", True):
                 non_trained_encoder = get_model_by_name("custom_resnet", False, args)
                 # Replace pool, fc, and prob_of_failure_layer — all depend on hidden dim
-                self.image_encoder._model.pool = nn.Identity()
-                self.image_encoder._model.fc = nn.Identity()
-                self.image_encoder._model.prob_of_failure_layer = nn.Identity()
+                self.image_encoder._model.pool               = non_trained_encoder._model.pool
+                self.image_encoder._model.fc                 = non_trained_encoder._model.fc
+                self.image_encoder._model.prob_of_failure_layer = non_trained_encoder._model.prob_of_failure_layer
                 self.image_encoder._model.args               = non_trained_encoder._model.args
         else:
             self.image_encoder = get_model_by_name("custom_resnet", False, args)
@@ -89,8 +89,9 @@ class VMRAMaR(nn.Module):
         x = x.view(B * T * V, C, H, W)
 
         # ── Encode all images ─────────────────────────────────────────
-        img_feats = self.image_encoder(x, None, batch)
-        print(img_feats.shape)
+        pooled_feat, img_feats, _ = self.image_encoder(x, None, batch)
+        print("pooled feat", pooled_feat.shape)
+        print("img feat", img_feats.shape)
         img_feats = img_feats.view(B, T, V, -1)
         img_feats = img_feats[:, :, :, :self.image_repr_dim]
 
