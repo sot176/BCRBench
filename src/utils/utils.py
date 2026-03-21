@@ -156,7 +156,7 @@ def bootstrap_c_index_by_density(
     return c_index_summary_by_density, c_index_results_by_density
 
 
-def bootstrap_confidence_interval(data, num_samples=1000, confidence_level=0.95):
+def bootstrap_confidence_interval(data, num_samples=2000, confidence_level=0.95):
     """
     Calculate the confidence interval using bootstrapping.
 
@@ -792,6 +792,52 @@ def bootstrap_c_index_by_race(
         pred_r = predictions[idx]
         obs_r = event_observed[idx]
 
+        
+def bootstrap_c_index_by_race(
+    event_times,
+    predictions,
+    event_observed,
+    race_categories,
+    censoring_dist,
+    n_bootstrap=2000,
+    alpha=0.05,
+    save_json_path=None,
+):
+    """
+       Compute bootstrap confidence intervals for C-index by race categories.
+       Uses simple (non-stratified) bootstrap, consistent with
+       bootstrap_auc_by_cancer_type.
+       """
+
+    race_categories = np.array([
+        r if isinstance(r, str) and r.strip() != "" else "Unknown"
+        for r in race_categories
+    ])
+
+    RACES = [
+        "Caucasian or White",
+        "African American  or Black",
+        "Asian",
+        "American Indian or Alaskan Native",
+        "Native Hawaiian or Other Pacific Islander",
+        "Multiple",
+        "Unknown",
+        "Unavailable or Unreported",
+    ]
+
+    cindex_results_by_race = {r: [] for r in RACES}
+
+    for race in RACES:
+        idx = np.where(race_categories == race)[0]
+
+        if len(idx) < 10 or np.sum(event_observed[idx]) < 5:
+            print(f"[INFO] Skipping race '{race}' — insufficient samples/events")
+            continue
+
+        et_r = event_times[idx]
+        pred_r = predictions[idx]
+        obs_r = event_observed[idx]
+
         for _ in range(n_bootstrap):
             boot_idx = resample(
                 np.arange(len(et_r)),
@@ -799,15 +845,31 @@ def bootstrap_c_index_by_race(
                 n_samples=len(et_r),
             )
 
-            cidx = concordance_index_ipcw(
-                et_r[boot_idx],
-                pred_r[boot_idx],
-                obs_r[boot_idx],
-                censoring_dist,
-            )
+            et_sample = et_r[boot_idx]
+            pred_sample = pred_r[boot_idx]
+            obs_sample = obs_r[boot_idx]
 
-            if np.isfinite(cidx):
-                cindex_results_by_race[race].append(cidx)
+            # ✅ Ensure valid sample
+            if (
+                np.sum(obs_sample) == 0 or                 # no events
+                np.sum(obs_sample == 0) == 0 or            # no censored
+                len(np.unique(et_sample)) < 2              # no time variation
+            ):
+                continue
+
+            try:
+                cidx = concordance_index_ipcw(
+                    et_sample,
+                    pred_sample,
+                    obs_sample,
+                    censoring_dist,
+                )
+
+                if np.isfinite(cidx):
+                    cindex_results_by_race[race].append(cidx)
+
+            except ZeroDivisionError:
+                continue
 
     # Optional JSON save
     if save_json_path is not None:
