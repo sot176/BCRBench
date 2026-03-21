@@ -762,7 +762,7 @@ def bootstrap_c_index_by_race(
     for race in RACES:
         idx = np.where(race_categories == race)[0]
 
-        if len(idx) < 10 or np.sum(event_observed[idx]) < 5:
+        if len(idx) < 5 or np.sum(event_observed[idx]) < 2:
             print(f"[INFO] Skipping race '{race}' — insufficient samples/events")
             continue
 
@@ -780,17 +780,19 @@ def bootstrap_c_index_by_race(
             et_sample = et_r[boot_idx]
             pred_sample = pred_r[boot_idx]
             obs_sample = obs_r[boot_idx]
-
            
-            cidx = concordance_index_ipcw(
-                et_sample,
-                pred_sample,
-                obs_sample,
-                censoring_dist,
-            )
+            try:
+                cidx = concordance_index_ipcw(
+                    et_sample,
+                    pred_sample,
+                    obs_sample,
+                    censoring_dist,
+                )
+                if np.isfinite(cidx):
+                    cindex_results_by_race[race].append(cidx)
+            except ZeroDivisionError:
+                continue  # skip this bootstrap sample
 
-            if np.isfinite(cidx):
-                cindex_results_by_race[race].append(cidx)
 
     # Optional JSON save
     if save_json_path is not None:
