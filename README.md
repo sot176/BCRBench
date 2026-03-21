@@ -48,7 +48,10 @@ Each model is implemented with a consistent API and unified training/evaluation 
 ## Dataset Format
 To use the models and dataset classes in this repository, the datasets must be organized as CSV files with specific columns.
 
+---
+
 ### Required Columns
+
 | Column Name                  | Description                                                                 |
 | ----------------------------- | --------------------------------------------------------------------------- |
 | `patient_id`                  | Unique ID for each patient                                                  |
@@ -57,11 +60,43 @@ To use the models and dataset classes in this repository, the datasets must be o
 | `view`                        | Mammogram view (e.g., CC, MLO)                                             |
 | `diagnosed_date_year`         | Year of breast cancer diagnosis (empty if cancer-free)                      |
 | `study_date_year`             | Year the mammogram was taken                                                |
-| `Time_to_Cancer_Years`        | Years until cancer diagnosis (empty if cancer-free)                         |
+| `Time_to_Cancer_Years`       | Years until cancer diagnosis (empty if cancer-free)                         |
 | `years_last_followup`         | Years from this exam until the last follow-up for the patient               |
-| `density`                     | Breast density class                                                        |
-| `path_severity`               | Cancer type             |
-| `race`                        | Patient race                            |
+| `density` / `libra_percentdensity` | Breast density. In EMBED, categorical (1–5). In CSAW-CC, continuous 0–100, which can be grouped into categories. |
+| `path_severity` / `x_type`   | Cancer type. In EMBED, use `path_severity` (0–6). In CSAW-CC, use `x_type` (1–3). |
+| `race`                        | Patient race (optional, leave empty if not available)                       |
+
+---
+
+### Values for `path_severity` (EMBED) / `x_type` (CSAW-CC)
+
+| Dataset | Column | Values | Meaning |
+| ------- | ------ | ------ | ------- |
+| EMBED   | path_severity | 0 | Invasive cancer |
+| EMBED   | path_severity | 1 | Non-invasive cancer |
+| EMBED   | path_severity | 2 | High-risk lesion |
+| EMBED   | path_severity | 3 | Borderline lesion |
+| EMBED   | path_severity | 4 | Benign findings |
+| EMBED   | path_severity | 5 | Negative (normal breast tissue) |
+| EMBED   | path_severity | 6 | Non-breast cancer |
+| CSAW-CC | x_type        | 1 | In situ only (non-invasive) |
+| CSAW-CC | x_type        | 2 | Invasive ≤ 15 mm |
+| CSAW-CC | x_type        | 3 | Invasive > 15 mm |
+
+---
+
+### Values for `density` / `libra_percentdensity`
+
+| Dataset | Column | Values / Range | Meaning |
+| ------- | ------ | -------------- | ------- |
+| EMBED   | density | 1 | Almost entirely fat (BIRADS A) |
+| EMBED   | density | 2 | Scattered fibroglandular densities (BIRADS B) |
+| EMBED   | density | 3 | Heterogeneously dense (BIRADS C) |
+| EMBED   | density | 4 | Extremely dense (BIRADS D) |
+| EMBED   | density | 5 | Normal male |
+| CSAW-CC | libra_percentdensity | 0–100 | Percentage breast density. Can be binned into categories (e.g., low, medium, high). |
+
+---
 
 ### Example: Cancer-Free Patient
 
