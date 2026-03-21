@@ -60,29 +60,36 @@ To use the models and dataset classes in this repository, the datasets must be o
 | `Time_to_Cancer_Years`        | Years until cancer diagnosis (empty if cancer-free)                         |
 | `years_last_followup`         | Years from this exam until the last follow-up for the patient               |
 | `density`                     | Breast density class                                                        |
-| `path_severity`               | Cancer severity label (0 = benign / cancer-free, 1 = malignant)            |
-| `race`                        | Patient race (optional, use "Unknown" if missing)                           |
+| `path_severity`               | Cancer type             |
+| `race`                        | Patient race                            |
 
 ### Example: Cancer-Free Patient
 
 | patient_id | exam_id | ImageLateralityFinal | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | path_severity | race   |
 | ---------- | ------- | ------------------ | ---- | ----------------- | --------------- | ------------------ | ----------------- | ------- | ------------- | ------ |
-| P0001      | E0001   | L                  | CC   |                   | 2018            |                    | 5                 | B       | 0             | White  |
-| P0001      | E0001   | R                  | MLO  |                   | 2018            |                    | 5                 | B       | 0             | White  |
-
+| 10093833      | 6488770689649000   | L                  | CC   |                   | 2015            |                    | 3                 |1       |             | Caucasian or White  |
+| 10093833      | 6488770689649000   | L                  | MLO   |                   | 2015            |                    | 3                 |1       |             | Caucasian or White  |
+| 10093833      | 6488770689649000   | R                  | CC   |                   | 2015            |                    | 3                 |1       |             | Caucasian or White  |
+| 10093833      | 6488770689649000   | R                  | MLO   |                   | 2015            |                    | 3                 |1       |             | Caucasian or White  |
+| 10093833      | 4173769076863720   | L                  | CC   |                   | 2015            |                    | 0                 |1       |             | Caucasian or White  |
+| 10093833      | 4173769076863720   | L                  | MLO   |                   | 2015            |                    | 0                 |1       |             | Caucasian or White  |
+| 10093833      | 4173769076863720   | R                  | CC   |                   | 2015            |                    | 0                 |1       |             | Caucasian or White  |
+| 10093833      | 4173769076863720   | R                  | MLO   |                   | 2015            |                    | 0                 |1       |             | Caucasian or White  |
 
 ### Example: Cancer Patient
 
 | patient_id | exam_id | ImageLateralityFinal | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | path_severity | race   |
 | ---------- | ------- | ------------------ | ---- | ----------------- | --------------- | ------------------ | ----------------- | ------- | ------------- | ------ |
-| 11513410      | 1147087669482550   | L                  | CC   | 2020              | 2016            | 4                  | 4                 | 3      | 1             | African American or Black  |
-| 11513410      | 1147087669482550   | L                  | MLO   | 2020              | 2016            | 4                  | 4                 | 3       | 1             | African American or Black  |
-| 11513410      | 1147087669482550   | L                  | CC   | 2020              | 2017            | 3                  | 3                 | 3       | 1             | African American or Black  |
-| 11513410      | 1147087669482550   | L                  | MLO   | 2020              | 2017            | 3                  | 3                 | 3       | 1             | African American or Black  |
-| 10173804      | 1147087669482550   | R                  | CC   | 2019              | 2016            | 3                  | 3                 | 2      | 0             | Caucasian or White  |
-| 10173804      | 1147087669482550   | R                  | MLO   | 2019              | 2016            | 4                  | 4                 | 2       | 0             | Caucasian or White  |
-| 10173804      | 1147087669482550   | R                  | CC   | 2019              | 2018            | 3                  | 3                 | 2       | 0             | Caucasian or White  |
-| 10173804      | 1147087669482550   | R                  | MLO   | 2019              | 2018            | 3                  | 3                 | 2       | 0             | Caucasian or White  |
+| 11513410      | 1147087669482550   | L                  | CC   | 2020              | 2016            | 4                  | 4                 | 3      | 1             | Caucasian or White  |
+| 11513410      | 1147087669482550   | L                  | MLO   | 2020              | 2016            | 4                  | 4                 | 3       | 1             | Caucasian or White  |
+| 11513410      | 1147087669482550   | R                  | CC   | 2020              | 2016            | 4                  | 4                 | 3      | 1             | Caucasian or White  |
+| 11513410      | 1147087669482550   | R                  | MLO   | 2020              | 2016            | 4                  | 4                 | 3       | 1             | Caucasian or White  |
+| 11513410      | 1707099151654590   | L                  | CC   | 2020              | 2017            | 3                  | 3                 | 3       | 1             | Caucasian or White  |
+| 11513410      | 1707099151654590   | L                  | MLO   | 2020              | 2017            | 3                  | 3                 | 3       | 1             | Caucasian or White  |
+| 11513410      | 1707099151654590   | R                  | CC   | 2020              | 2017            | 3                  | 3                 | 3       | 1             | Caucasian or White  |
+| 11513410      | 1707099151654590   | R                  | MLO   | 2020              | 2017            | 3                  | 3                 | 3       | 1             | Caucasian or White  |
+
+ 
 
 
 
