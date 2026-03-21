@@ -94,23 +94,37 @@ class SpatialAsymmetryDetector(nn.Module):
                 flexible=getattr(self, "flexible_asymmetry", False),
                 bias_params=self.bias if self.use_bias else None,
             )
-            asym_values.append(max_asym)
+
+            # --- Ensure max_asym is (B,) ---
+            if max_asym.dim() != 1:
+                max_asym = max_asym.view(B)
 
             # --- SAFE stacking of coordinates ---
             x_arg = other["x_argmin"]
             y_arg = other["y_argmin"]
 
-            # Ensure shape (B, 1) for concatenation
+            # Ensure x_arg/y_arg are (B, 1)
+            if x_arg.dim() == 0:
+                x_arg = x_arg.unsqueeze(0)
             if x_arg.dim() == 1:
                 x_arg = x_arg.unsqueeze(1)
+            if y_arg.dim() == 0:
+                y_arg = y_arg.unsqueeze(0)
             if y_arg.dim() == 1:
                 y_arg = y_arg.unsqueeze(1)
 
             asym_coords.append(torch.cat([x_arg, y_arg], dim=1))
-            asym_maps.append(other["heatmap"])
+
+            # --- SAFE heatmap shape ---
+            heatmap = other["heatmap"]
+            if heatmap.dim() == 2:   # (H_out, W_out) → add batch dim
+                heatmap = heatmap.unsqueeze(0)
+            asym_maps.append(heatmap)
+
+            asym_values.append(max_asym)
 
         return {
             "asymmetry_values": torch.stack(asym_values, dim=1),   # (B, T)
             "asymmetry_coords": torch.stack(asym_coords, dim=1),   # (B, T, 2)
-            "heatmap":          torch.stack(asym_maps,   dim=1),   # (B, T, H, W)
+            "heatmap":          torch.stack(asym_maps,   dim=1),   # (B, T, latent_h, latent_w)
         }
