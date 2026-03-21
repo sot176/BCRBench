@@ -119,9 +119,9 @@ class VMRAMaR(nn.Module):
 
             # Apply SAD alignment
             sad_out = self.sad(left_feats, right_feats)
-            asym_values = sad_out["asymmetry_values"].view(B, T, -1)   # (B, T, 1)
-            asym_coords = sad_out["asymmetry_coords"].view(B, T, 2)    # (B, T, 2)
-            asym_maps   = sad_out["heatmap"].view(B, T, self.latent_h, self.latent_w)  # (B, T, H_lat, W_lat)  
+            asym_values = sad_out["asymmetry_values"]#.view(B, T, -1)   # (B, T, 1)
+            asym_coords = sad_out["asymmetry_coords"]#.view(B, T, -1)    # (B, T, 2)
+            asym_maps   = sad_out["heatmap"]#.view(B, T, self.latent_h, self.latent_w)  # (B, T, H_lat, W_lat)  
 
             # Pass all three to LongitudinalAsymmetryTracker
             asym_feature = self.lat(asym_values, asym_coords, asym_maps)
