@@ -24,8 +24,9 @@ class IdentityPool(nn.Module):
     def forward(self, x):
         # Return dummy "logit" and hidden to match the old interface
         return None, x  # logit=None, hidden=feature_map
-    
-    
+    def replaces_fc(self):
+        return False
+
 class VMRAMaR(nn.Module):
     """
     VMRNN-Asymmetry Mammogram Risk model.
