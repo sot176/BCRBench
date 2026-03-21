@@ -74,8 +74,6 @@ To use the models and dataset classes in this repository, the datasets must be o
 <details>
 <summary><b>Values for Cancer types</b></summary>
 
-<small>
-
 The column names listed below correspond to the original dataset CSV files.
 
 | Dataset | Column | Values | Meaning |
@@ -90,17 +88,12 @@ The column names listed below correspond to the original dataset CSV files.
 | CSAW-CC | x_type        | 1 | In situ only (non-invasive) |
 | CSAW-CC | x_type        | 2 | Invasive ≤ 15 mm |
 | CSAW-CC | x_type        | 3 | Invasive > 15 mm |
-<small>
 </details>
 
 
 <details>
 <summary><b>Values for Breast density</b></summary>
-<style>
-  details table {
-    font-size: 9px;
-  }
-</style>
+
 The column names listed below correspond to the original dataset CSV files.
 
 | Dataset | Column | Values / Range | Meaning |
@@ -116,11 +109,6 @@ The column names listed below correspond to the original dataset CSV files.
 
 <details>
 <summary><b>Example: Cancer-Free Patient</b></summary>
-<style>
-  details table {
-    font-size: 9px;
-  }
-</style>
 
 | patient_id | exam_id | ImageLaterality | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | cancer_type | race   |
 | :--------: | :-----: | :-------------: | :--: | :-----------------: | :-------------: | :------------------: | :-----------------: | :-----: | :-----------: | :--: |
@@ -137,11 +125,6 @@ The column names listed below correspond to the original dataset CSV files.
 
 <details>
 <summary><b>Example: Cancer Patient</b></summary>
-<style>
-  details table {
-    font-size: 9px;
-  }
-</style>
 
 | patient_id | exam_id | ImageLaterality | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | cancer_type | race   |
 | :--------: | :-----: | :-------------: | :--: | :-----------------: | :-------------: | :------------------: | :-----------------: | :-----: | :-----------: | :--: |
@@ -153,7 +136,6 @@ The column names listed below correspond to the original dataset CSV files.
 | 11513410      | 17070991   | L                  | MLO   | 2020              | 2017            | 3                  | 3                 | 3       | 1             | Caucasian or White  |
 | 11513410      | 17070991   | R                  | CC   | 2020              | 2017            | 3                  | 3                 | 3       | 1             | Caucasian or White  |
 | 11513410      | 17070991   | R                  | MLO   | 2020              | 2017            | 3                  | 3                 | 3       | 1             | Caucasian or White  |
-
 
 </details>
 
