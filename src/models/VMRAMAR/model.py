@@ -99,26 +99,39 @@ class VMRAMaR(nn.Module):
         x = x.view(B * T * V, C, H, W)
 
         # ── Encode all images ─────────────────────────────────────────
-        _, img_feats, _ = self.image_encoder(x, None, batch)
-        print("img feat", img_feats.shape)
-        img_feats = img_feats.view(B, T, V, -1)
-        img_feats = img_feats[:, :, :, :self.image_repr_dim]
+        _, img_feats, _ = self.image_encoder(x, None, batch) # img feat shape [B*T*V, C_feat, H_feat, W_feat]
+        C_feat, H_feat, W_feat = img_feats.shape[1:]
+        
+        img_feats = img_feats.view(B, T, V, C_feat, H_feat, W_feat)
+        
+        # ── Fuse features across views (left/right) ──────────────────
+        fused_feats = img_feats.mean(dim=2)  # average over V → [B, T, C, H, W]
 
-        fused_feats = img_feats.mean(dim=2)
-
-        # ── Asymmetry features ────────────────────────────────────────
+         # ── Asymmetry features ───────────────────────────────────────
         if self.use_asymmetry:
-            left_feats = img_feats[:, :, 0, :]
-            right_feats = img_feats[:, :, 1, :]
+            # Extract left/right breasts
+            left_feats = img_feats[:, :, 0, :, :, :]   # [B, T, C, H, W]
+            right_feats = img_feats[:, :, 1, :, :, :]  # [B, T, C, H, W]
+
+            # Merge batch and temporal dims for SAD module
+            left_feats = left_feats.view(B * T, C_feat, H_feat, W_feat)
+            right_feats = right_feats.view(B * T, C_feat, H_feat, W_feat)
+
+            # Apply SAD alignment
             aligned_right_feats = self.sad(left_feats, right_feats)
+
+            # Compute asymmetry
             asym_feats = torch.abs(left_feats - aligned_right_feats)
-            asym_feature = self.lat(asym_feats)
-            # Temporal pooling (mean over time)
-            temporal_feature = fused_feats.mean(dim=1)
+            asym_feature = self.lat(asym_feats.view(B, T, -1))  # collapse H,W into linear layer
+
+            # Temporal pooling
+            temporal_feature = fused_feats.view(B, T, -1).mean(dim=1)
+
+            # Combine features
             combined_feats = torch.cat([temporal_feature, asym_feature], dim=1)
         else:
-            # Just average over time dimension
-            combined_feats = fused_feats.mean(dim=1)
+            # Only temporal pooling
+            combined_feats = fused_feats.view(B, T, -1).mean(dim=1)
 
         # ── Risk prediction ───────────────────────────────────────────
         risk = self.ahl(combined_feats)
