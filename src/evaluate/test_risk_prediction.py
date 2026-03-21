@@ -20,38 +20,7 @@ from utils import (
 from config.config import cfg
 from models.model_factory import get_model
 
-
-def to_json_safe(obj):
-    if isinstance(obj, dict):
-        new_dict = {}
-        for k, v in obj.items():
-            # Convert keys safely
-            if isinstance(k, np.integer):
-                k = int(k)
-            elif isinstance(k, np.floating):
-                k = float(k)
-            elif not isinstance(k, (str, int, float, bool, type(None))):
-                k = str(k)  # fallback ONLY if needed
-
-            new_dict[k] = to_json_safe(v)
-        return new_dict
-
-    elif isinstance(obj, (np.integer,)):
-        return int(obj)
-
-    elif isinstance(obj, (np.floating,)):
-        return float(obj)
-
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
-
-    elif isinstance(obj, list):
-        return [to_json_safe(x) for x in obj]
-
-    else:
-        return obj
-
-
+ 
 def test_risk(
         args,
         test_loader,
@@ -214,8 +183,7 @@ def test_risk(
 
         # Pretty print to console
         print("Final Test Results:")
-        results_safe = to_json_safe(results)
-        print(json.dumps(results_safe, indent=2))
+        print(results)
         logger.info(f"Final Test Results: {results}")
 
         # Save to JSON file

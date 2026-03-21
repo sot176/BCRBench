@@ -4,19 +4,8 @@ import json
 from sklearn import metrics
 from sklearn.utils import resample
 import numpy as np
-
 from .c_index import concordance_index_ipcw
 
-
-def map_density( value):
-    """Map numeric density values (1–4) to categorical labels A–D."""
-    mapping = {
-        1: "A",
-        2: "B",
-        3: "C",
-        4: "D"
-    }
-    return mapping.get(value, "NA")
 
 RACES = [
     "Caucasian or White",
@@ -31,7 +20,19 @@ RACES = [
 
 RACE_TO_ID = {r: i for i, r in enumerate(RACES)}
 ID_TO_RACE = {i: r for r, i in RACE_TO_ID.items()}
+ 
 
+def map_density( value):
+    """Map numeric density values (1–4) to categorical labels A–D."""
+    mapping = {
+        1: "A",
+        2: "B",
+        3: "C",
+        4: "D"
+    }
+    return mapping.get(value, "NA")
+
+ 
 
 def bootstrap_c_index(
     event_times,
@@ -179,7 +180,6 @@ def bootstrap_confidence_interval(data, num_samples=2000, confidence_level=0.95)
     upper_bound = np.percentile(bootstrapped_means, 100 * (1 - alpha / 2))
     return lower_bound, upper_bound
 
-
 def bootstrap_auc(event_times, predictions, event_observed, n_bootstrap=2000, alpha=0.05, max_attempts=50):
     """
     Compute bootstrap confidence intervals for AUC at 5 yearly follow-ups.
@@ -200,22 +200,13 @@ def bootstrap_auc(event_times, predictions, event_observed, n_bootstrap=2000, al
     auc_results = {f"Year {i+1}": [] for i in range(5)}
 
     for _ in range(n_bootstrap):
-        for attempt in range(max_attempts):
-            indices = np.random.choice(N, N, replace=True)
-            sample_event_times = event_times[indices]
-            sample_predictions = predictions[indices]
-            sample_event_observed = event_observed[indices]
+        indices = np.random.choice(N, N, replace=True)
+        sample_event_times = event_times[indices]
+        sample_predictions = predictions[indices]
+        sample_event_observed = event_observed[indices]
 
-            yearly_aucs = compute_auc_x_year_auc(sample_predictions, sample_event_times, sample_event_observed)
-            
-            # Check if all years have both positive and negative
-            valid_sample = all(0 < auc < 1 for auc in yearly_aucs.values())
-            if valid_sample:
-                break  # Accept this sample
-        else:
-            # If after max_attempts still invalid, skip this bootstrap
-            continue
-
+        yearly_aucs = compute_auc_x_year_auc(sample_predictions, sample_event_times, sample_event_observed)
+        
         for year, auc in yearly_aucs.items():
             auc_results[f"Year {year+1}"].append(auc)
 
@@ -229,21 +220,28 @@ def bootstrap_auc(event_times, predictions, event_observed, n_bootstrap=2000, al
 
     return auc_summary, auc_results
 
+def print_results(results):
+    """
+    Nicely print nested dictionaries or key-value pairs.
+
+    Args:
+        results: Dict or nested dict to print.
+    """
+    for key, value in results.items():
+        if isinstance(value, dict):
+            print(f"{key}:")
+            for sub_key, sub_value in value.items():
+                print(f"  {sub_key}: {sub_value}")
+        else:
+            print(f"{key}: {value}")
+
 
 def compute_auc_x_year_auc(probs, censor_times, golds):
     """
     Compute AUC for each year from 1 to 5 given predicted probabilities, censoring times, and event labels.
-
-    Args:
-        probs: List or array of predicted probabilities with shape (N, 5).
-        censor_times: Array of censoring/event times (N,).
-        golds: Array of binary event indicators (N,).
-
-    Returns:
-        aucs_per_year: Dict mapping follow-up year (0 to 4) to AUC values.
     """
     def include_exam_and_determine_label(prob_arr, censor_time, gold, followup):
-        valid_pos = gold == 1 and censor_time <= followup  # event occurred before or at followup
+        valid_pos = gold == 1 and censor_time <= followup
         valid_neg = censor_time >= followup
         included = valid_pos or valid_neg
         label = valid_pos
@@ -263,8 +261,9 @@ def compute_auc_x_year_auc(probs, censor_times, golds):
             auc = metrics.roc_auc_score(golds_for_eval, probs_for_eval, average="samples")
         except Exception as e:
             warnings.warn(f"Failed to calculate AUC because {e}")
-            auc = float("nan")
+            auc = np.nan  # <-- use numeric NaN instead of string
         aucs_per_year[followup] = auc
+
     return aucs_per_year
 
 
@@ -333,6 +332,8 @@ def compute_c_index_by_density(event_times, predictions, event_observed, density
 
     return c_indexes_by_density
 
+
+
 def bootstrap_auc_by_cancer_type(
     event_times,
     predictions,
@@ -377,19 +378,9 @@ def bootstrap_auc_by_cancer_type(
 
         for _ in range(n_bootstrap):
             # Resample until at least one positive and one negative exists
-            max_tries = 50
-            for attempt in range(max_tries):
-                boot_idx = resample(
-                    np.arange(len(event_times_cat)), replace=True, n_samples=len(event_times_cat)
-                )
-                if (
-                    np.sum(event_observed_cat[boot_idx] == 1) > 0
-                    and np.sum(event_observed_cat[boot_idx] == 0) > 0
-                ):
-                    break
-            else:
-                # If valid sample not found after max_tries, skip this bootstrap
-                continue
+            boot_idx = resample(
+                np.arange(len(event_times_cat)), replace=True, n_samples=len(event_times_cat)
+            )
 
             yearly_aucs_sample = compute_auc_x_year_auc(
                 predictions_cat[boot_idx], event_times_cat[boot_idx], event_observed_cat[boot_idx]
@@ -411,7 +402,6 @@ def bootstrap_auc_by_cancer_type(
             else:
                 auc_summary_by_cancer[cat][year] = (None, (None, None))
     return auc_summary_by_cancer
-
 
 def bootstrap_c_index_by_cancer_type(
     event_times,
@@ -515,75 +505,63 @@ def bootstrap_auc_by_density(
     alpha=0.05,
 ):
     """
-    Compute bootstrap confidence intervals for AUC by density categories.
-
-    Ensures that each year has at least one positive and one negative sample; 
-    otherwise, resamples until valid.
-
-    Args:
-        event_times: Array of event/censoring times (N,)
-        predictions: Array of predicted risk scores (N,)
-        event_observed: Binary array indicating event occurrence (N,)
-        density_categories: Array of breast density categories (N,), values in {"A", "B", "C", "D"}
-        n_bootstrap: Number of bootstrap samples (default=2000)
-        alpha: Significance level for confidence intervals (default=0.05)
-
-    Returns:
-        auc_summary_by_density: Dict mapping density categories to dicts with year keys
-                               and values as (mean_auc, (lower_CI, upper_CI))
+    Compute bootstrap confidence intervals for AUC by density categories
+    WITHOUT balancing cancer vs non-cancer during resampling.
     """
-    densities = ["A", "B", "C", "D"]
-    auc_results_by_density = {d: {f"Year {i+1}": [] for i in range(5)} for d in densities}
-    density_categories = np.array(density_categories)
 
-    for d in densities:
-        density_indices = np.where(density_categories == d)[0]
+    auc_results_by_density = {
+        d: {f"Year {i+1}": [] for i in range(5)} for d in ["A", "B", "C", "D"]
+    }
+
+    density_categories = np.array([map_density(v) for v in density_categories])
+
+    for density in ["A", "B", "C", "D"]:
+        density_indices = np.where(density_categories == density)[0]
 
         if len(density_indices) == 0:
-            warnings.warn(f"Skipping density '{d}': no samples.")
+            print(f"Skipping density '{density}': no samples.")
             continue
 
-        event_times_d = event_times[density_indices]
-        predictions_d = predictions[density_indices]
-        event_observed_d = event_observed[density_indices]
+        event_times_density = event_times[density_indices]
+        predictions_density = predictions[density_indices]
+        event_observed_density = event_observed[density_indices]
 
-        # Require at least one positive and one negative
-        if np.sum(event_observed_d == 1) == 0 or np.sum(event_observed_d == 0) == 0:
-            warnings.warn(f"Skipping density '{d}': missing cancer or non-cancer cases.")
-            continue
+        n_density = len(density_indices)
 
         for _ in range(n_bootstrap):
-            # Resample until at least one positive and one negative exists
-            max_tries = 50
-            for attempt in range(max_tries):
-                sample_idx = resample(np.arange(len(event_times_d)), replace=True, n_samples=len(event_times_d))
-                if (
-                    np.sum(event_observed_d[sample_idx] == 1) > 0
-                    and np.sum(event_observed_d[sample_idx] == 0) > 0
-                ):
-                    break
-            else:
-                continue  # skip if valid sample not found
+            sample_indices = resample(
+                np.arange(n_density),
+                replace=True,
+                n_samples=n_density,
+            )
+
+            event_times_sample = event_times_density[sample_indices]
+            predictions_sample = predictions_density[sample_indices]
+            event_observed_sample = event_observed_density[sample_indices]
 
             yearly_aucs_sample = compute_auc_x_year_auc(
-                predictions_d[sample_idx], event_times_d[sample_idx], event_observed_d[sample_idx]
+                predictions_sample,
+                event_times_sample,
+                event_observed_sample,
             )
 
             for year, auc in yearly_aucs_sample.items():
-                auc_results_by_density[d][f"Year {year+1}"].append(auc)
+                auc_results_by_density[density][f"Year {year + 1}"].append(auc)
 
-    # Compute mean and CI for each density/year
     auc_summary_by_density = {}
-    for d, auc_results in auc_results_by_density.items():
-        auc_summary_by_density[d] = {}
+    for density, auc_results in auc_results_by_density.items():
+        auc_summary_by_density[density] = {}
         for year, auc_values in auc_results.items():
-            valid_values = np.array([v for v in auc_values if np.isfinite(v)])
-            if len(valid_values) > 0:
-                lower = np.percentile(valid_values, 100 * alpha / 2)
-                upper = np.percentile(valid_values, 100 * (1 - alpha / 2))
-                auc_summary_by_density[d][year] = (np.mean(valid_values), (lower, upper))
+            if auc_values:
+                lower = np.percentile(auc_values, 100 * alpha / 2)
+                upper = np.percentile(auc_values, 100 * (1 - alpha / 2))
+                auc_summary_by_density[density][year] = (
+                    np.mean(auc_values),
+                    (lower, upper),
+                )
             else:
-                auc_summary_by_density[d][year] = (None, (None, None))
+                auc_summary_by_density[density][year] = (None, (None, None))
+
     return auc_summary_by_density
 
 
@@ -672,7 +650,7 @@ def bootstrap_auc_by_race(
     predictions,
     event_observed,
     race_categories,
-    n_bootstrap=2000,
+    n_bootstrap=1000,
     alpha=0.05,
 ):
     """
@@ -792,52 +770,6 @@ def bootstrap_c_index_by_race(
         pred_r = predictions[idx]
         obs_r = event_observed[idx]
 
-        
-def bootstrap_c_index_by_race(
-    event_times,
-    predictions,
-    event_observed,
-    race_categories,
-    censoring_dist,
-    n_bootstrap=2000,
-    alpha=0.05,
-    save_json_path=None,
-):
-    """
-       Compute bootstrap confidence intervals for C-index by race categories.
-       Uses simple (non-stratified) bootstrap, consistent with
-       bootstrap_auc_by_cancer_type.
-       """
-
-    race_categories = np.array([
-        r if isinstance(r, str) and r.strip() != "" else "Unknown"
-        for r in race_categories
-    ])
-
-    RACES = [
-        "Caucasian or White",
-        "African American  or Black",
-        "Asian",
-        "American Indian or Alaskan Native",
-        "Native Hawaiian or Other Pacific Islander",
-        "Multiple",
-        "Unknown",
-        "Unavailable or Unreported",
-    ]
-
-    cindex_results_by_race = {r: [] for r in RACES}
-
-    for race in RACES:
-        idx = np.where(race_categories == race)[0]
-
-        if len(idx) < 10 or np.sum(event_observed[idx]) < 5:
-            print(f"[INFO] Skipping race '{race}' — insufficient samples/events")
-            continue
-
-        et_r = event_times[idx]
-        pred_r = predictions[idx]
-        obs_r = event_observed[idx]
-
         for _ in range(n_bootstrap):
             boot_idx = resample(
                 np.arange(len(et_r)),
@@ -849,27 +781,16 @@ def bootstrap_c_index_by_race(
             pred_sample = pred_r[boot_idx]
             obs_sample = obs_r[boot_idx]
 
-            # ✅ Ensure valid sample
-            if (
-                np.sum(obs_sample) == 0 or                 # no events
-                np.sum(obs_sample == 0) == 0 or            # no censored
-                len(np.unique(et_sample)) < 2              # no time variation
-            ):
-                continue
+           
+            cidx = concordance_index_ipcw(
+                et_sample,
+                pred_sample,
+                obs_sample,
+                censoring_dist,
+            )
 
-            try:
-                cidx = concordance_index_ipcw(
-                    et_sample,
-                    pred_sample,
-                    obs_sample,
-                    censoring_dist,
-                )
-
-                if np.isfinite(cidx):
-                    cindex_results_by_race[race].append(cidx)
-
-            except ZeroDivisionError:
-                continue
+            if np.isfinite(cidx):
+                cindex_results_by_race[race].append(cidx)
 
     # Optional JSON save
     if save_json_path is not None:
@@ -896,3 +817,59 @@ def bootstrap_c_index_by_race(
     return cindex_summary_by_race, cindex_results_by_race
 
 
+
+def save_model_results_to_file(probs, censor_times, golds, density_categories, censoring_dist, cancer_categories, out_dir):
+    """
+    Computes and saves the AUC values, C-index by density, predictions,
+    censoring times, and event labels to a JSON file.
+
+    Args:
+        probs: Array of predicted probabilities (N, T).
+        censor_times: Array of event or censoring times (N,).
+        golds: Array of event indicators (1 if event occurred, else 0) (N,).
+        density_categories: Array of breast density categories (N,), values in {"A", "B", "C", "D"}.
+        censoring_dist: Censoring distribution used for IPCW calculation.
+        out_dir: Directory path to save the output JSON file.
+
+    Saves:
+        model_results.json containing:
+            - "C_index_by_density": Concordance index per density category.
+            - "auc_per_year": AUC values for years 1–5.
+            - "predictions": Predicted probabilities (as list).
+            - "censor_times": Event/censor times (as list).
+            - "golds": Ground truth labels (as list).
+    """
+    # Compute AUC per year for the current model
+    aucs_per_year = compute_auc_x_year_auc(probs, censor_times, golds)
+
+    # Compute C-index by density
+    c_indexes_by_density = compute_c_index_by_density(
+        censor_times,
+        probs,
+        golds,
+        density_categories,
+        censoring_dist,
+    )
+    auc_by_cancer = auc_by_cancer_type(censor_times,
+    probs,
+    golds,
+    cancer_categories)
+
+    # Prepare results dictionary
+    results_dict = {
+        "C_index_by_density": c_indexes_by_density,
+        "auc_per_year": aucs_per_year,
+        "auc_by_cancer_type":auc_by_cancer,
+        "predictions": probs.tolist(),
+        "censor_times": censor_times.tolist(),
+        "golds": golds.tolist()
+    }
+
+    # Define output file path
+    filename = "model_results.json"
+    file_path = os.path.join(out_dir, filename)
+
+    # Save the results to a JSON file
+    with open(file_path, 'w') as file:
+        json.dump(results_dict, file, indent=4)
+        print(f"Results for all models saved to {file_path}")
