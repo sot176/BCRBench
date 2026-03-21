@@ -41,7 +41,7 @@ class LongitudinalAsymmetryTracker(nn.Module):
         )
 
     def forward(self, asymmetry_features, asymmetry_coords, asymmetry_maps):
-        B, T, D = asymmetry_features.shape
+        B, T = asymmetry_features.shape
 
         scale_h = asymmetry_maps.shape[-2] / self.latent_h
         scale_w = asymmetry_maps.shape[-1] / self.latent_w
