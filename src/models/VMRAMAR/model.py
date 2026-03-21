@@ -93,8 +93,7 @@ class VMRAMaR(nn.Module):
         x = x.view(B * T * V, C, H, W)
 
         # ── Encode all images ─────────────────────────────────────────
-        pooled_feat, img_feats, _ = self.image_encoder(x, None, batch)
-        print("pooled feat", pooled_feat.shape)
+        _, img_feats, _ = self.image_encoder(x, None, batch)
         print("img feat", img_feats.shape)
         img_feats = img_feats.view(B, T, V, -1)
         img_feats = img_feats[:, :, :, :self.image_repr_dim]
