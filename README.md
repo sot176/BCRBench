@@ -50,7 +50,9 @@ To use the models and dataset classes in this repository, the datasets must be o
 
 ---
 
-### Required Columns
+<details>
+<summary><b>Required Columns</b></summary>
+<div style="font-size: 12px">
 
 | Column Name                  | Description                                                                 |
 | ----------------------------- | --------------------------------------------------------------------------- |
@@ -65,10 +67,13 @@ To use the models and dataset classes in this repository, the datasets must be o
 | `density` / `libra_percentdensity` | Breast density. In EMBED, categorical (1–5). In CSAW-CC, continuous 0–100, which can be grouped into categories. |
 | `path_severity` / `x_type`   | Cancer type. In EMBED, use `path_severity` (0–6). In CSAW-CC, use `x_type` (1–3). |
 | `race`                        | Patient race (optional, leave empty if not available)                       |
+</div>
+</details>
 
----
 
-### Values for `path_severity` (EMBED) / `x_type` (CSAW-CC)
+<details>
+<summary><b>Values for Cancer types</b></summary>
+<div style="font-size: 12px">
 
 | Dataset | Column | Values | Meaning |
 | ------- | ------ | ------ | ------- |
@@ -82,10 +87,13 @@ To use the models and dataset classes in this repository, the datasets must be o
 | CSAW-CC | x_type        | 1 | In situ only (non-invasive) |
 | CSAW-CC | x_type        | 2 | Invasive ≤ 15 mm |
 | CSAW-CC | x_type        | 3 | Invasive > 15 mm |
+</div>
+</details>
 
----
 
-### Values for `density` / `libra_percentdensity`
+<details>
+<summary><b>Values for Breast density</b></summary>
+<div style="font-size: 12px">
 
 | Dataset | Column | Values / Range | Meaning |
 | ------- | ------ | -------------- | ------- |
@@ -95,11 +103,13 @@ To use the models and dataset classes in this repository, the datasets must be o
 | EMBED   | density | 4 | Extremely dense (BIRADS D) |
 | EMBED   | density | 5 | Normal male |
 | CSAW-CC | libra_percentdensity | 0–100 | Percentage breast density. Can be binned into categories (e.g., low, medium, high). |
+</div>
+</details>
 
----
 
-### Example: Cancer-Free Patient
-
+<details>
+<summary><b>Example: Cancer-Free Patient</b></summary>
+<div style="font-size: 12px">
 | patient_id | exam_id | ImageLateralityFinal | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | path_severity | race   |
 | ---------- | ------- | ------------------ | ---- | ----------------- | --------------- | ------------------ | ----------------- | ------- | ------------- | ------ |
 | 10093833      | 6488770689649000   | L                  | CC   |                   | 2015            |                    | 3                 |1       |             | Caucasian or White  |
@@ -111,7 +121,13 @@ To use the models and dataset classes in this repository, the datasets must be o
 | 10093833      | 4173769076863720   | R                  | CC   |                   | 2015            |                    | 0                 |1       |             | Caucasian or White  |
 | 10093833      | 4173769076863720   | R                  | MLO   |                   | 2015            |                    | 0                 |1       |             | Caucasian or White  |
 
-### Example: Cancer Patient
+</div>
+</details>
+
+
+<details>
+<summary><b>Example: Cancer Patient</b></summary>
+<div style="font-size: 12px">
 
 | patient_id | exam_id | ImageLateralityFinal | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | path_severity | race   |
 | ---------- | ------- | ------------------ | ---- | ----------------- | --------------- | ------------------ | ----------------- | ------- | ------------- | ------ |
@@ -124,7 +140,8 @@ To use the models and dataset classes in this repository, the datasets must be o
 | 11513410      | 1707099151654590   | R                  | CC   | 2020              | 2017            | 3                  | 3                 | 3       | 1             | Caucasian or White  |
 | 11513410      | 1707099151654590   | R                  | MLO   | 2020              | 2017            | 3                  | 3                 | 3       | 1             | Caucasian or White  |
 
- 
+</div>
+</details>
 
 
 
