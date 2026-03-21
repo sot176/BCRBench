@@ -20,7 +20,12 @@ for _key in list(sys.modules.keys()):
 
 from models.Mirai.onconet.models.factory import get_model_by_name, load_model
 
-
+class IdentityPool(nn.Module):
+    def forward(self, x):
+        # Return dummy "logit" and hidden to match the old interface
+        return None, x  # logit=None, hidden=feature_map
+    
+    
 class VMRAMaR(nn.Module):
     """
     VMRNN-Asymmetry Mammogram Risk model.
@@ -53,7 +58,7 @@ class VMRAMaR(nn.Module):
             self.image_encoder = get_model_by_name("custom_resnet", False, args)
 
         self.image_repr_dim = self.image_encoder._model.args.img_only_dim    
-        self.image_encoder._model.pool = nn.Identity()  # removes global pooling
+        self.image_encoder._model.pool = IdentityPool()  # removes global pooling
         self.image_encoder._model.fc   = nn.Identity()  # removes fully connected
         self.image_encoder._model.prob_of_failure_layer = nn.Identity()  # optional
         
