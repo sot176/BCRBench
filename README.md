@@ -66,30 +66,7 @@ pip install -r requirements.txt
 **Important**: For each script in the `scripts` folder, make sure to update the paths to point to your datasets and choose the output directories for results.
 
 ### 2) Requirements
-All Python dependencies are listed in `requirements.txt`. Install them using the commands above.e
-
-### 3) Pre-processing of the datasets
-
-Before training, datasets need to be preprocessed. The `preprocessing` folder contains scripts for image preparation and dataset splitting.
-
-- **EMBED dataset:**
-```bash 
-preprocessing/preprocess_img_embed.py
-```
-
-- **CSAW-CC dataset:**
-```bash 
-preprocessing/preprocess_img_csaw_cc.py
-``` 
-
-- **Splitting datasets into train/val/test sets:**
-```bash 
-preprocessing/split_data.py
-``` 
-
-
-- **Creating dataset CSVs:**
-Use the notebooks in the `notebooks` folder to generate CSV files describing your dataset, including file paths, labels, and metadata.
+All Python dependencies are listed in `requirements.txt`. Install them using the commands above.
  
 
 ### 3) Training 
