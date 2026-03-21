@@ -149,8 +149,8 @@ Clone the repository, create a conda environment, and install the requirements:
 
 ### 1) Clone & Setup Environment
 ```bash
-git clone https://github.com/yourusername/breast-cancer-risk-prediction.git
-cd breast-cancer-risk-prediction
+git clone https://github.com/sot176/BreastCancerRiskBenchmark.git
+cd BreastCancerRiskBenchmark
 conda create -n bc_risk python=3.12
 conda activate bc_risk
 pip install -r requirements.txt
