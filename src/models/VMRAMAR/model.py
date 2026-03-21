@@ -118,7 +118,12 @@ class VMRAMaR(nn.Module):
             asym_values = sad_out["asymmetry_values"]  # (B, T)
             asym_coords = sad_out["asymmetry_coords"]  # (B, T, 2)
             asym_maps   = sad_out["heatmap"]  # (B, T, H_feat, W_featW_lat)  
-            
+             # --- Flatten heatmaps for linear projection ---
+            B, T, H_lat, W_lat = asym_maps.shape
+            asym_maps_flat = asym_maps.view(B * T, H_lat * W_lat)  # (B*T, H*W)
+            asym_feature = self.asym_proj(asym_maps_flat)          # (B*T, 512)
+            asym_feature = asym_feature.view(B, T, -1)             # (B, T, 512)
+
             # Pass all three to LongitudinalAsymmetryTracker
             asym_feature = self.lat(asym_values, asym_coords, asym_maps)
 
