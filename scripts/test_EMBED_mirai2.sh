@@ -51,6 +51,7 @@ accelerate launch  main_test.py \
   --batch_size 1 \
   --id_training 1 \
   --num_workers 7 \
+  --model "Mirai" \
   --best_model "True" \
   --dataset "EMBED" \
   --seed 2023 \
