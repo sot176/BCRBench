@@ -122,7 +122,9 @@ class VMRAMaR(nn.Module):
             asym_values = sad_out["asymmetry_values"]#.view(B, T, -1)   # (B, T, 1)
             asym_coords = sad_out["asymmetry_coords"]#.view(B, T, -1)    # (B, T, 2)
             asym_maps   = sad_out["heatmap"]#.view(B, T, self.latent_h, self.latent_w)  # (B, T, H_lat, W_lat)  
-
+            print("asym values", asym_values.shape)
+            print("asym_cord", asym_coords.shape)
+            print("asym maps", asym_maps.shape)
             # Pass all three to LongitudinalAsymmetryTracker
             asym_feature = self.lat(asym_values, asym_coords, asym_maps)
 
