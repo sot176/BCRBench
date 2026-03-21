@@ -118,11 +118,9 @@ class VMRAMaR(nn.Module):
             right_feats = right_feats.view(B * T, C_feat, H_feat, W_feat)
 
             # Apply SAD alignment
-            aligned_right_feats = self.sad(left_feats, right_feats)
-
-            # Compute asymmetry
-            asym_feats = torch.abs(left_feats - aligned_right_feats)
-            asym_feature = self.lat(asym_feats.view(B, T, -1))  # collapse H,W into linear layer
+            sad_out = self.sad(left_feats, right_feats)
+            asym_feats = sad_out["asymmetry_values"]  # shape (B*T,)
+            asym_feature = self.lat(asym_feats.view(B, T, -1))
 
             # Temporal pooling
             temporal_feature = fused_feats.view(B, T, -1).mean(dim=1)
