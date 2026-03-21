@@ -39,6 +39,7 @@ def parse_arguments():
         parser.add_argument('--img_encoder_snapshot', type=str, default=None,
                             help='Filename of image feature extractor snapshot for mirai_full models')
         parser.add_argument('--survival_analysis_setup', action='store_true',  help='Whether to modify model, eval and training for survival analysis.') #
+        parser.add_argument('--model_name', type=str, default='mirai_full', help="Form of model, i.e resnet18, aggregator, revnet, etc.")
 
     # Other Optional Configs
         parser.add_argument('--num_images', type=int, default=1,
