@@ -48,6 +48,7 @@ accelerate launch  main_test.py \
   --img_encoder_snapshot /scratch/project_465002309/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_MIRAI_Base_May20_2019.p \
   --path_test_folder  /scratch/project_465002309/thrunsol/Mirai_Risk_prediction_test_results_1664_2048/embed/pretrained_frozen_model \
   --batch_size 1 \
+  --id_training 1 \
   --num_workers 7 \
   --best_model "True" \
   --dataset "EMBED" \
