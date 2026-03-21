@@ -293,8 +293,6 @@ def main():
         shuffle=args.shuffle,
         pin_memory=args.pin_memory,
         transforms=train_transform,
-        drop_last=args.drop_last
-
     )
 
     # Setup the path to save the model and the logger.
