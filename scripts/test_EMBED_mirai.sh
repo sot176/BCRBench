@@ -52,6 +52,7 @@ accelerate launch  main_test.py \
   --batch_size 1 \
   --id_training 1 \
   --num_workers 7 \
+  --survival_analysis_setup \
   --model "Mirai" \
   --best_model "True" \
   --dataset "EMBED" \
