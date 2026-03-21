@@ -52,7 +52,7 @@ To use the models and dataset classes in this repository, the datasets must be o
 
 <details>
 <summary><b>Required Columns</b></summary>
-<div style="font-size: 11px">
+<div style="font-size: 9px">
 
 | Column Name                  | Description                                                                 |
 | ----------------------------- | --------------------------------------------------------------------------- |
@@ -73,7 +73,7 @@ To use the models and dataset classes in this repository, the datasets must be o
 
 <details>
 <summary><b>Values for Cancer types</b></summary>
-<div style="font-size: 11px">
+<div style="font-size: 9px">
 
 The column names listed below correspond to the original dataset CSV files.
 
@@ -95,7 +95,7 @@ The column names listed below correspond to the original dataset CSV files.
 
 <details>
 <summary><b>Values for Breast density</b></summary>
-<div style="font-size: 11px">
+<div style="font-size: 9px">
 The column names listed below correspond to the original dataset CSV files.
 
 | Dataset | Column | Values / Range | Meaning |
@@ -112,7 +112,7 @@ The column names listed below correspond to the original dataset CSV files.
 
 <details>
 <summary><b>Example: Cancer-Free Patient</b></summary>
-<div style="font-size: 11px">
+<div style="font-size: 9px">
 
 | patient_id | exam_id | ImageLaterality | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | cancer_type | race   |
 | :--------: | :-----: | :-------------: | :--: | :-----------------: | :-------------: | :------------------: | :-----------------: | :-----: | :-----------: | :--: |
@@ -131,7 +131,7 @@ The column names listed below correspond to the original dataset CSV files.
 
 <details>
 <summary><b>Example: Cancer Patient</b></summary>
-<div style="font-size: 11px">
+<div style="font-size: 9px">
 
 | patient_id | exam_id | ImageLaterality | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | cancer_type | race   |
 | :--------: | :-----: | :-------------: | :--: | :-----------------: | :-------------: | :------------------: | :-----------------: | :-----: | :-----------: | :--: |
