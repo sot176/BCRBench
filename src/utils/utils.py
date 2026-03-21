@@ -38,7 +38,7 @@ def bootstrap_c_index(
     predictions,
     event_observed,
     censoring_dist,
-    n_bootstrap=1000,
+    n_bootstrap=2000,
     alpha=0.05,
 ):
     """
@@ -84,7 +84,7 @@ def bootstrap_c_index_by_density(
     event_observed,
     density_categories,
     censoring_dist,
-    n_bootstrap=1000,
+    n_bootstrap=2000,
     alpha=0.05,
     save_json_path=None,
 ):
@@ -180,7 +180,7 @@ def bootstrap_confidence_interval(data, num_samples=1000, confidence_level=0.95)
     return lower_bound, upper_bound
 
 
-def bootstrap_auc(event_times, predictions, event_observed, n_bootstrap=1000, alpha=0.05):
+def bootstrap_auc(event_times, predictions, event_observed, n_bootstrap=2000, alpha=0.05):
     """
     Compute bootstrap confidence intervals for AUC at 5 yearly follow-ups.
 
@@ -328,7 +328,7 @@ def bootstrap_auc_by_cancer_type(
     predictions,
     event_observed,
     cancer_categories,
-    n_bootstrap=1000,
+    n_bootstrap=2000,
     alpha=0.05,
 ):
     """
@@ -401,7 +401,7 @@ def bootstrap_c_index_by_cancer_type(
     event_observed,
     cancer_categories,
     censoring_dist,
-    n_bootstrap=1000,
+    n_bootstrap=2000,
     alpha=0.05,
         save_json_path=None,
 ):
@@ -493,7 +493,7 @@ def bootstrap_auc_by_density(
     predictions,
     event_observed,
     density_categories,
-    n_bootstrap=1000,
+    n_bootstrap=2000,
     alpha=0.05,
 ):
     """
@@ -573,7 +573,7 @@ def bootstrap_c_index_by_density(
     event_observed,
     density_categories,
     censoring_dist,
-    n_bootstrap=1000,
+    n_bootstrap=2000,
     alpha=0.05,
     save_json_path=None,
 ):
@@ -652,7 +652,7 @@ def bootstrap_auc_by_race(
     predictions,
     event_observed,
     race_categories,
-    n_bootstrap=1000,
+    n_bootstrap=2000,
     alpha=0.05,
 ):
     """
@@ -733,7 +733,7 @@ def bootstrap_c_index_by_race(
     event_observed,
     race_categories,
     censoring_dist,
-    n_bootstrap=1000,
+    n_bootstrap=2000,
     alpha=0.05,
     save_json_path=None,
 ):
