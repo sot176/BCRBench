@@ -6,9 +6,9 @@ import torch.nn.functional as F
 
 def hybrid_asymmetry(left, right, latent_h=5, latent_w=5, flexible=False, topk=None, bias_params=None):
     if bias_params is None:
-        dif = torch.abs(left - right)
+        dif = torch.abs(left - right).contiguous()
     else:
-        dif = torch.abs(left - right + bias_params)
+        dif = torch.abs(left - right + bias_params).contiguous()
 
     kernel_h = max(dif.shape[-2] // latent_h, 1)
     kernel_w = max(dif.shape[-1] // latent_w, 1)
@@ -83,11 +83,15 @@ class SpatialAsymmetryDetector(nn.Module):
         asym_values, asym_coords, asym_maps = [], [], []
 
         for t in range(T):
-            lt = self.bn(left_features[:, t])  if self.use_bn else left_features[:, t]
-            rt = self.bn(right_features[:, t]) if self.use_bn else right_features[:, t]
+            lt = left_features[:, t].clone()
+            rt = right_features[:, t].clone()
+
+            if self.use_bn:
+                lt = self.bn(lt)
+                rt = self.bn(rt)
 
             max_asym, other = hybrid_asymmetry(
-                lt, rt,
+                lt.clone(), rt.clone(),
                 latent_h=self.latent_h,
                 latent_w=self.latent_w,
                 flexible=getattr(self, "flexible_asymmetry", False),
