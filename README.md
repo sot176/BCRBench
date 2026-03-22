@@ -110,7 +110,7 @@ The column names listed below correspond to the original dataset CSV files.
 <details>
 <summary><b>Example: Cancer-Free Patient</b></summary>
 
-| patient_id | exam_id | ImageLaterality | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | cancer_type | race   |
+| patient_id | exam_id | <sub>ImageLaterality<sub> | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | cancer_type | race   |
 | :--------: | :-----: | :-------------: | :--: | :-----------------: | :-------------: | :------------------: | :-----------------: | :-----: | :-----------: | :--: |
 | 10093833      | 64887706   | L                  | CC   |                   | 2015            |                    | 3                 |1       |             | Caucasian or White  |
 | 10093833      | 64887706   | L                  | MLO   |                   | 2015            |                    | 3                 |1       |             | Caucasian or White  |
