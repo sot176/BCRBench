@@ -112,8 +112,7 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
     """
     if args.model == "OA-BreaCR":
         def _compute_head_loss(risk, risk_label, years_last_followup, emb, log_var):
-            """BCE + MV + POE for one head — matches their compute_losses exactly."""
-            is_sto = (risk.dim() == 3)
+            is_sto = risk.dim() == 3
 
             if is_sto and emb is not None:
                 sample_size, _, out_dim = risk.shape
@@ -125,16 +124,11 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                 label_flat = risk_label
                 years_flat = years_last_followup
 
-            # ── BCE via get_risk_heads + get_risk_loss_BCE ────────────
-            # (handled outside this function — see oa_breacr_loss below)
-
-            # ── MV loss ───────────────────────────────────────────────
             loss_MV = criterion_MV(
                 risk_flat, label_flat, years_flat,
                 weights=getattr(args, "time_to_events_weights", None)
             )
 
-            # ── POE loss ──────────────────────────────────────────────
             loss_POE = torch.tensor(0.0, device=risk.device)
             if emb is not None and log_var is not None and criterion_POE is not None:
                 _, _, _, loss_POE = criterion_POE(
@@ -147,23 +141,37 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
             return loss_MV + loss_POE
 
         def oa_breacr_loss(outputs, batch, model_risk):
-            total_loss  = 0.0
+            device     = next(model_risk.parameters()).device
+            total_loss = torch.tensor(0.0, device=device)
 
-            # Optional model-internal loss
             if outputs.get("loss") is not None:
                 total_loss += outputs["loss"]
 
-            # ── BCE via get_risk_heads ────────────────────────────────
-            # get_risk_heads handles target/mask computation per head
+            # ── BCE via get_risk_heads ────────────────────────────────────────
             risk_heads = model_risk.get_risk_heads(outputs, batch)
             for head_name, (logits, target, mask) in risk_heads.items():
                 if logits is None:
                     continue
-                bce = get_risk_loss_BCE(logits, target, mask)
+
                 weight = 1.0 if head_name == "final" else 0.2
+
+                # Handle stochastic outputs (sample_size, B, out_dim)
+                is_sto = logits.dim() == 3
+                if is_sto:
+                    sample_size, batch_size, out_dim = logits.shape
+                    logits_flat = logits.view(-1, out_dim)
+                    target_flat = target.unsqueeze(0).repeat(sample_size, 1, 1).view(-1, out_dim)
+                    mask_flat   = mask.unsqueeze(0).repeat(sample_size, 1, 1).view(-1, out_dim) \
+                                if mask is not None else None
+                else:
+                    logits_flat = logits
+                    target_flat = target
+                    mask_flat   = mask
+
+                bce = get_risk_loss_BCE(logits_flat, target_flat, mask_flat)
                 total_loss += weight * bce
 
-            # ── MV + POE per head ─────────────────────────────────────
+            # ── MV + POE per head ─────────────────────────────────────────────
             head_configs = {
                 "final": (
                     outputs.get("final"),
@@ -207,7 +215,6 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                 )
 
             return total_loss
-
         return oa_breacr_loss
 
     else:
