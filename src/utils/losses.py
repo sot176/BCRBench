@@ -111,105 +111,100 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
     Returns a loss function for a given model.
     """
     if args.model == "OA-BreaCR":
-        def oa_breacr_loss(outputs, batch, model_risk, criterion, args):
-            """
-            Compute total loss following OA-BreaCR training exactly.
-            Matches their direct_train logic: main loss + 0.2 * auxiliary losses.
-            """
-            total_loss = 0.0
+        def _compute_head_loss(risk, risk_label, years_last_followup, emb, log_var):
+            """BCE + MV + POE for one head — matches their compute_losses exactly."""
+            is_sto = (risk.dim() == 3)
 
-            # Optional model-internal loss (e.g. flow field regularisation)
+            if is_sto and emb is not None:
+                sample_size, _, out_dim = risk.shape
+                risk_flat  = risk.view(-1, out_dim)
+                label_flat = risk_label.repeat(sample_size)
+                years_flat = years_last_followup.repeat(sample_size)
+            else:
+                risk_flat  = risk
+                label_flat = risk_label
+                years_flat = years_last_followup
+
+            # ── BCE via get_risk_heads + get_risk_loss_BCE ────────────
+            # (handled outside this function — see oa_breacr_loss below)
+
+            # ── MV loss ───────────────────────────────────────────────
+            loss_MV = criterion_MV(
+                risk_flat, label_flat, years_flat,
+                weights=getattr(args, "time_to_events_weights", None)
+            )
+
+            # ── POE loss ──────────────────────────────────────────────
+            loss_POE = torch.tensor(0.0, device=risk.device)
+            if emb is not None and log_var is not None and criterion_POE is not None:
+                _, _, _, loss_POE = criterion_POE(
+                    risk, emb, log_var,
+                    risk_label, years_last_followup, None,
+                    use_sto=is_sto,
+                    weights=getattr(args, "time_to_events_weights", None)
+                )
+
+            return loss_MV + loss_POE
+
+        def oa_breacr_loss(outputs, batch, model_risk):
+            total_loss  = 0.0
+
+            # Optional model-internal loss
             if outputs.get("loss") is not None:
                 total_loss += outputs["loss"]
 
-            criterion_BCE = criterion['criterion_BCE']
-            criterion_MV  = criterion['criterion_MV']
-            criterion_POE = criterion['criterion_POE']
+            # ── BCE via get_risk_heads ────────────────────────────────
+            # get_risk_heads handles target/mask computation per head
+            risk_heads = model_risk.get_risk_heads(outputs, batch)
+            for head_name, (logits, target, mask) in risk_heads.items():
+                if logits is None:
+                    continue
+                bce = get_risk_loss_BCE(logits, target, mask)
+                weight = 1.0 if head_name == "final" else 0.2
+                total_loss += weight * bce
 
-            def _compute_head_loss(risk, risk_label, years_last_followup, emb, log_var):
-                """Compute BCE + MV + POE for one head — matches their compute_losses exactly."""
-                is_sto = (risk.dim() == 3)
-
-                if is_sto and emb is not None:
-                    sample_size, s_dim, out_dim = risk.shape
-                    risk_flat   = risk.view(-1, out_dim)
-                    label_flat  = risk_label.repeat(sample_size)
-                    years_flat  = years_last_followup.repeat(sample_size)
-                else:
-                    risk_flat  = risk
-                    label_flat = risk_label
-                    years_flat = years_last_followup
-
-                # BCE loss
-                loss = criterion_BCE(
-                    risk_flat, label_flat, years_flat,
-                    weights=getattr(args, "time_to_events_weights", None)
-                )
-
-                # MV loss
-                loss_MV = criterion_MV(
-                    risk_flat, label_flat, years_flat,
-                    weights=getattr(args, "time_to_events_weights", None)
-                )
-                loss = loss + loss_MV
-
-                # POE loss
-                if emb is not None and log_var is not None:
-                    _, _, _, loss_POE = criterion_POE(
-                        risk, emb, log_var,
-                        risk_label, years_last_followup, None,
-                        use_sto=is_sto,
-                        weights=getattr(args, "time_to_events_weights", None)
-                    )
-                    loss = loss + loss_POE
-
-                return loss
-
-            # ── Main head (weight 1.0) ────────────────────────────────────────
-            risk_label          = batch["years_to_cancer"]
-            years_last_followup = batch["years_to_last_followup"]
-
-            loss_final = _compute_head_loss(
-                outputs["final"],
-                risk_label,
-                years_last_followup,
-                outputs.get("emb_final"),
-                outputs.get("log_var_final"),
-            )
-            total_loss += loss_final
-
-            # ── Current head (weight 0.2) ─────────────────────────────────────
-            if outputs.get("current") is not None:
-                loss_current = _compute_head_loss(
-                    outputs["current"],
-                    risk_label,
-                    years_last_followup,
+            # ── MV + POE per head ─────────────────────────────────────
+            head_configs = {
+                "final": (
+                    outputs.get("final"),
+                    batch["years_to_cancer"],
+                    batch["years_to_last_followup"],
+                    outputs.get("emb_final"),
+                    outputs.get("log_var_final"),
+                    1.0,
+                ),
+                "current": (
+                    outputs.get("current"),
+                    batch["years_to_cancer"],
+                    batch["years_to_last_followup"],
                     outputs.get("emb_current"),
                     outputs.get("log_var_current"),
-                )
-                total_loss += 0.2 * loss_current
-
-            # ── Difference head (weight 0.2) ──────────────────────────────────
-            if outputs.get("difference") is not None:
-                loss_diff = _compute_head_loss(
-                    outputs["difference"],
-                    risk_label,
-                    years_last_followup,
+                    0.2,
+                ),
+                "difference": (
+                    outputs.get("difference"),
+                    batch["years_to_cancer"],
+                    batch["years_to_last_followup"],
                     outputs.get("emb_difference"),
                     outputs.get("log_var_difference"),
-                )
-                total_loss += 0.2 * loss_diff
-
-            # ── Prior head (weight 0.2, uses prior labels) ────────────────────
-            if outputs.get("prior") is not None:
-                loss_prior = _compute_head_loss(
-                    outputs["prior"],
+                    0.2,
+                ),
+                "prior": (
+                    outputs.get("prior"),
                     batch["years_to_cancer_prior"],
                     batch["years_to_last_followup_prior"],
                     outputs.get("emb_prior"),
                     outputs.get("log_var_prior"),
+                    0.2,
+                ),
+            }
+
+            for head_name, (risk, risk_label, years_lfu, emb, log_var, weight) in head_configs.items():
+                if risk is None:
+                    continue
+                total_loss += weight * _compute_head_loss(
+                    risk, risk_label, years_lfu, emb, log_var
                 )
-                total_loss += 0.2 * loss_prior
 
             return total_loss
 
