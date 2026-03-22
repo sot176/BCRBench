@@ -27,11 +27,11 @@ This repository provides implementations of several recent breast cancer risk pr
 
 | Model            | Conference/Journal      | Input Views & Timepoints                     | Key Idea                                                           |
 | ---------------- | --------------------- | -------------------------------------------- | ------------------------------------------------------------------ |
-| **[Mirai](https://doi.org/10.1126/scitranslmed.aba4373)**        | Sci. Transl. Med.          | 4 screening mammograms (single timepoint)    | Learns risk using all 4 views from one visit.                      |
-| **[VMRA-MaR](https://doi.org/10.1007/978-3-032-05182-0_64)**     | MICCAI 2025             | 4 screening mammograms (multiple timepoints) | Extends Mirai to longitudinal mammograms.                          |
-| **[OA-BReaCR](https://doi.org/10.1007/978-3-031-72378-0_15)**    | MICCAI 2024             | 1 view of 1 breast, 2 timepoints             | Focuses on single-view longitudinal features.                      |
-| **[ImgFeatAlign](https://doi.org/10.1007/978-3-032-04937-7_47)** | MICCAI 2025             | 1 view of 1 breast                           | Explicit feature alignment for better longitudinal comparison.     |
-| **[LMV-Net]()**      | submitted to MICCAI 2026  | Both views of 1 breast, 2 timepoints         | Multi-view longitudinal model leveraging both views of one breast. |
+| **[Mirai](https://doi.org/10.1126/scitranslmed.aba4373)**        | Sci. Transl. Med.          | 4 screening mammograms (single timepoint)    | Learns breast cancer risk from all four views in a single visit         |
+| **[VMRA-MaR](https://doi.org/10.1007/978-3-032-05182-0_64)**     | MICCAI 2025             | 4 screening mammograms (multiple timepoints) | Extends Mirai to longitudinal mammograms using Spatial Asymmetry Detector and Longitudinal Asymmetry Tracker.                     |
+| **[OA-BReaCR](https://doi.org/10.1007/978-3-031-72378-0_15)**    | MICCAI 2024             | 1 view of 1 breast, 2 timepoints             | Learns longitudinal changes using feature-based deformation fields for better temporal alignment.             |
+| **[ImgFeatAlign](https://doi.org/10.1007/978-3-032-04937-7_47)** | MICCAI 2025             | 1 view of 1 breast                           | Uses image-based deformation (MammoRegNet) applied in feature space for improved longitudinal comparison.   |
+| **[LMV-Net]()**      | submitted to MICCAI 2026  | Both views of 1 breast, 2 timepoints         | Multi-view longitudinal model with dual-stream attention leveraging both views of one breast. |
 
 
 Each model is implemented with a consistent API and unified training/evaluation pipeline.
@@ -187,7 +187,7 @@ Similarly, each model has its own evaluation script:
  
 ## Citation
 
-If you use these implementations in your research, please cite the original papers for the models **and** this repository.
+If you use these implementations in your research, please cite the original papers for the models and this repository.
 
 ### Model Papers
 
