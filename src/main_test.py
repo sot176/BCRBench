@@ -178,7 +178,11 @@ def main():
     )
 
     # --- Model Path Logic ---
-    model_filename = f"best_model_risk_prediction_id-{args.id_training}.pth"
+    if args.best_model == "True":
+        model_filename = f"best_model_risk_prediction_id-{args.id_training}.pth"
+    else:
+        model_filename = f"model_risk_prediction_training_id_{args.id_training}_last_epoch.pth"
+
 
     path_model_risk = os.path.join(args.path_out_dir, model_filename)
     logg_filename = f"test_risk_prediction_training_id_{args.id_training}.log"
