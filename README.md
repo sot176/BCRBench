@@ -54,19 +54,19 @@ To use the models and dataset classes in this repository, the datasets must be o
 <summary><b>Required Columns</b></summary>
 <div style="font-size: 9px">
 
-| Column Name                  | Description                                                                 |
-| ----------------------------- | --------------------------------------------------------------------------- |
-| `patient_id`                  | Unique ID for each patient                                                  |
-| `exam_id`                     | Unique ID for each exam (one per timepoint)                                 |
-| `ImageLaterality`        | `L` for left breast, `R` for right breast                                   |
-| `view`                        | Mammogram view (e.g., CC, MLO)                                             |
-| `diagnosed_date_year`         | Year of breast cancer diagnosis (empty if cancer-free)                      |
-| `study_date_year`             | Year the mammogram was taken                                                |
-| `Time_to_Cancer_Years`       | Years until cancer diagnosis (empty if cancer-free)                         |
-| `years_last_followup`         | Years from this exam until the last follow-up for the patient               |
-| `density`  | Breast density. In EMBED, categorical (1–5). In CSAW-CC, continuous 0–100, which can be grouped into categories. |
-| `cancer_type`   | Cancer type. In EMBED, use `path_severity` (0–6). In CSAW-CC, use `x_type` (1–3). |
-| `race`                        | Patient race (optional, leave empty if not available)                       |
+| Column Name | Description |
+|-------------|-------------|
+| <sub>`patient_id`</sub> | <sub>Unique ID for each patient</sub> |
+| <sub>`exam_id`</sub> | <sub>Unique ID for each exam (one per timepoint)</sub> |
+| <sub>`ImageLaterality`</sub> | <sub>`L` for left breast, `R` for right breast</sub> |
+| <sub>`view`</sub> | <sub>Mammogram view (e.g., CC, MLO)</sub> |
+| <sub>`diagnosed_date_year`</sub> | <sub>Year of breast cancer diagnosis (empty if cancer-free)</sub> |
+| <sub>`study_date_year`</sub> | <sub>Year the mammogram was taken</sub> |
+| <sub>`Time_to_Cancer_Years`</sub> | <sub>Years until cancer diagnosis (empty if cancer-free)</sub> |
+| <sub>`years_last_followup`</sub> | <sub>Years from this exam until the last follow-up for the patient</sub> |
+| <sub>`density`</sub> | <sub>Breast density. In EMBED, categorical (1–5). In CSAW-CC, continuous 0–100, which can be grouped into categories.</sub> |
+| <sub>`cancer_type`</sub> | <sub>Cancer type. In EMBED, use `path_severity` (0–6). In CSAW-CC, use `x_type` (1–3).</sub> |
+| <sub>`race`</sub> | <sub>Patient race (optional, leave empty if not available)</sub> |
 </div>
 </details>
 
@@ -78,16 +78,16 @@ The column names listed below correspond to the original dataset CSV files.
 
 | Dataset | Column | Values | Meaning |
 | ------- | ------ | ------ | ------- |
-| EMBED   | path_severity | 0 | Invasive cancer |
-| EMBED   | path_severity | 1 | Non-invasive cancer |
-| EMBED   | path_severity | 2 | High-risk lesion |
-| EMBED   | path_severity | 3 | Borderline lesion |
-| EMBED   | path_severity | 4 | Benign findings |
-| EMBED   | path_severity | 5 | Negative (normal breast tissue) |
-| EMBED   | path_severity | 6 | Non-breast cancer |
-| CSAW-CC | x_type        | 1 | In situ only (non-invasive) |
-| CSAW-CC | x_type        | 2 | Invasive ≤ 15 mm |
-| CSAW-CC | x_type        | 3 | Invasive > 15 mm |
+| <sub>EMBED</sub>   | <sub>path_severity</sub> | <sub>0</sub> | <sub>Invasive cancer</sub> |
+| <sub>EMBED</sub>   | <sub>path_severity</sub> | <sub>1</sub> | <sub>Non-invasive cancer</sub> |
+| <sub>EMBED</sub>   | <sub>path_severity</sub> | <sub>2</sub> | <sub>High-risk lesion</sub> |
+| <sub>EMBED</sub>   | <sub>path_severity</sub> | <sub>3</sub> | <sub>Borderline lesion</sub> |
+| <sub>EMBED</sub>   | <sub>path_severity</sub> | <sub>4</sub> | <sub>Benign findings</sub> |
+| <sub>EMBED</sub>   | <sub>path_severity</sub> | <sub>5</sub> | <sub>Negative (normal breast tissue)</sub> |
+| <sub>EMBED</sub>   | <sub>path_severity</sub> | <sub>6</sub> | <sub>Non-breast cancer</sub> |
+| <sub>CSAW-CC</sub> | <sub>x_type</sub>        | <sub>1</sub> | <sub>In situ only (non-invasive)</sub> |
+| <sub>CSAW-CC</sub> | <sub>x_type</sub>        | <sub>2</sub> | <sub>Invasive ≤ 15 mm</sub> |
+| <sub>CSAW-CC</sub> | <sub>x_type</sub>        | <sub>3</sub> | <sub>Invasive > 15 mm</sub> |
 </details>
 
 
@@ -98,12 +98,12 @@ The column names listed below correspond to the original dataset CSV files.
 
 | Dataset | Column | Values / Range | Meaning |
 | ------- | ------ | -------------- | ------- |
-| EMBED   | tissueden | 1 | Almost entirely fat (BIRADS A) |
-| EMBED   | tissueden | 2 | Scattered fibroglandular densities (BIRADS B) |
-| EMBED   | tissueden | 3 | Heterogeneously dense (BIRADS C) |
-| EMBED   | tissueden | 4 | Extremely dense (BIRADS D) |
-| EMBED   | tissueden | 5 | Normal male |
-| CSAW-CC | libra_percentdensity | 0–100 | Percentage breast density. Can be binned into categories (e.g., low, medium, high). |
+| <sub>EMBED</sub>   | <sub>tissueden</sub> | <sub>1</sub> | <sub>Almost entirely fat (BIRADS A)</sub> |
+| <sub>EMBED</sub>   | <sub>tissueden</sub> | <sub>2</sub> | <sub>Scattered fibroglandular densities (BIRADS B)</sub> |
+| <sub>EMBED</sub>   | <sub>tissueden</sub> | <sub>3</sub> | <sub>Heterogeneously dense (BIRADS C)</sub> |
+| <sub>EMBED</sub>   | <sub>tissueden</sub> | <sub>4</sub> | <sub>Extremely dense (BIRADS D)</sub> |
+| <sub>EMBED</sub>   | <sub>tissueden</sub> | <sub>5</sub> | <sub>Normal male</sub> |
+| <sub>CSAW-CC</sub> | <sub>libra_percentdensity</sub> | <sub>0–100</sub> | <sub>Percentage breast density. Can be binned into categories (e.g., low, medium, high).</sub> |
 </details>
 
 
