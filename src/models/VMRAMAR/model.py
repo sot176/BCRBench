@@ -110,8 +110,8 @@ class VMRAMaR(nn.Module):
          # ── Asymmetry features ───────────────────────────────────────
         if self.use_asymmetry:
             # Extract left/right breasts
-            left_feats = img_feats[:, :, 0, :, :, :]   # [B, T, C, H, W]
-            right_feats = img_feats[:, :, 1, :, :, :]  # [B, T, C, H, W]
+            left_feats = img_feats[:, :, 0, :, :, :].clone()   # [B, T, C, H, W]
+            right_feats = img_feats[:, :, 1, :, :, :].clone()  # [B, T, C, H, W]
 
             # Apply SAD alignment
             sad_out = self.sad(left_feats, right_feats)
