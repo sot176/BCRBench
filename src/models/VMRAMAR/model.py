@@ -18,6 +18,12 @@ for _key in list(sys.modules.keys()):
             sys.modules[_key]
         )
 
+
+def _disable_inplace_relu(module):
+    for m in module.modules():
+        if isinstance(m, nn.ReLU):
+            m.inplace = False
+
 from models.Mirai.onconet.models.factory import get_model_by_name, load_model
 
 class IdentityPool(nn.Module):
@@ -62,7 +68,7 @@ class VMRAMaR(nn.Module):
         self.image_encoder._model.pool = IdentityPool()  # removes global pooling
         self.image_encoder._model.fc   = nn.Identity()  # removes fully connected
         self.image_encoder._model.prob_of_failure_layer = nn.Identity()  # optional
-        
+        _disable_inplace_relu(self.image_encoder)
 
         # ── 2. Image aggregator ───────────────────────────────────────
         num_views = getattr(args, "num_images", 4)
