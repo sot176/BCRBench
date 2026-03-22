@@ -110,16 +110,16 @@ The column names listed below correspond to the original dataset CSV files.
 <details>
 <summary><b>Example: Cancer-Free Patient</b></summary>
 
-| patient_id | exam_id | <sub>ImageLaterality<sub> | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | cancer_type | race   |
+| <sub>patient_id<sub> | exam_id | <sub>ImageLaterality<sub> | <sub>view <sub>| <sub>diagnosed_date_year<sub> | <sub>study_date_year<sub> | <sub>Time_to_Cancer_Years<sub> | <sub>years_last_followup<sub> | <sub>density<sub> | <sub>cancer_type<sub> | <sub>race<sub>   |
 | :--------: | :-----: | :-------------: | :--: | :-----------------: | :-------------: | :------------------: | :-----------------: | :-----: | :-----------: | :--: |
-| 10093833      | 64887706   | L                  | CC   |                   | 2015            |                    | 3                 |1       |             | Caucasian or White  |
-| 10093833      | 64887706   | L                  | MLO   |                   | 2015            |                    | 3                 |1       |             | Caucasian or White  |
-| 10093833      | 64887706   | R                  | CC   |                   | 2015            |                    | 3                 |1       |             | Caucasian or White  |
-| 10093833      | 64887706   | R                  | MLO   |                   | 2015            |                    | 3                 |1       |             | Caucasian or White  |
-| 10093833      | 41737690   | L                  | CC   |                   | 2015            |                    | 0                 |1       |             | Caucasian or White  |
-| 10093833      | 41737690   | L                  | MLO   |                   | 2015            |                    | 0                 |1       |             | Caucasian or White  |
-| 10093833      | 41737690   | R                  | CC   |                   | 2015            |                    | 0                 |1       |             | Caucasian or White  |
-| 10093833      | 41737690   | R                  | MLO   |                   | 2015            |                    | 0                 |1       |             | Caucasian or White  |
+| <sub>10093833<sub> | <sub>64887706<sub> | <sub>L<sub> | <sub>CC<sub> |            | 2015            |                    | 3                 |1       |             | <sub>Caucasian or White<sub>  |
+| <sub>10093833<sub> | <sub>64887706<sub> |<sub>L<sub>  | <sub>MLO<sub> |                   | 2015            |                    | 3                 |1       |             | <sub>Caucasian or White<sub>  |
+| <sub>10093833<sub> | <sub>64887706<sub> | <sub>R<sub>   |<sub>CC<sub>|                   | 2015            |                    | 3                 |1       |             | <sub>Caucasian or White<sub>  |
+| <sub>10093833<sub> | <sub>64887706<sub>| <sub>R<sub>  |<sub>MLO<sub> |                   | 2015            |                    | 3                 |1       |             | <sub>Caucasian or White<sub>  |
+| <sub>10093833<sub> | <sub>41737690<sub> |<sub>L<sub>  |<sub>CC<sub>|                   | 2015            |                    | 0                 |1       |             | <sub>Caucasian or White<sub>  |
+| <sub>10093833<sub> |<sub>41737690<sub> |<sub>L<sub> |<sub>MLO<sub> |                   | 2015            |                    | 0                 |1       |             |<sub>Caucasian or White<sub>  |
+| <sub>10093833<sub> | <sub>41737690<sub> | <sub>R<sub>  |<sub>CC<sub>|                   | 2015            |                    | 0                 |1       |             |<sub>Caucasian or White<sub>  |
+| <sub>10093833<sub> | <sub>41737690<sub> |  <sub>R<sub>  |<sub>MLO<sub> |                   | 2015            |                    | 0                 |1       |             | <sub>Caucasian or White<sub>  |
 </details>
 
 
