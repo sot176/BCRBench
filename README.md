@@ -110,8 +110,8 @@ The column names listed below correspond to the original dataset CSV files.
 <details>
 <summary><b>Example: Cancer-Free Patient</b></summary>
 
-| <sub>patient_id<sub> | exam_id | <sub>ImageLaterality<sub> | <sub>view <sub>| <sub>diagnosed_date_year<sub> | <sub>study_date_year<sub> | <sub>Time_to_Cancer_Years<sub> | <sub>years_last_followup<sub> | <sub>density<sub> | <sub>cancer_type<sub> | <sub>race<sub>   |
-| :--------: | :-----: | :-------------: | :--: | :-----------------: | :-------------: | :------------------: | :-----------------: | :-----: | :-----------: | :--: |
+|<sub>patient_id<sub>|<sub>exam_id<sub>|<sub>ImageLaterality<sub>|<sub>view<sub>|<sub>diagnosed_date_year<sub> |<sub>study_date_year<sub> |<sub>Time_to_Cancer_Years<sub>|<sub>years_last_followup<sub>|<sub>density<sub> |<sub>cancer_type<sub>|<sub>race<sub> |
+| :--------: | :-----: | :-----------: | :--: | :---------------: | :------------: | :----------------: | :---------------: | :-----: | :----------: | :--: |
 | <sub>10093833<sub> | <sub>64887706<sub> | <sub>L<sub> | <sub>CC<sub> |            | 2015            |                    | 3                 |1       |             | <sub>Caucasian or White<sub>  |
 | <sub>10093833<sub> | <sub>64887706<sub> |<sub>L<sub>  | <sub>MLO<sub> |                   | 2015            |                    | 3                 |1       |             | <sub>Caucasian or White<sub>  |
 | <sub>10093833<sub> | <sub>64887706<sub> | <sub>R<sub>   |<sub>CC<sub>|                   | 2015            |                    | 3                 |1       |             | <sub>Caucasian or White<sub>  |
@@ -126,16 +126,16 @@ The column names listed below correspond to the original dataset CSV files.
 <details>
 <summary><b>Example: Cancer Patient</b></summary>
 
-| patient_id | exam_id | ImageLaterality | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | cancer_type | race   |
-| :--------: | :-----: | :-------------: | :--: | :-----------------: | :-------------: | :------------------: | :-----------------: | :-----: | :-----------: | :--: |
-| 11513410      | 11470876    | L                  | CC   | 2020              | 2016            | 4                  | 4                 | 3      | 1             | Caucasian or White  |
-| 11513410      | 11470876   | L                  | MLO   | 2020              | 2016            | 4                  | 4                 | 3       | 1             | Caucasian or White  |
-| 11513410      | 11470876   | R                  | CC   | 2020              | 2016            | 4                  | 4                 | 3      | 1             | Caucasian or White  |
-| 11513410      | 11470876   | R                  | MLO   | 2020              | 2016            | 4                  | 4                 | 3       | 1             | Caucasian or White  |
-| 11513410      | 17070991     | L                  | CC   | 2020              | 2017            | 3                  | 3                 | 3       | 1             | Caucasian or White  |
-| 11513410      | 17070991   | L                  | MLO   | 2020              | 2017            | 3                  | 3                 | 3       | 1             | Caucasian or White  |
-| 11513410      | 17070991   | R                  | CC   | 2020              | 2017            | 3                  | 3                 | 3       | 1             | Caucasian or White  |
-| 11513410      | 17070991   | R                  | MLO   | 2020              | 2017            | 3                  | 3                 | 3       | 1             | Caucasian or White  |
+|<sub>patient_id<sub>|<sub>exam_id<sub>|<sub>ImageLaterality<sub>|<sub>view<sub>|<sub>diagnosed_date_year<sub> |<sub>study_date_year<sub> |<sub>Time_to_Cancer_Years<sub>|<sub>years_last_followup<sub>|<sub>density<sub> |<sub>cancer_type<sub>|<sub>race<sub> |
+| :--------: | :-----: | :-----------: | :--: | :---------------: | :------------: | :----------------: | :---------------: | :-----: | :----------: | :--: |
+| <sub>11513410<sub> | <sub>11470876<sub> | <sub>L<sub> | <sub>CC<sub> | <sub>2020<sub> | <sub>2016<sub>| <sub>4<sub>| <sub>4<sub> | <sub>3<sub>| <sub>1<sub>| <sub>Caucasian or White<sub>  |
+| <sub>11513410<sub>|<sub>11470876<sub> |<sub>L<sub> | <sub>MLO<sub>  | <sub>2020<sub> | <sub>2016<sub>| <sub>4 <sub> | <sub>4 <sub> | <sub>3<sub> |<sub>1<sub>| <sub>Caucasian or White<sub>|
+| <sub>11513410<sub>|<sub>11470876<sub> | <sub>R<sub> | <sub>CC<sub> | <sub>2020<sub> | <sub>2016<sub>| <sub>4 <sub> | <sub>4 <sub> | <sub>3<sub> |<sub>1<sub>| <sub>Caucasian or White<sub>|
+| <sub>11513410<sub>| <sub>11470876<sub> |<sub>R<sub>| <sub>MLO<sub> | <sub>2020<sub> | <sub>2016<sub>| <sub>4 <sub> |  <sub>4 <sub> | <sub>3<sub> | <sub>1<sub>| <sub>Caucasian or White<sub>|
+|<sub>11513410<sub>| <sub>17070991<sub>     |<sub>L<sub> |<sub>CC<sub> | <sub>2020<sub> | <sub>2017<sub>  | <sub>3<sub>| <sub>3<sub> | <sub>3<sub> |<sub>1<sub>| <sub>Caucasian or White<sub>|
+|<sub>11513410<sub>| <sub>17070991<sub>|<sub>L<sub> |<sub>MLO<sub>| <sub>2020<sub> | <sub>2017<sub> | <sub>3<sub>| <sub>3<sub> | <sub>3<sub> |<sub>1<sub>| <sub>Caucasian or White<sub>|
+|<sub>11513410<sub> | <sub>17070991<sub>|<sub>R<sub>|<sub>CC<sub> | <sub>2020<sub> | <sub>2017<sub> | <sub>3<sub>| <sub>3<sub> | <sub>3<sub> |<sub>1<sub>| <sub>Caucasian or White<sub> |
+| <sub>11513410<sub>| <sub>17070991<sub>| <sub>R<sub> | <sub>MLO<sub>| <sub>2020<sub>  | <sub>2017<sub> | <sub>3<sub> | <sub>3<sub> | <sub>3<sub> | <sub>1<sub>| <sub>Caucasian or White<sub>|
 
 </details>
 
