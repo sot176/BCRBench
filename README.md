@@ -112,14 +112,14 @@ The column names listed below correspond to the original dataset CSV files.
 
 |<sub>patient_id<sub>|<sub>exam_id<sub>|<sub>ImageLaterality<sub>|<sub>view<sub>|<sub>diagnosed_date_year<sub> |<sub>study_date_year<sub> |<sub>Time_to_Cancer_Years<sub>|<sub>years_last_followup<sub>|<sub>density<sub> |<sub>cancer_type<sub>|<sub>race<sub> |
 | :--------: | :-----: | :-----------: | :--: | :---------------: | :------------: | :----------------: | :---------------: | :-----: | :----------: | :--: |
-| <sub>10093833<sub> | <sub>64887706<sub> | <sub>L<sub> | <sub>CC<sub> |            | 2015            |                    | 3                 |1       |             | <sub>Caucasian or White<sub>  |
-| <sub>10093833<sub> | <sub>64887706<sub> |<sub>L<sub>  | <sub>MLO<sub> |                   | 2015            |                    | 3                 |1       |             | <sub>Caucasian or White<sub>  |
-| <sub>10093833<sub> | <sub>64887706<sub> | <sub>R<sub>   |<sub>CC<sub>|                   | 2015            |                    | 3                 |1       |             | <sub>Caucasian or White<sub>  |
-| <sub>10093833<sub> | <sub>64887706<sub>| <sub>R<sub>  |<sub>MLO<sub> |                   | 2015            |                    | 3                 |1       |             | <sub>Caucasian or White<sub>  |
-| <sub>10093833<sub> | <sub>41737690<sub> |<sub>L<sub>  |<sub>CC<sub>|                   | 2015            |                    | 0                 |1       |             | <sub>Caucasian or White<sub>  |
-| <sub>10093833<sub> |<sub>41737690<sub> |<sub>L<sub> |<sub>MLO<sub> |                   | 2015            |                    | 0                 |1       |             |<sub>Caucasian or White<sub>  |
-| <sub>10093833<sub> | <sub>41737690<sub> | <sub>R<sub>  |<sub>CC<sub>|                   | 2015            |                    | 0                 |1       |             |<sub>Caucasian or White<sub>  |
-| <sub>10093833<sub> | <sub>41737690<sub> |  <sub>R<sub>  |<sub>MLO<sub> |                   | 2015            |                    | 0                 |1       |             | <sub>Caucasian or White<sub>  |
+| <sub>10093833<sub> | <sub>64887706<sub> | <sub>L<sub> | <sub>CC<sub> |            | <sub>2015<sub>  |                    | <sub>3<sub>  |<sub>1<sub>|             | <sub>Caucasian or White<sub>  |
+| <sub>10093833<sub> | <sub>64887706<sub> |<sub>L<sub>  | <sub>MLO<sub> |                   | <sub>2015<sub>|                    |<sub>3<sub>  |<sub>1<sub>|             | <sub>Caucasian or White<sub>  |
+| <sub>10093833<sub> | <sub>64887706<sub> | <sub>R<sub>   |<sub>CC<sub>|                   | <sub>2015<sub>|                    |<sub>3<sub>  |<sub>1<sub>|             | <sub>Caucasian or White<sub>  |
+| <sub>10093833<sub> | <sub>64887706<sub>| <sub>R<sub>  |<sub>MLO<sub> |                   | <sub>2015<sub>|                    |<sub>3<sub>  |<sub>1<sub>|             | <sub>Caucasian or White<sub>  |
+| <sub>10093833<sub> | <sub>41737690<sub> |<sub>L<sub>  |<sub>CC<sub>|                   | <sub>2015<sub>|                    | <sub>0<sub> |<sub>1<sub>|             | <sub>Caucasian or White<sub>  |
+| <sub>10093833<sub> |<sub>41737690<sub> |<sub>L<sub> |<sub>MLO<sub> |                   | <sub>2015<sub>|                    |<sub>0<sub>|<sub>1<sub>|             |<sub>Caucasian or White<sub>  |
+| <sub>10093833<sub> | <sub>41737690<sub> | <sub>R<sub>  |<sub>CC<sub>|                   | <sub>2015<sub> |                    |<sub>0<sub>|<sub>1<sub>|             |<sub>Caucasian or White<sub>  |
+| <sub>10093833<sub> | <sub>41737690<sub> |  <sub>R<sub>  |<sub>MLO<sub> |                   | <sub>2015<sub> |                    | <sub>0<sub> |<sub>1<sub>|             | <sub>Caucasian or White<sub>  |
 </details>
 
 
