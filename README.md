@@ -56,7 +56,7 @@ Each model is implemented with a consistent API and unified training/evaluation 
 ## Dataset Format
 To use the models and dataset classes in this repository, the datasets must be organized as CSV files with specific columns.
 
----
+
 
 <details>
 <summary><b>Required Columns</b></summary>
