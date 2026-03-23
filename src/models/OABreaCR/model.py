@@ -124,39 +124,36 @@ class OA_BreaCR(nn.Module):
 
     def compute_risk_target_and_mask(self, pred, years_to_cancer, years_last_followup):
         """
-        Converts scalar event times into cumulative binary target and mask.
+        Matches OA-BreaCR target construction exactly.
+        One-hot classification target, not cumulative.
 
-        Args:
-            years_to_cancer: Tensor [B]  (event year)
-            years_last_followup: Tensor [B]  (last observed year)
-            max_followup: int, max years
-
-        Returns:
-            y_true: [B, max_followup], 1 if event happened by year t
-            y_mask: [B, max_followup], 1 if year t is observed, else 0
+        y_true[i, event_year] = 1   (only the event year)
+        y_mask[i, f+1:] = 0         (mask years after last followup for censored)
         """
         if pred.dim() == 3:
             pred = pred.mean(dim=0)
 
         B, num_pred_years = pred.shape
-        max_index = num_pred_years - 1
+        followup  = num_pred_years - 1
+        device    = years_to_cancer.device
 
-        device = years_to_cancer.device
+        # Move to CPU for numpy ops — matches their implementation
+        risk_label          = years_to_cancer.cpu().detach().numpy().copy()
+        years_last_followup = years_last_followup.cpu().detach().numpy().copy()
+
+        # Clamp event year to valid range
+        risk_label[risk_label > followup] = followup
 
         y_true = torch.zeros(B, num_pred_years, device=device)
         y_mask = torch.ones(B, num_pred_years, device=device)
 
         for i in range(B):
+            # One-hot target at event year
+            y_true[i, int(risk_label[i])] = 1
 
-            # Clamp event year so it never exceeds prediction range
-            event_year = torch.clamp(years_to_cancer[i], max=max_index)
-
-            # ---- ONE HOT TARGET (old behavior) ----
-            y_true[i, event_year] = 1
-
-            # ---- Mask future unobserved years (censoring case) ----
-            if event_year == max_index and years_last_followup[i] < max_index:
-                y_mask[i, years_last_followup[i] + 1:] = 0
+            # Mask years after last followup for censored patients
+            if risk_label[i] == followup and years_last_followup[i] < followup:
+                y_mask[i, int(years_last_followup[i]) + 1:] = 0
 
         return y_true, y_mask
         
