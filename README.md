@@ -4,6 +4,8 @@ Unified repository implementing state-of-the-art image-based breast cancer risk 
 
 We aim to encourage further research by providing a single, unified repository where all image-based breast cancer risk prediction models can be collected, compared, and extended. By centralizing these implementations, we hope to accelerate progress in the field and make it easier for researchers to benchmark and build upon existing methods.
 
+---
+
 ## Table of Contents
 1. 📘 [Overview](#overview)  
 2. ⚙️ [Models Implemented](#models-implemented)  
@@ -12,6 +14,8 @@ We aim to encourage further research by providing a single, unified repository w
 5. ▶️ [Usage](#usage)  
 6. 📄 [Citation](#citation) 
 7. 📝 [License](#license) 
+
+---
 
 ## Overview
 This repository provides implementations of several recent breast cancer risk prediction models, allowing users to:
