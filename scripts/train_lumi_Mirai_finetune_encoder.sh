@@ -47,10 +47,10 @@ accelerate launch  main_train.py \
             --img_encoder_snapshot /scratch/project_465002309/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_MIRAI_Base_May20_2019.p \
             --id_training 1 \
             --use_scheduler "True" \
-            --batch_size 6 \
+            --batch_size 12 \
             --augmentations "True" \
             --num_workers 7 \
-            --learning_rate 1e-5 \
+            --learning_rate 5e-5 \
             --weight_decay 1e-4 \
             --model "Mirai" \
             --survival_analysis_setup \
