@@ -171,8 +171,8 @@ def get_risk_loss_BCE_OA_BreaCR(pred, y_true, y_mask):
         weight=y_mask.float(),
         reduction='sum'
     )
-
-    return loss / mask_sum
+    loss = loss / mask_sum * 2
+    return loss  
 
 #########################################################################
 # ------------------ Mean Variance loss ------------------
