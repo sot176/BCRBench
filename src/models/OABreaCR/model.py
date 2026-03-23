@@ -31,7 +31,7 @@ class OA_BreaCR(nn.Module):
 
         self.reg_transformer = SpatialTransformerBlock(mode='bilinear')
         self.flew = Feedforward(inplace=2, outplace=2)
-        self.pos_encoding = ContinuousPosEncoding(dim=num_feat, drop=0.2)
+        self.pos_encoding = ContinuousPosEncoding(dim=num_feat)
         self.mlp = nn.Sequential(
             nn.Linear(num_feat * 3, num_feat),
             nn.Dropout(p=0.2),
@@ -135,7 +135,6 @@ class OA_BreaCR(nn.Module):
 
         B, num_pred_years = pred.shape
         followup  = num_pred_years - 1
-        device    = years_to_cancer.device
 
         # Move to CPU for numpy ops — matches their implementation
         risk_label          = years_to_cancer.cpu().detach().numpy().copy()
@@ -144,8 +143,8 @@ class OA_BreaCR(nn.Module):
         # Clamp event year to valid range
         risk_label[risk_label > followup] = followup
 
-        y_true = torch.zeros(B, num_pred_years, device=device)
-        y_mask = torch.ones(B, num_pred_years, device=device)
+        y_true = torch.zeros(B, num_pred_years)
+        y_mask = torch.ones(B, num_pred_years)
 
         for i in range(B):
             # One-hot target at event year

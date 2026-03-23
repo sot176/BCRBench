@@ -168,7 +168,7 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                     target_flat = target
                     mask_flat   = mask
 
-                bce = get_risk_loss_BCE(logits_flat, target_flat, mask_flat)
+                bce = get_risk_loss_BCE_OA_BreaCR(logits_flat, target_flat, mask_flat)
                 total_loss += weight * bce
 
             # ── MV + POE per head ─────────────────────────────────────────────
@@ -254,6 +254,27 @@ def get_risk_loss_BCE(pred, y_true, y_mask):
 
     return loss / mask_sum
 
+
+def get_risk_loss_BCE_OA_BreaCR(pred, y_true, y_mask):
+
+    y_mask = y_mask.to(pred.device)
+    y_true = y_true.to(pred.device)
+
+    mask_sum = torch.sum(y_mask.float())
+
+    if mask_sum == 0:
+        return torch.tensor(0.0, device=pred.device)
+    
+    pred = F.softmax(pred, dim=1)
+
+    loss = F.binary_cross_entropy(
+        pred,
+        y_true.float(),
+        weight=y_mask.float(),
+        reduction='sum'
+    )
+
+    return loss / mask_sum
 
 #########################################################################
 # ------------------ Mean Variance loss ------------------
