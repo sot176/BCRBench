@@ -1,1 +1,1 @@
-from model import VMRAMaR
+from .model import VMRAMaR
