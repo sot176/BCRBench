@@ -9,10 +9,9 @@ We aim to encourage further research by providing a single, unified repository w
 2. ⚙️ [Models Implemented](#models-implemented)  
 3. 📚 [Comparison of Models](#comparison-of-models)  
 4. 🔍 [Dataset Format](#dataset-format)  
-5. 💻 [Installation](#installation)
-6. ▶️ [Usage](#usage)  
-7. 📄 [Citation](#citation) 
-8. 📝 [License](#license) 
+5. ▶️ [Usage](#usage)  
+6. 📄 [Citation](#citation) 
+7. 📝 [License](#license) 
 
 ## Overview
 This repository provides implementations of several recent breast cancer risk prediction models, allowing users to:
@@ -22,6 +21,8 @@ This repository provides implementations of several recent breast cancer risk pr
 - Evaluate models with unified metrics.
 
 - Experiment with single-view, multi-view, and longitudinal mammogram data.
+
+---
 
 ## Models Implemented
 
@@ -36,6 +37,7 @@ This repository provides implementations of several recent breast cancer risk pr
 
 Each model is implemented with a consistent API and unified training/evaluation pipeline.
 
+---
 
 ## Comparison of Models
  
@@ -44,6 +46,8 @@ Each model is implemented with a consistent API and unified training/evaluation 
 - Single-timepoint vs Multi-timepoint: Mirai (single); VMRA-MAR, OA-BReaCR, ImgFeatAlign, LMV-Net (multi)
 
 - Patient-wise vs Breast-wise aggregation: Mirai, VMRA-MAR (patient-wise, all 4 images of a patient); LMV-Net (breast-wise, per breast)
+
+---
 
 ## Dataset Format
 To use the models and dataset classes in this repository, the datasets must be organized as CSV files with specific columns.
@@ -140,14 +144,14 @@ The column names listed below correspond to the original dataset CSV files.
 </details>
 
 
-
-##  Installation
-For reproducing the results follow the instructions below:
+---
 
 ## Usage
-Clone the repository, create a conda environment, and install the requirements:
+For using this framework follow the instructions below:
 
 ### 1) Clone & Setup Environment
+Clone the repository, create a conda environment, and install the requirements:
+
 ```bash
 git clone https://github.com/sot176/BreastCancerRiskBenchmark.git
 cd BreastCancerRiskBenchmark
@@ -184,7 +188,9 @@ Similarly, each model has its own evaluation script:
  scripts/test_lmv_net.sh
 ``` 
 
- 
+---
+
+
 ## Citation
 
 If you use these implementations in your research, please cite the original papers for the models and this repository.
@@ -256,6 +262,7 @@ And please cite this repository:
 }
 ```
 
+---
 
 ## License
 This repository is released under the [MIT License](LICENSE).
