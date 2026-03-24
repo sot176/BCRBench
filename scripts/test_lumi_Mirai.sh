@@ -44,12 +44,10 @@ export PYTHONPATH=$WORKING_DIR
 accelerate launch  main_test.py \
   --csv_file /scratch/project_465002309/thrunsol/embed_datasets/combined_cases_with_follow_up_races_new.csv \
   --data_root /scratch/project_465002309/thrunsol/embed_datasets/risk_dataset_1664_2048 \
-  --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/Train_Risk-16772949_Model_Mirai_lr_5e-05_wd_0.0001_epochs_30_bs_6_2026-03-16-19-29 \
+  --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/Train_Risk_Mirai_finetuned_encoder-16950528_Model_Mirai_lr_5e-05_wd_0.0001_epochs_40_bs_6_2026-03-23-11-51 \
   --img_encoder_snapshot /scratch/project_465002309/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_MIRAI_Base_May20_2019.p \
-  --transformer_snapshot /scratch/project_465002309/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_cancer_MIRAI_Transformer_Jan13_2020.p \
   --path_test_folder  /scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/embed/finetuned_model \
   --model "Mirai" \
-  --use_asymmetry \
   --id_training 1 \
   --use_sad_bias \
   --use_lat_bn \
