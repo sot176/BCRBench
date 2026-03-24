@@ -70,11 +70,8 @@ class VMRAMaR(nn.Module):
         self.image_encoder._model.prob_of_failure_layer = nn.Identity()  # optional
         _disable_inplace_relu(self.image_encoder)
 
-        # ── 2. Image aggregator ───────────────────────────────────────
-        num_views = getattr(args, "num_images", 4)
-        self.image_aggregator = ImageAggregator(args.embed_dim, num_views=num_views)
 
-        # ── 3. VMRNN ──────────────────────────────────────────────────
+        # ── 2. VMRNN ──────────────────────────────────────────────────
         self.vmrnn = VMRNN(
             embed_dim=args.embed_dim,
             depths_downsample=args.depths_downsample,
@@ -82,16 +79,16 @@ class VMRAMaR(nn.Module):
             feature_resolution=(1, 1),          # temporal mode
         )
 
-        # ── 4. Asymmetry modules ──────────────────────────────────────
+        # ── 3. Asymmetry modules ──────────────────────────────────────
         self.use_asymmetry = getattr(args, "use_asymmetry", False)
         if self.use_asymmetry:
             self.sad      = SpatialAsymmetryDetector(args)
             self.lat      = LongitudinalAsymmetryTracker(args)
-            latent_h      = getattr(args, "latent_h", 52)
-            latent_w      = getattr(args, "latent_w", 64)
+            latent_h      = getattr(args, "latent_h", 5)
+            latent_w      = getattr(args, "latent_w", 5)
             self.asym_proj = nn.Linear(latent_h * latent_w, 512)
 
-        # ── 5. Additive Hazard Layer ───────────────────────────────────
+        # ── 4. Additive Hazard Layer ───────────────────────────────────
         ahl_input_dim = args.embed_dim
         if self.use_asymmetry:
             ahl_input_dim += 512
@@ -110,38 +107,42 @@ class VMRAMaR(nn.Module):
         
         img_feats = img_feats.view(B, T, V, C_feat, H_feat, W_feat)
         
-        # ── Fuse features across views (left/right) ──────────────────
-        fused_feats = img_feats.mean(dim=2)  # average over V → [B, T, C, H, W]
+        # ── Pool spatial dims, fuse views ────────────────────────────
+        feats_pooled     = img_feats.mean(dim=(-2, -1))     # (B, T, V, C)
+        visit_embeddings = feats_pooled.mean(dim=2)          # (B, T, C) — mean over views
 
-         # ── Asymmetry features ───────────────────────────────────────
-        if self.use_asymmetry:
-            # Extract left/right breasts
-            left_feats  = img_feats[:, :, 0, :, :, :].detach().clone()
-            right_feats = img_feats[:, :, 1, :, :, :].detach().clone()
+        # ── VMRNN temporal modeling ───────────────────────────────────
+        out, _, _ = self.vmrnn(visit_embeddings)             # (B, T, C)
+        temporal_feature = out.mean(dim=1)                   # (B, C)
 
-            # Apply SAD alignment
-            sad_out = self.sad(left_feats, right_feats)
-            asym_values = sad_out["asymmetry_values"]  # (B, T)
-            asym_coords = sad_out["asymmetry_coords"]  # (B, T, 2)
-            asym_maps   = sad_out["heatmap"]  # (B, T, H_feat, W_featW_lat)  
-             # --- Flatten heatmaps for linear projection ---
-            B, T, H_lat, W_lat = asym_maps.shape
-            asym_maps_flat = asym_maps.view(B * T, H_lat * W_lat)  # (B*T, H*W)
-            asym_feature = self.asym_proj(asym_maps_flat)          # (B*T, 512)
-            asym_feature = asym_feature.view(B, T, -1)             # (B, T, 512)
+         # ── Asymmetry features ────────────────────────────────────────
+        features = [temporal_feature]
+        if self.use_asymmetry and V >= 2:
+            left_feats  = img_feats[:, :, 0]                # (B, T, C, H, W)
+            right_feats = img_feats[:, :, 1]                # (B, T, C, H, W)
 
-            # Pass all three to LongitudinalAsymmetryTracker
-            asym_feature = self.lat(asym_feature, asym_coords, asym_maps)
+            sad_out     = self.sad(left_feats, right_feats)
+            asym_coords = sad_out["asymmetry_coords"]        # (B, T, 2)
+            asym_maps   = sad_out["heatmap"]                 # (B, T, H_lat, W_lat)
 
-            # Temporal pooling
-            fused_feats = fused_feats.mean(dim=[3, 4])   # (B, T, C)
-            temporal_feature = fused_feats.mean(dim=1)   # (B, C)
-            
-            # Combine features
-            combined_feats = torch.cat([temporal_feature, asym_feature], dim=1)
-        else:
-            # Only temporal pooling
-            combined_feats = fused_feats.view(B, T, -1).mean(dim=1)
+            if asym_maps.dim() == 3:
+                _, H_lat, W_lat = asym_maps.shape
+                asym_maps = asym_maps.view(B, T, H_lat, W_lat)
+
+            if asym_coords.dim() == 2:
+                asym_coords = asym_coords.view(B, T, 2)
+
+            B_a, T_a, H_lat, W_lat = asym_maps.shape
+            asym_feature = self.asym_proj(
+                asym_maps.view(B_a, T_a, H_lat * W_lat)    # (B, T, H*W)
+            )                                                # (B, T, 512)
+
+            asym_feature = self.lat(
+                asym_feature, asym_coords, asym_maps
+            )                                                # (B, 512)
+            features.append(asym_feature)
+
+        combined_feats = torch.cat(features, dim=1)         # (B, C) or (B, C+512)
 
         # ── Risk prediction ───────────────────────────────────────────
         risk = self.ahl(combined_feats)
