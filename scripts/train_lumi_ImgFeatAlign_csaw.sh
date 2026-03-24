@@ -1,6 +1,6 @@
 #!/bin/bash -l
 
-#SBATCH --job-name=Train_Risk         # Job name
+#SBATCH --job-name=Train_Risk_ImgFeatAlign         # Job name
 #SBATCH --output=/scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/error_output_files/embed/%x-%j.out  # Output file with job name and ID
 #SBATCH --error=/scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/error_output_files/embed/%x-%j.err   # Error file with job name and ID
 #SBATCH --partition=standard-g
@@ -42,9 +42,9 @@ set -xv  # Print commands for debugging
 export PYTHONPATH=$WORKING_DIR
 
 accelerate launch  main_train.py \
-            --csv_file /scratch/project_465002309/thrunsol/embed_datasets/combined_cases_with_follow_up_races_new.csv \
-            --data_root /scratch/project_465002309/thrunsol/embed_datasets/risk_dataset_1664_2048 \
-            --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/$SLURM_JOB_NAME-$SLURM_JOB_ID \
+            --csv_file /scratch/project_465002309/thrunsol/csawcc_datasets/metadata_csawcc_dcm_path_density_new.csv \
+            --data_root /scratch/project_465002309/thrunsol/csawcc_datasets/Risk_dataset_train_val_test_1664_2048_new \
+            --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/csaw/$SLURM_JOB_NAME-$SLURM_JOB_ID \
             --id_training 1 \
             --use_scheduler "True" \
             --batch_size 8 \
