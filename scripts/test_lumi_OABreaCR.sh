@@ -1,8 +1,8 @@
 #!/bin/bash -l
 
 #SBATCH --job-name=Test_Mirai_EMBED         # Job name
-#SBATCH --output=/scratch/project_465002309/thrunsol/VMaR_Risk_prediction_test_results_1664_2048/error_output_files/embed/%x-%j.out  # Output file with job name and ID
-#SBATCH --error=/scratch/project_465002309/thrunsol/VMaR_Risk_prediction_test_results_1664_2048/error_output_files/embed/%x-%j.err   # Error file with job name and ID
+#SBATCH --output=/scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/error_output_files/embed/%x-%j.out  # Output file with job name and ID
+#SBATCH --error=/scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/error_output_files/embed/%x-%j.err   # Error file with job name and ID
 #SBATCH --partition=standard-g
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=8
@@ -47,7 +47,6 @@ accelerate launch  main_test.py \
   --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/Train_Risk-16959214_Model_OA-BreaCR_lr_5e-05_wd_0.0001_epochs_30_bs_12_2026-03-23-19-37 \
   --path_test_folder  /scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/embed/OABreaCR \
   --model "OA-BreaCR" \
-  --use_asymmetry \
   --id_training 1 \
   --batch_size 1 \
   --num_workers 7 \
