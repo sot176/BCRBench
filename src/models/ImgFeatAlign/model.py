@@ -13,14 +13,22 @@ class ImgFeatAlign(nn.Module):
     """
     Combines downsampled deformation field applied to feature maps for risk prediction.
     """
-    def __init__(self, mammo_reg_net: nn.Module):
+    def __init__(self, mammo_reg_net: nn.Module, finetune_all: bool = False):
         super().__init__()
         sys.path.append(cfg["paths"]["asymMirai_master_onconet"])
         self.encoder = extract_mirai_backbone(
             cfg["paths"]["mirai_path"]
         )
-        self.encoder.requires_grad_(False)
-        self.encoder.eval()
+        if finetune_all:
+            print("Finetuning all layers of the encoder")
+            for param in self.encoder.parameters():
+                param.requires_grad = True
+            self.encoder.train()
+
+        else:
+            for param in self.encoder.parameters():
+                param.requires_grad = False
+            self.encoder.eval()
 
         self.risk_prediction_model = RiskModelWithAttention()
         self.feat_transformer = SpatialTransformerBlock(mode='bilinear')
