@@ -49,7 +49,6 @@ accelerate launch  main_test.py \
   --model "OA-BreaCR" \
   --id_training 1 \
   --batch_size 1 \
-   --use_poe \
   --num_workers 7 \
   --dataset "EMBED" \
   --seed 2023 \
