@@ -56,6 +56,31 @@ def parse_arguments():
                         help="Model name (mirai, ImgFeatAlign, VMRA-MaR, OA-BreaCR, LMV-Net, etc.)")
     
     temp_args, _ = parser.parse_known_args()  # Only parse known args for now
+
+    if temp_args.model == "OA-BreaCR":
+        parser.add_argument('-a', '--arch', default='resnet18',
+                    help='resnet18, resnet50')
+        parser.add_argument('--img_size', type=int, nargs='+', default=[2048, 1664],
+                    help='Height and width of image in pixels. [default: [2048,1664]]')
+        parser.add_argument('--num_output_neurons', type=int, default=6,
+                            help='Number of output neurons, should be max_followup+1')
+        parser.add_argument('--start_label', type=int, default=0,
+                            help='Start label for ordinal learning')
+        parser.add_argument('--max-t', type=int, default=50,
+                            help='Number of samples during stochastic sampling')
+        parser.add_argument('--no-sto', action='store_true',
+                            help='Disable stochastic sampling')
+        parser.add_argument('--distance', type=str, default='Bhattacharyya',
+                            help='Distance metric between two Gaussian distributions')
+        parser.add_argument('--alpha-coeff', type=float, default=1e-5)
+        parser.add_argument('--beta-coeff', type=float, default=1e-4)
+        parser.add_argument('--margin', type=float, default=2)
+        parser.add_argument('--use_poe', action='store_true', help='Enable POE functionality')
+        parser.add_argument('--no_poe', action='store_false', dest='use_poe')
+        parser.add_argument('--use_sto', action='store_true', help='Enable stochastic sampling in POE')
+        parser.add_argument('--no_sto', action='store_false', dest='use_sto')
+        
+
     if temp_args.model == "Mirai" or temp_args.model == "VMRA-MaR":
         # Snapshots / Pretrained weights
         parser.add_argument('--img_encoder_snapshot', type=str, default=None,

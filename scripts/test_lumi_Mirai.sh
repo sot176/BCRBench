@@ -49,8 +49,6 @@ accelerate launch  main_test.py \
   --path_test_folder  /scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/embed/finetuned_model \
   --model "Mirai" \
   --id_training 1 \
-  --use_sad_bias \
-  --use_lat_bn \
   --batch_size 1 \
   --survival_analysis_setup \
   --num_workers 7 \
