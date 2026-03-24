@@ -51,16 +51,11 @@ class BreastCancerRiskDatasetEMBED_ImgFeatAlign(Dataset):
         self.num_elements = len(self.patient_view_pairs)
 
     def map_density(self, value):
-        if value == 1:
-            return "A"
-        elif value == 2:
-            return "B"
-        elif value == 3:
-            return "C"
-        elif value == 4:
-            return "D"
-        else:
-            return "NA"
+        """Map density value to integer tensor suitable for GPU operations."""
+        mapping = {1: 1, 2: 2, 3: 3, 4: 4}  # Map 1-4
+        index = mapping.get(value, -1)  # Use -1 for 'NA' if
+        return torch.tensor(index, dtype=torch.long)
+    
     def map_cancer_type(self, value):
         """Map cancer type (0,1,2) to integer tensor suitable for GPU ops.
            Return -1 if value is missing or outside {0,1,2}.
@@ -319,7 +314,7 @@ def main():
         K_A.Resize((2048, 1664), resample=Resample.NEAREST.name),
     )
 
-    train_dataset = BreastCancerRiskDataset(csv_file, path_data_train_val, 'train',
+    train_dataset = BreastCancerRiskDatasetEMBED_ImgFeatAlign(csv_file, path_data_train_val, 'train',
                                              transforms=train_transform)
     train_loader = DataLoader( train_dataset, batch_size=10,
                               shuffle=True, pin_memory=True)
@@ -348,7 +343,7 @@ def main():
     y_mask_pri = batch['y_mask_prior']
     print(event_observed)
     print(event_times)
-    print(density)
+    print("density", density)
     print("time gap", time_gap)
     print("mask", y_mask)
     print("target", target)
