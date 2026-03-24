@@ -49,6 +49,7 @@ accelerate launch  main_test.py \
   --path_test_folder  /scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/embed/VMRAMaR \
   --model "VMRA-MaR" \
   --use_asymmetry \
+  --survival_analysis_setup \
   --id_training 1 \
   --batch_size 1 \
   --num_workers 7 \
