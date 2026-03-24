@@ -1,8 +1,8 @@
 #!/bin/bash -l
 
 #SBATCH --job-name=Test_VMRAMaR_EMBED         # Job name
-#SBATCH --output=/scratch/project_465002309/thrunsol/VMaR_Risk_prediction_test_results_1664_2048/error_output_files/embed/%x-%j.out  # Output file with job name and ID
-#SBATCH --error=/scratch/project_465002309/thrunsol/VMaR_Risk_prediction_test_results_1664_2048/error_output_files/embed/%x-%j.err   # Error file with job name and ID
+#SBATCH --output=/scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/error_output_files/embed/%x-%j.out  # Output file with job name and ID
+#SBATCH --error=/scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/error_output_files/embed/%x-%j.err   # Error file with job name and ID
 #SBATCH --partition=standard-g
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=8
