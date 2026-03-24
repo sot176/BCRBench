@@ -56,8 +56,14 @@ def test_risk(
 
     checkpoint_risk = torch.load(path_model, map_location="cpu")
 
-    # Extract just the model weights from the full checkpoint
-    state_dict = checkpoint_risk["model"]
+    # Handle different checkpoint formats
+    if isinstance(checkpoint_risk, dict) and "model" in checkpoint_risk:
+        state_dict = checkpoint_risk["model"]
+    elif isinstance(checkpoint_risk, dict) and "state_dict" in checkpoint_risk:
+        state_dict = checkpoint_risk["state_dict"]
+    else:
+        # already a raw state_dict
+        state_dict = checkpoint_risk
 
     # Strip DDP "module." prefix if present
     state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
