@@ -57,7 +57,7 @@ accelerate launch  main_train.py \
             --patience_lr_scheduler 5 \
             --num_epochs 30 \
             --patience 15 \
-            --dataset "EMBED" \
+            --dataset "CSAW" \
             --finetune_all \
             --seed 2023
 
