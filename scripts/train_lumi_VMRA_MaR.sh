@@ -51,6 +51,7 @@ accelerate launch  main_train.py \
             --augmentations "True" \
             --num_workers 7 \
             --learning_rate 5e-5 \
+            --freeze_image_encoder \
             --weight_decay 1e-4 \
             --model "VMRA-MaR" \
             --survival_analysis_setup \
