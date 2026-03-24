@@ -85,6 +85,10 @@ def parse_arguments():
         parser.add_argument('--img_encoder_snapshot', type=str, default=None,
                             help='Filename of image feature extractor snapshot for mirai_full models')
         parser.add_argument('--transfomer_hidden_dim', type=int, default=512, help='start hidden dim for transformer')
+        parser.add_argument('--transformer_snapshot', type=str, default=None,
+                            help='Filename of transformer snapshot for mirai_full models')
+        parser.add_argument('--snapshot', type=str, default=None, help='filename of model snapshot to load[default: None]')
+
         parser.add_argument('--use_precomputed_hiddens', action='store_true', default=False, help='Whether to only use hiddens from a pretrained model.')
         parser.add_argument('--num_layers', type=int, default=2)
         parser.add_argument('--num_heads', type=int, default=8, help='Num heads for transformer')
