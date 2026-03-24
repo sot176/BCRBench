@@ -81,27 +81,14 @@ def parse_arguments():
         parser.add_argument('--no_sto', action='store_false', dest='use_sto')
         
 
-    if temp_args.model == "Mirai" or temp_args.model == "VMRA-MaR":
-        # Snapshots / Pretrained weights
-        parser.add_argument('--img_encoder_snapshot', type=str, default=None,
-                            help='Filename of image feature extractor snapshot for mirai_full models')
-        parser.add_argument('--transformer_snapshot', type=str, default=None,
-                            help='Filename of transformer snapshot for mirai_full models')
-        parser.add_argument('--snapshot', type=str, default=None, help='filename of model snapshot to load[default: None]')
-
-        # Training / Fine-tuning options
-        parser.add_argument('--freeze_image_encoder',   action='store_true',
-                            help='Whether to freeze image encoder during training')
-
-        # Transformer architecture
-
+     # Transformer architecture
         parser.add_argument('--transfomer_hidden_dim', type=int, default=512, help='start hidden dim for transformer')
         parser.add_argument('--use_precomputed_hiddens', action='store_true', default=False, help='Whether to only use hiddens from a pretrained model.')
-        parser.add_argument('--num_layers', type=int, default=1)
+        parser.add_argument('--num_layers', type=int, default=2)
         parser.add_argument('--num_heads', type=int, default=8, help='Num heads for transformer')
         parser.add_argument('--dropout', type=float, default=0.1)
         parser.add_argument('--num_chan', type=int, default=3, help='Number of channels in img. [default:3]')
-        parser.add_argument('--multi_image',type=bool, default=True, help='Whether image will contain multiple slices. Slices could indicate different times, depths, or views')  
+        parser.add_argument('--multi_image', action='store_true', default=True, help='Whether image will contain multiple slices. Slices could indicate different times, depths, or views')  
 
         # resnet-specific
         parser.add_argument('--model_name', type=str, default='mirai_full', help="Form of model, i.e resnet18, aggregator, revnet, etc.")
@@ -158,8 +145,8 @@ def parse_arguments():
         # Asymmetry module parameters
         parser.add_argument('--use_asymmetry', action='store_true',
                             help='Enable asymmetry module')
-        parser.add_argument('--latent_h', type=int, default=52)
-        parser.add_argument('--latent_w', type=int, default=64)
+        parser.add_argument('--latent_h', type=int, default=5)
+        parser.add_argument('--latent_w', type=int, default=5)
         parser.add_argument('--use_sad_bias', action='store_true')
         parser.add_argument('--use_lat_bn', action='store_true')   
         parser.add_argument('--use_sad_bn', action='store_true')
@@ -167,6 +154,7 @@ def parse_arguments():
         parser.add_argument('--initial_asym_mean', type=float, default=2000)
         parser.add_argument('--initial_asym_std', type=float, default=300)
         parser.add_argument("--asym_dim", type=int, default=0, help="Dimension of asymmetry features ")
+ 
     
     args = parser.parse_args()
 
