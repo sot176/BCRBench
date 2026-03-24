@@ -1,15 +1,15 @@
 #!/bin/bash -l
 
 #SBATCH --job-name=Test_Mirai_EMBED         # Job name
-#SBATCH --output=/scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/error_output_files/embed/%x-%j.out  # Output file with job name and ID
-#SBATCH --error=/scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/error_output_files/embed/%x-%j.err   # Error file with job name and ID
+#SBATCH --output=/scratch/project_465002309/thrunsol/VMaR_Risk_prediction_test_results_1664_2048/error_output_files/embed/%x-%j.out  # Output file with job name and ID
+#SBATCH --error=/scratch/project_465002309/thrunsol/VMaR_Risk_prediction_test_results_1664_2048/error_output_files/embed/%x-%j.err   # Error file with job name and ID
 #SBATCH --partition=standard-g
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=8
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=56
 #SBATCH --mem=480G
-#SBATCH --time=01:59:00               # Run time (hh:mm:ss)
+#SBATCH --time=00:59:00               # Run time (hh:mm:ss)
 #SBATCH --account=project_465002309     # Project for billing
 
 # Directories for data and output
@@ -35,7 +35,7 @@ wandb login
 
 # Run the training script using Singularity
 export PYTHONPATH=$WORKING_DIR
-mkdir -p  /scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/embed/finetuned_model/
+mkdir -p  /scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/embed/OABreaCR
 
 # Run the training script using Singularity
 export PYTHONPATH=$WORKING_DIR
@@ -44,21 +44,18 @@ export PYTHONPATH=$WORKING_DIR
 accelerate launch  main_test.py \
   --csv_file /scratch/project_465002309/thrunsol/embed_datasets/combined_cases_with_follow_up_races_new.csv \
   --data_root /scratch/project_465002309/thrunsol/embed_datasets/risk_dataset_1664_2048 \
-  --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/Train_Risk-16772949_Model_Mirai_lr_5e-05_wd_0.0001_epochs_30_bs_6_2026-03-16-19-29 \
-  --img_encoder_snapshot /scratch/project_465002309/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_MIRAI_Base_May20_2019.p \
-  --transformer_snapshot /scratch/project_465002309/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_cancer_MIRAI_Transformer_Jan13_2020.p \
-  --path_test_folder  /scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/embed/finetuned_model \
-  --model "Mirai" \
+  --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/Train_Risk-16959214_Model_OA-BreaCR_lr_5e-05_wd_0.0001_epochs_30_bs_12_2026-03-23-19-37 \
+  --path_test_folder  /scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/embed/OABreaCR \
+  --model "OA-BreaCR" \
   --use_asymmetry \
   --id_training 1 \
-  --use_sad_bias \
-  --use_lat_bn \
   --batch_size 1 \
-  --survival_analysis_setup \
   --num_workers 7 \
-  --best_model "True" \
   --dataset "EMBED" \
   --seed 2023 \
+
+
+
 
 
 
