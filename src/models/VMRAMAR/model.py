@@ -101,7 +101,7 @@ class VMRAMaR(nn.Module):
 
     def forward(self, batch):
         x = batch["images"]  # (B, T, V, C, H, W)
-        B, T, V, C, H, W = x.shape
+        B, T, C, V, H, W = x.size()
 
         x = x.view(B * T * V, C, H, W)
 
