@@ -64,8 +64,7 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                 total_loss += outputs["loss"]
 
             # ── BCE + MV + POE per head ───────────────────────────────
-            # Note: BCE now handles target/mask internally like their code
-            # No need to use get_risk_heads for BCE — pass raw risk + labels
+            # Note: BCE  handles target/mask internally like their code
             head_configs = {
                 "final":      (outputs.get("final"),      batch["years_to_cancer"],       batch["years_to_last_followup"],       outputs.get("emb_final"),      outputs.get("log_var_final"),      1.0),
                 "current":    (outputs.get("current"),    batch["years_to_cancer"],       batch["years_to_last_followup"],       outputs.get("emb_current"),    outputs.get("log_var_current"),    0.2),
