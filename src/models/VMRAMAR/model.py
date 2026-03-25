@@ -46,6 +46,13 @@ class VMRAMaR(nn.Module):
             self.image_encoder = load_model(
                 args.img_encoder_snapshot, args, do_wrap_model=False
             )
+            if getattr(args, "replace_snapshot_pool", True):
+                non_trained_encoder = get_model_by_name("custom_resnet", False, args)
+                # Replace pool, fc, and prob_of_failure_layer — all depend on hidden dim
+                self.image_encoder._model.pool               = non_trained_encoder._model.pool
+                self.image_encoder._model.fc                 = non_trained_encoder._model.fc
+                self.image_encoder._model.prob_of_failure_layer = non_trained_encoder._model.prob_of_failure_layer
+                self.image_encoder._model.args               = non_trained_encoder._model.args
         else:
             self.image_encoder = get_model_by_name("custom_resnet", False, args)
 
@@ -105,72 +112,56 @@ class VMRAMaR(nn.Module):
 
         x = x.view(B * T * V, C, H, W)
 
-        # ── Encode images ───────────────────────────────────────────
+        # ── Encode ──────────────────────────────────────────────────
         _, img_feats, _ = self.image_encoder(x, None, batch)
         C_feat, H_feat, W_feat = img_feats.shape[1:]
-
         img_feats = img_feats.view(B, T, V, C_feat, H_feat, W_feat)
 
-        # ── Spatial pooling ─────────────────────────────────────────
-        feats = img_feats.mean(dim=(-2, -1))  # (B, T, V, C_feat)
+        # ── Spatial pool ─────────────────────────────────────────────
+        feats = img_feats.mean(dim=(-2, -1))   # (B, T, V, C_feat)
 
-        # ── View aggregation (attention) ────────────────────────────
-        feats = self.view_fc(feats)  # (B, T, V, D)
+        # ── View aggregation — matches figure ─────────────────────────
+        # view_fc projects each view, then attention fuses CC/MLO
+        feats = self.view_fc(feats)            # (B, T, V, D)
+        feats_bt = feats.view(B * T, V, -1)
+        attn_out, _ = self.view_attn(feats_bt, feats_bt, feats_bt)
+        visit_embeddings = attn_out.mean(dim=1).view(B, T, -1)  # (B, T, D)
 
-        feats = feats.view(B * T, V, -1)
-        attn_out, _ = self.view_attn(feats, feats, feats)
 
-        visit_embeddings = attn_out.mean(dim=1).view(B, T, -1)
-
-        # ── Temporal projection ─────────────────────────────────────
-        visit_embeddings = self.temporal_proj(visit_embeddings)
-
-        # ── VMRNN ───────────────────────────────────────────────────
-        out, _, _ = self.vmrnn(visit_embeddings)
-
-        # Use last timestep (more stable than mean)
-        temporal_feature = out[:, -1]
-        temporal_feature = F.layer_norm(
-            temporal_feature, temporal_feature.shape[1:]
-        )
+         # ── VMRNN ────────────────────────────────────────────────────
+        out, _, _ = self.vmrnn(visit_embeddings)   # (B, T, D)
+        temporal_feature = self.vmrnn_out_proj(out.mean(dim=1))  # (B, D)
 
         features = [temporal_feature]
 
-        # ── Asymmetry branch ────────────────────────────────────────
+        # ── Asymmetry branch ─────────────────────────────────────────
         if self.use_asymmetry and V >= 2:
-            left_feats = img_feats[:, :, 0]
-            right_feats = img_feats[:, :, 1]
+            left_feats  = img_feats[:, :, 0]   # (B, T, C, Hf, Wf)
+            right_feats = img_feats[:, :, 1]   # (B, T, C, Hf, Wf)
 
-            sad_out = self.sad(left_feats, right_feats)
-
-            asym_maps = sad_out["heatmap"]  # (B, T, H_lat, W_lat)
+            sad_out     = self.sad(left_feats, right_feats)
+            asym_maps   = sad_out["heatmap"]   # (B, T, H_lat, W_lat)
             asym_coords = sad_out["asymmetry_coords"]
 
+            if asym_coords.dim() == 2:
+                asym_coords = asym_coords.view(B, T, 2)
+            if asym_maps.dim() == 3:
+                _, H_lat, W_lat = asym_maps.shape
+                asym_maps = asym_maps.view(B, T, H_lat, W_lat)
+
             B_a, T_a, H_lat, W_lat = asym_maps.shape
-
-            # Stabilize maps
-            asym_maps = torch.sigmoid(asym_maps)
-
             asym_feature = self.asym_proj(
-                asym_maps.view(B_a, T_a, -1)
-            )  # (B, T, 512)
+                asym_maps.view(B_a, T_a, H_lat * W_lat)   # (B, T, H*W)
+            )                                               # (B, T, 512)
 
             asym_feature = self.lat(
                 asym_feature, asym_coords, asym_maps
-            )  # (B, 512)
-
-            asym_feature = F.layer_norm(
-                asym_feature, asym_feature.shape[1:]
-            )
-
+            )                                               # (B, 512)
             features.append(asym_feature)
 
-        # ── Fusion ──────────────────────────────────────────────────
-        combined = torch.cat(features, dim=1)
-        combined = self.fusion_norm(combined)
-
-        # ── Risk prediction ─────────────────────────────────────────
-        risk = self.ahl(combined)
+        # ── Fusion + risk ─────────────────────────────────────────────
+        combined = self.fusion_norm(torch.cat(features, dim=1))
+        risk     = self.ahl(combined)
 
         return {"logit": risk}
 
