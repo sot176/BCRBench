@@ -9,6 +9,8 @@ from .train_utils import train_one_epoch, evaluate, get_param_groups, linear_war
     save_checkpoint
 from config.config import cfg
 
+from utils import (loss_factory, MeanVarianceLoss, ProbOrdiLoss
+)
 
 def train_val(args, train_loader, valid_loader, path_loggger, path_model, accelerator: Accelerator):
     # Initialize logger
@@ -105,16 +107,28 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
             id=args.wandb_id if hasattr(args, "wandb_id") else None,
             config=vars(args),
         )
+    if args.model == "OA-BreaCR":
+        criterion_POE = ProbOrdiLoss(
+            distance=args.distance, alpha_coeff=args.alpha_coeff,
+            beta_coeff=args.beta_coeff, margin=args.margin,
+            main_loss_type='cls', criterion='l1',
+            start_label=args.start_label
+        )
+        criterion_MV = MeanVarianceLoss(
+            cumpet_ce_loss=False, start_label=args.start_label
+        )
+
+    loss_fn = loss_factory(args, criterion_POE=criterion_POE, criterion_MV=criterion_MV)
 
     # --------------------------------------------------
     # Loop over epochs
     # --------------------------------------------------
     for epoch in range(start_epoch, args.num_epochs):
         # --- Training ---
-        avg_train_loss, train_c_index, auc_results_train = train_one_epoch(args, model_risk, train_loader, optimizer, accelerator,  warmup_scheduler, global_step, warmup_steps)
+        avg_train_loss, train_c_index, auc_results_train = train_one_epoch(args, model_risk, train_loader, optimizer, accelerator,  warmup_scheduler, global_step, warmup_steps, loss_fn )
 
         # --- Validation ---
-        val_risk_loss, val_c_index, auc_results = evaluate(args, model_risk, valid_loader, accelerator)
+        val_risk_loss, val_c_index, auc_results = evaluate(args, model_risk, valid_loader, accelerator, loss_fn )
 
         # --- Logging, Checkpointing, and Early Stopping (on main process) ---
         if accelerator.is_main_process:

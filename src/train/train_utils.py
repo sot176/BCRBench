@@ -5,7 +5,7 @@ from utils import (
     compute_auc_x_year_auc, loss_factory, MeanVarianceLoss, ProbOrdiLoss
 )
 
-def train_one_epoch(args,model_risk, train_loader, optimizer, accelerator,  warmup_scheduler, global_step, warmup_steps):
+def train_one_epoch(args,model_risk, train_loader, optimizer, accelerator,  warmup_scheduler, global_step, warmup_steps, loss_fn):
     """
     Handles the training logic for a single epoch.
 
@@ -15,21 +15,6 @@ def train_one_epoch(args,model_risk, train_loader, optimizer, accelerator,  warm
     model_risk.train()
     running_risk_loss = 0.0
     all_preds, all_times, all_events = [], [], []
-
-    criterion_POE = None
-    criterion_MV = None
-
-    if args.model == "OA-BreaCR":
-        criterion_POE = ProbOrdiLoss(distance=args.distance, alpha_coeff=args.alpha_coeff,
-                                 beta_coeff=args.beta_coeff, margin=args.margin,
-                                 main_loss_type='cls', criterion='l1',
-                                 start_label=args.start_label)
-
-        criterion_MV = MeanVarianceLoss( cumpet_ce_loss=False, start_label=args.start_label)
-
-    # --- Create loss function passing criteria ---
-    loss_fn = loss_factory(args, criterion_POE=criterion_POE, criterion_MV=criterion_MV)
-
 
     for batch in train_loader:
 
@@ -73,7 +58,7 @@ def train_one_epoch(args,model_risk, train_loader, optimizer, accelerator,  warm
     return avg_risk_loss, c_index, auc_results
 
 
-def evaluate(args, model_risk, valid_loader, accelerator):
+def evaluate(args, model_risk, valid_loader, accelerator, loss_fn):
     """
     Handles the evaluation logic for a single epoch.
 
@@ -83,22 +68,6 @@ def evaluate(args, model_risk, valid_loader, accelerator):
     model_risk.eval()
     running_risk_loss = 0.0
     val_preds, val_times, val_events = [], [], []
-    
-    criterion_POE = None
-    criterion_MV = None
-
-    if args.model == "OA-BreaCR":
-        criterion_POE = ProbOrdiLoss(distance=args.distance, alpha_coeff=args.alpha_coeff,
-                                 beta_coeff=args.beta_coeff, margin=args.margin,
-                                 main_loss_type='cls', criterion='l1',
-                                 start_label=args.start_label)
-
-        criterion_MV = MeanVarianceLoss(
-            cumpet_ce_loss=False
-        )
-
-    # --- Create loss function passing criteria ---
-    loss_fn = loss_factory(args, criterion_POE=criterion_POE, criterion_MV=criterion_MV)
     
     with torch.no_grad():
         for batch_val in valid_loader:

@@ -165,8 +165,8 @@ class risk_BCE_loss(nn.Module):
             risk_mask = risk_mask * weights_
 
         loss = F.binary_cross_entropy(
-            pred, y_seq.float().cuda(),
-            weight=risk_mask.float().cuda(),
+            pred, y_seq.float(),
+            weight=risk_mask.float(),
             reduction='sum'
         ) / torch.sum(risk_mask.float()) * self.weight_loss
 
