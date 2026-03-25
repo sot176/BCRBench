@@ -81,5 +81,6 @@ class LMVNet(nn.Module):
         }
 
     def get_primary_risk_head(self, outputs):
-        return outputs["risk_multi"]
+        pred_risk = torch.sigmoid(outputs["risk_multi"])
+        return pred_risk
     

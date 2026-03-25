@@ -48,10 +48,10 @@ def train_one_epoch(args,model_risk, train_loader, optimizer, accelerator,  warm
             warmup_scheduler.step()
         global_step += 1
 
-        primary_logits = base_model.get_primary_risk_head(outputs)
+        pred_risk = base_model.get_primary_risk_head(outputs)
        
         all_preds.append(
-            accelerator.gather(torch.sigmoid(primary_logits).detach())
+            accelerator.gather(pred_risk.detach())
         )
 
         # Gather results for metric calculation
@@ -115,10 +115,10 @@ def evaluate(args, model_risk, valid_loader, accelerator):
 
             running_risk_loss += risk_loss_val.item()
 
-            primary_logits = base_model.get_primary_risk_head(outputs_val)
+            pred_risk = base_model.get_primary_risk_head(outputs_val)
 
             val_preds.append(
-                accelerator.gather(torch.sigmoid(primary_logits).detach())
+                accelerator.gather(pred_risk.detach())
             )
             val_times.append(accelerator.gather(batch_val["event_times"]))
             val_events.append(accelerator.gather(batch_val["event_observed"]))

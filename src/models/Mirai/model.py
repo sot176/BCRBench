@@ -79,4 +79,6 @@ class Mirai(nn.Module):
 
     def get_primary_risk_head(self, outputs):
         logit, _, _ = outputs
-        return logit
+        pred_risk = torch.sigmoid(logit)
+
+        return pred_risk

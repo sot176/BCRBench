@@ -116,5 +116,8 @@ class ImgFeatAlign(nn.Module):
         }
 
     def get_primary_risk_head(self, outputs):
-        return outputs["risk_prediction"]["pred_fused"]
+        logits = outputs["risk_prediction"]["pred_fused"]
+        pred_risk = torch.sigmoid(logits)
+
+        return pred_risk
     

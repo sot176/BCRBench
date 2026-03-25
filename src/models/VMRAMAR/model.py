@@ -160,4 +160,9 @@ class VMRAMaR(nn.Module):
         }
 
     def get_primary_risk_head(self, outputs):
-        return outputs["logit"]
+        logit =  outputs["logit"]
+        pred_risk = torch.sigmoid(logit)
+
+        return pred_risk
+    
+ 
