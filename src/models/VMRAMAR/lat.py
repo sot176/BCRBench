@@ -34,40 +34,45 @@ class LongitudinalAsymmetryTracker(nn.Module):
         # Learned output normalisation instead of hardcoded mean/std
         self.out_norm = nn.LayerNorm(self.feature_dim)
 
-    def compute_displacement(self, coords1, coords2, scale_factors):
-        return torch.norm(
-            coords1.float() * scale_factors - coords2.float() * scale_factors,
-            dim=-1,
-        )
+    def compute_displacement(self, coords1, coords2):
+        # Normalize to [0, 1]
+        norm_factor = torch.tensor(
+            [self.latent_h, self.latent_w], device=coords1.device
+        ).float()
+
+        coords1 = coords1 / norm_factor
+        coords2 = coords2 / norm_factor
+
+        return torch.norm(coords1 - coords2, dim=-1)
 
     def forward(self, asymmetry_features, asymmetry_coords, asymmetry_maps):
-        B, T,D = asymmetry_features.shape
+        B, T, D = asymmetry_features.shape
 
-        scale_h = asymmetry_maps.shape[-2] / self.latent_h
-        scale_w = asymmetry_maps.shape[-1] / self.latent_w
-        scale_factors = torch.tensor(
-            [scale_h, scale_w], device=asymmetry_features.device
-        )
-
-        # Persistence weights — upweight regions that persist across visits
+        # ── Persistence weights ─────────────────────────────
         persistence_weights = torch.ones(B, T, device=asymmetry_features.device)
+
         for t in range(1, T):
             disp = self.compute_displacement(
-                asymmetry_coords[:, t], asymmetry_coords[:, t - 1], scale_factors
+                asymmetry_coords[:, t],
+                asymmetry_coords[:, t - 1],
             )
+
             is_persistent = disp < self.displacement_threshold
+
             persistence_weights[:, t] = torch.where(
                 is_persistent,
-                persistence_weights[:, t - 1] + 1.0,
+                torch.clamp(persistence_weights[:, t - 1] + 1.0, max=5.0),
                 torch.ones_like(persistence_weights[:, t]),
             )
 
-        # Transform features
+        # ── Feature transform ───────────────────────────────
         transformed = self.feature_transform(asymmetry_features)
-        if self.use_bn:
-            transformed = self.bn(transformed.transpose(1, 2)).transpose(1, 2)
+        transformed = F.layer_norm(transformed, transformed.shape[-1:])
 
-        # Weighted aggregation
-        weights  = F.softmax(persistence_weights, dim=1).unsqueeze(-1)
-        fused    = (transformed * weights).sum(dim=1)  # (B, 512)
+        # ── Weighted aggregation ────────────────────────────
+        temperature = 2.0
+        weights = F.softmax(persistence_weights / temperature, dim=1).unsqueeze(-1)
+
+        fused = (transformed * weights).sum(dim=1)
+
         return self.out_norm(fused)
