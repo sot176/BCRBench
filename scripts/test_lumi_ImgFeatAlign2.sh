@@ -9,7 +9,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=56
 #SBATCH --mem=480G
-#SBATCH --time=02:59:00               # Run time (hh:mm:ss)
+#SBATCH --time=03:59:00               # Run time (hh:mm:ss)
 #SBATCH --account=project_465002309     # Project for billing
 
 # Directories for data and output
@@ -35,7 +35,7 @@ wandb login
 
 # Run the training script using Singularity
 export PYTHONPATH=$WORKING_DIR
-mkdir -p  /scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/embed/ImgFeatAlign_finetuned_encoder
+mkdir -p  /scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/csaw/ImgFeatAlign_finetuned_encoder_applied_on_EMBED
 
 # Run the training script using Singularity
 export PYTHONPATH=$WORKING_DIR
@@ -51,8 +51,10 @@ accelerate launch  main_test.py \
   --batch_size 1 \
   --num_workers 7 \
   --dataset "EMBED" \
-  --best_model "True" \
   --seed 2023 \
+
+
+mkdir -p  /scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/csaw/ImgFeatAlign_finetuned_encoder
 
 
 accelerate launch  main_test.py \
@@ -65,7 +67,6 @@ accelerate launch  main_test.py \
   --batch_size 1 \
   --num_workers 7 \
   --dataset "CSAW" \
-  --best_model "True" \
   --seed 2023 \
 
 
