@@ -51,6 +51,7 @@ accelerate launch  main_test.py \
   --batch_size 1 \
   --num_workers 7 \
   --dataset "EMBED" \
+  --best_model "True" \
   --seed 2023 \
 
 
@@ -67,6 +68,7 @@ accelerate launch  main_test.py \
   --batch_size 1 \
   --num_workers 7 \
   --dataset "CSAW" \
+  --best_model "True" \
   --seed 2023 \
 
 
