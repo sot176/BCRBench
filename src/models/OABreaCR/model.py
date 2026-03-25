@@ -122,69 +122,7 @@ class OA_BreaCR(nn.Module):
         loss_t1 = torch.mean((x - target_x_source) ** 2)
         return loss_t1 * 1e-2
 
-    def compute_risk_target_and_mask(self, pred, years_to_cancer, years_last_followup):
-        """
-        Matches OA-BreaCR target construction exactly.
-        One-hot classification target, not cumulative.
-
-        y_true[i, event_year] = 1   (only the event year)
-        y_mask[i, f+1:] = 0         (mask years after last followup for censored)
-        """
-        if pred.dim() == 3:
-            pred = pred.mean(dim=0)
-
-        B, num_pred_years = pred.shape
-        followup  = num_pred_years - 1
-
-        # Move to CPU for numpy ops — matches their implementation
-        risk_label          = years_to_cancer.cpu().detach().numpy().copy()
-        years_last_followup = years_last_followup.cpu().detach().numpy().copy()
-
-        # Clamp event year to valid range
-        risk_label[risk_label > followup] = followup
-
-        y_true = torch.zeros(B, num_pred_years)
-        y_mask = torch.ones(B, num_pred_years)
-
-        for i in range(B):
-            # One-hot target at event year
-            y_true[i, int(risk_label[i])] = 1
-
-            # Mask years after last followup for censored patients
-            if risk_label[i] == followup and years_last_followup[i] < followup:
-                y_mask[i, int(years_last_followup[i]) + 1:] = 0
-
-        return y_true, y_mask
-        
-
-    def get_risk_heads(self, outputs, batch):
-        heads = {}
-        y_true, y_mask = self.compute_risk_target_and_mask(outputs['final'],
-                batch['years_to_cancer'], batch['years_to_last_followup']
-            )
-        y_true_prior, y_mask_prior = self.compute_risk_target_and_mask(outputs['final'],
-                batch['years_to_cancer_prior'], batch['years_to_last_followup_prior']
-            )
-        
-        # Final/main head
-        if 'final' in outputs and outputs['final'] is not None:
-            heads['final'] = (outputs['final'], y_true, y_mask)
-
-        # Current head
-        if 'current' in outputs and outputs['current'] is not None:
-            heads['current'] = (outputs['current'], y_true, y_mask)
-
-        # Prior head
-        if 'prior' in outputs and outputs['prior'] is not None:
-            heads['prior'] = (outputs['prior'], y_true_prior, y_mask_prior)
-
-        # Difference head
-        if 'difference' in outputs and outputs['difference'] is not None:
-            heads['difference'] = (outputs['difference'], y_true, y_mask)
-
-        return heads
-        
-
+    
     def get_auxiliary_outputs(self, outputs):
         """
         Returns auxiliary outputs for additional losses

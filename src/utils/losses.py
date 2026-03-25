@@ -9,6 +9,14 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
     Returns a loss function for a given model.
     """
     if args.model == "OA-BreaCR":
+
+        # Use their exact BCE loss
+        criterion_BCE = risk_BCE_loss(
+            weight_loss=2,
+            batch_size=args.batch_size,
+            num_pred_years=getattr(args, "max_followup", 6),
+        )
+
         def _compute_head_loss(risk, risk_label, years_last_followup, emb, log_var):
             is_sto = risk.dim() == 3
 
@@ -22,12 +30,21 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                 label_flat = risk_label
                 years_flat = years_last_followup
 
-            loss_MV = criterion_MV(
+            # BCE — matches their compute_losses exactly
+            loss = criterion_BCE(
                 risk_flat, label_flat, years_flat,
                 weights=getattr(args, "time_to_events_weights", None)
             )
 
-            loss_POE = torch.tensor(0.0, device=risk.device)
+            # MV
+            if criterion_MV is not None:
+                loss_MV = criterion_MV(
+                    risk_flat, label_flat, years_flat,
+                    weights=getattr(args, "time_to_events_weights", None)
+                )
+                loss = loss + loss_MV
+
+            # POE
             if emb is not None and log_var is not None and criterion_POE is not None:
                 _, _, _, loss_POE = criterion_POE(
                     risk, emb, log_var,
@@ -35,8 +52,9 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                     use_sto=is_sto,
                     weights=getattr(args, "time_to_events_weights", None)
                 )
+                loss = loss + loss_POE
 
-            return loss_MV + loss_POE
+            return loss
 
         def oa_breacr_loss(outputs, batch, model_risk):
             device     = next(model_risk.parameters()).device
@@ -45,64 +63,14 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
             if outputs.get("loss") is not None:
                 total_loss += outputs["loss"]
 
-            # ── BCE via get_risk_heads ────────────────────────────────────────
-            risk_heads = model_risk.get_risk_heads(outputs, batch)
-            for head_name, (logits, target, mask) in risk_heads.items():
-                if logits is None:
-                    continue
-
-                weight = 1.0 if head_name == "final" else 0.2
-
-                # Handle stochastic outputs (sample_size, B, out_dim)
-                is_sto = logits.dim() == 3
-                if is_sto:
-                    sample_size, batch_size, out_dim = logits.shape
-                    logits_flat = logits.view(-1, out_dim)
-                    target_flat = target.unsqueeze(0).repeat(sample_size, 1, 1).view(-1, out_dim)
-                    mask_flat   = mask.unsqueeze(0).repeat(sample_size, 1, 1).view(-1, out_dim) \
-                                if mask is not None else None
-                else:
-                    logits_flat = logits
-                    target_flat = target
-                    mask_flat   = mask
-
-                bce = get_risk_loss_BCE_OA_BreaCR(logits_flat, target_flat, mask_flat)
-                total_loss += weight * bce
-
-            # ── MV + POE per head ─────────────────────────────────────────────
+            # ── BCE + MV + POE per head ───────────────────────────────
+            # Note: BCE now handles target/mask internally like their code
+            # No need to use get_risk_heads for BCE — pass raw risk + labels
             head_configs = {
-                "final": (
-                    outputs.get("final"),
-                    batch["years_to_cancer"],
-                    batch["years_to_last_followup"],
-                    outputs.get("emb_final"),
-                    outputs.get("log_var_final"),
-                    1.0,
-                ),
-                "current": (
-                    outputs.get("current"),
-                    batch["years_to_cancer"],
-                    batch["years_to_last_followup"],
-                    outputs.get("emb_current"),
-                    outputs.get("log_var_current"),
-                    0.2,
-                ),
-                "difference": (
-                    outputs.get("difference"),
-                    batch["years_to_cancer"],
-                    batch["years_to_last_followup"],
-                    outputs.get("emb_difference"),
-                    outputs.get("log_var_difference"),
-                    0.2,
-                ),
-                "prior": (
-                    outputs.get("prior"),
-                    batch["years_to_cancer_prior"],
-                    batch["years_to_last_followup_prior"],
-                    outputs.get("emb_prior"),
-                    outputs.get("log_var_prior"),
-                    0.2,
-                ),
+                "final":      (outputs.get("final"),      batch["years_to_cancer"],       batch["years_to_last_followup"],       outputs.get("emb_final"),      outputs.get("log_var_final"),      1.0),
+                "current":    (outputs.get("current"),    batch["years_to_cancer"],       batch["years_to_last_followup"],       outputs.get("emb_current"),    outputs.get("log_var_current"),    0.2),
+                "difference": (outputs.get("difference"), batch["years_to_cancer"],       batch["years_to_last_followup"],       outputs.get("emb_difference"), outputs.get("log_var_difference"), 0.2),
+                "prior":      (outputs.get("prior"),      batch["years_to_cancer_prior"], batch["years_to_last_followup_prior"], outputs.get("emb_prior"),      outputs.get("log_var_prior"),      0.2),
             }
 
             for head_name, (risk, risk_label, years_lfu, emb, log_var, weight) in head_configs.items():
@@ -113,6 +81,7 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                 )
 
             return total_loss
+
         return oa_breacr_loss
 
     else:
@@ -153,26 +122,57 @@ def get_risk_loss_BCE(pred, y_true, y_mask):
     return loss / mask_sum
 
 
-def get_risk_loss_BCE_OA_BreaCR(pred, y_true, y_mask):
 
-    y_mask = y_mask.to(pred.device)
-    y_true = y_true.to(pred.device)
+class risk_BCE_loss(nn.Module):
+    """
+    Defines for computing the risk prediction loss for time-to-event data.
 
-    mask_sum = torch.sum(y_mask.float())
+    This class calculates a custom loss function based on binary
+    cross-entropy. It utilizes masking to handle censored data during follow-up periods and allows
+    for weighted contributions to the loss computation to reflect varying levels of significance
+    across events and time periods. The class is parameterized for flexibility in accounting for
+    different datasets and settings.
+    """
+    def __init__(self, weight_loss=2, batch_size=1, num_pred_years=16):
+        super(risk_BCE_loss, self).__init__()
+        self.weight_loss = weight_loss
+        self.batch_size = batch_size
+        self.num_pred_years = num_pred_years
+        self.max_followup = num_pred_years
 
-    if mask_sum == 0:
-        return torch.tensor(0.0, device=pred.device)
-    
-    pred = F.softmax(pred, dim=1)
+    def forward(self, pred, risk_label, years_last_followup, weights=None):
+        pred = F.softmax(pred, dim=1)
+        batch_size, num_pred_years = pred.shape
+        followup = num_pred_years - 1
+        risk_label = risk_label.cpu().detach().numpy()
+        years_last_followup = years_last_followup.cpu().detach().numpy()
+        device = pred.device  # or self.device
+        risk_mask = torch.ones((batch_size, self.num_pred_years), device=device)
+        y_seq = torch.zeros((batch_size, self.num_pred_years), device=device)
 
-    loss = F.binary_cross_entropy(
-        pred,
-        y_true.float(),
-        weight=y_mask.float(),
-        reduction='sum'
-    )
-    loss = loss / mask_sum * 2
-    return loss  
+        risk_label[risk_label > (num_pred_years - 1)] = num_pred_years - 1
+        for i in range(batch_size):
+            y_seq[i, risk_label[i]] = 1
+            # ra = risk_label[i]
+            # fa = years_last_followup[i]
+            if risk_label[i] == followup and years_last_followup[i] < followup:
+                risk_mask[i, years_last_followup[i] + 1:] = 0
+
+        if torch.sum(risk_mask.float()) == 0:
+            print('wrong!!!!!!!!!', torch.sum(risk_mask.float()))
+
+        if weights is not None:
+            weights_ = torch.tensor(weights, dtype=torch.float, device=pred.device).view(1, -1)
+            risk_mask = risk_mask * weights_
+
+        loss = F.binary_cross_entropy(
+            pred, y_seq.float().cuda(),
+            weight=risk_mask.float().cuda(),
+            reduction='sum'
+        ) / torch.sum(risk_mask.float()) * self.weight_loss
+
+
+        return loss 
 
 #########################################################################
 # ------------------ Mean Variance loss ------------------
