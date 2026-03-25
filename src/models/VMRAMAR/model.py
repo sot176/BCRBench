@@ -63,6 +63,9 @@ class VMRAMaR(nn.Module):
                 self.image_encoder._model.args               = non_trained_encoder._model.args
         else:
             self.image_encoder = get_model_by_name("custom_resnet", False, args)
+        if getattr(args, "freeze_image_encoder", False):
+            for param in self.image_encoder.parameters():
+                param.requires_grad = False
 
         self.image_repr_dim = self.image_encoder._model.args.img_only_dim    
         self.image_encoder._model.pool = IdentityPool()  # removes global pooling
@@ -162,7 +165,6 @@ class VMRAMaR(nn.Module):
     def get_primary_risk_head(self, outputs):
         logit =  outputs["logit"]
         pred_risk = torch.sigmoid(logit)
-
         return pred_risk
     
  

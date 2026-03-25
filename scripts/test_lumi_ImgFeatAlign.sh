@@ -40,19 +40,6 @@ mkdir -p  /scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1
 # Run the training script using Singularity
 export PYTHONPATH=$WORKING_DIR
 
-
-accelerate launch  main_test.py \
-  --csv_file /scratch/project_465002309/thrunsol/embed_datasets/combined_cases_with_follow_up_races_new.csv \
-  --data_root /scratch/project_465002309/thrunsol/embed_datasets/risk_dataset_1664_2048 \
-  --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/Train_Risk-16979301_Model_ImgFeatAlign_lr_5e-05_wd_0.0001_epochs_30_bs_8_2026-03-24-17-52 \
-  --path_test_folder  /scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/embed/ImgFeatAlign_finetuned_encoder \
-  --model "ImgFeatAlign" \
-  --id_training 1 \
-  --batch_size 1 \
-  --num_workers 7 \
-  --dataset "EMBED" \
-  --seed 2023 \
-
 mkdir -p  /scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/embed/ImgFeatAlign_finetuned_encoder_applied_on_CSAW
 
 accelerate launch  main_test.py \

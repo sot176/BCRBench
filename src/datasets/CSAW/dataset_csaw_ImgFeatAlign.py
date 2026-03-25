@@ -51,12 +51,12 @@ class BreastCancerRiskDatasetCSAWCC_ImgFeatAlign(Dataset):
 
     def map_density(self, value):
         mapping = {
-            'A': 'A',
-            'B': 'B',
-            'C': 'C',
-            #'75-100': 'D'
+            'A': 1,
+            'B': 2,
+            'C': 3,
         }
-        return mapping.get(value, 'NA')
+        index = mapping.get(value, -1)  # -1 for NA or unknown values
+        return torch.tensor(index, dtype=torch.long)
 
     def map_cancer_type(self, value):
         """Map cancer type (0,1,2) to integer tensor suitable for GPU ops.

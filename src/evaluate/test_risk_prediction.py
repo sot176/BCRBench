@@ -90,10 +90,10 @@ def test_risk(
             # Risk model forward
             outputs = model_risk(batch)
 
-            primary_logits = base_model.get_primary_risk_head(outputs)
+            pred_risk = base_model.get_primary_risk_head(outputs)
 
             # Gather results from all processes
-            gathered_preds = accelerator.gather((torch.sigmoid(primary_logits).detach()))
+            gathered_preds = accelerator.gather(pred_risk.detach())
             gathered_times = accelerator.gather(batch["event_times"])
             gathered_events = accelerator.gather(batch["event_observed"])
             gathered_densities = accelerator.gather(batch["density"])
