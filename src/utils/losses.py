@@ -132,7 +132,7 @@ class risk_BCE_loss(nn.Module):
     across events and time periods. The class is parameterized for flexibility in accounting for
     different datasets and settings.
     """
-    def __init__(self, weight_loss=2, batch_size=1, num_pred_years=16):
+    def __init__(self, weight_loss=2, batch_size=1, num_pred_years=6):
         super(risk_BCE_loss, self).__init__()
         self.weight_loss = weight_loss
         self.batch_size = batch_size
