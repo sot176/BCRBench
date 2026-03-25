@@ -54,6 +54,7 @@ accelerate launch  main_train.py \
             --freeze_image_encoder \
             --weight_decay 1e-4 \
             --model "VMRA-MaR" \
+            --warmup_steps 0 \
             --survival_analysis_setup \
             --use_asymmetry \
             --lr_decay 0.5 \

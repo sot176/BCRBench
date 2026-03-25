@@ -18,6 +18,8 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
         )
 
         def _compute_head_loss(risk, risk_label, years_last_followup, emb, log_var):
+            risk_label          = risk_label.clone()           
+            years_last_followup = years_last_followup.clone()
             is_sto = risk.dim() == 3
 
             if is_sto and emb is not None:
