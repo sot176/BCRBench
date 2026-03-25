@@ -9,7 +9,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=56
 #SBATCH --mem=480G
-#SBATCH --time=00:59:00               # Run time (hh:mm:ss)
+#SBATCH --time=05:59:00               # Run time (hh:mm:ss)
 #SBATCH --account=project_465002309     # Project for billing
 
 # Directories for data and output
@@ -44,7 +44,7 @@ export PYTHONPATH=$WORKING_DIR
 accelerate launch  main_test.py \
   --csv_file /scratch/project_465002309/thrunsol/embed_datasets/combined_cases_with_follow_up_races_new.csv \
   --data_root /scratch/project_465002309/thrunsol/embed_datasets/risk_dataset_1664_2048 \
-  --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/Train_Risk_VMRA_MaR-16947422_Model_VMRA-MaR_lr_5e-05_wd_0.0001_epochs_30_bs_2_2026-03-23-09-23 \
+  --path_out_dir /scratch/project_465002309/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/Train_Risk_VMRA_MaR-16975029_Model_VMRA-MaR_lr_5e-05_wd_0.0001_epochs_30_bs_2_2026-03-24-14-08 \
   --img_encoder_snapshot /scratch/project_465002309/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_MIRAI_Base_May20_2019.p \
   --path_test_folder  /scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/embed/VMRAMaR \
   --model "VMRA-MaR" \
