@@ -18,7 +18,7 @@ def hybrid_asymmetry(left, right, latent_h=5, latent_w=5, flexible=False, topk=N
     else:
         dif = F.max_pool2d(dif, (kernel_h, kernel_w), stride=(kernel_h, kernel_w))
     
-    dif = torch.norm(dif, dim=-3)  # (B, H_out, W_out)
+    dif = dif.mean(dim=-3)  # (B, H_out, W_out)
     # Ensure dif is 3D
     if dif.dim() == 2:  # shape (B, N)
         dif = dif.unsqueeze(-1)  # (B, N, 1)
@@ -29,20 +29,24 @@ def hybrid_asymmetry(left, right, latent_h=5, latent_w=5, flexible=False, topk=N
     B, H_out, W_out = dif.shape
 
     if topk is None:
-        # Max over width
-        max_by_ftr, y_argmin = torch.max(dif, dim=-1)  # (B, H_out)
-        # Max over height
-        max_asym, x_argmin = torch.max(max_by_ftr, dim=-1)  # (B,)
+        # Softmax over spatial map
+        weights = F.softmax(dif.view(B, -1), dim=-1).view(B, H_out, W_out)
 
-        # Correct y_argmin to be batch-aligned
-        best_y = y_argmin[torch.arange(B, device=dif.device), x_argmin]  # (B,)
-        x_argmin = x_argmin.view(B)
-        best_y = best_y.view(B)
+        # Coordinate grids
+        x_coords = torch.arange(H_out, device=dif.device).float()
+        y_coords = torch.arange(W_out, device=dif.device).float()
+
+        # Expected coordinates (soft-argmax)
+        x_mean = (weights.sum(dim=2) * x_coords).sum(dim=1)  # (B,)
+        y_mean = (weights.sum(dim=1) * y_coords).sum(dim=1)  # (B,)
+
+        # Soft asymmetry score
+        max_asym = (dif * weights).sum(dim=(1, 2))  # (B,)
 
         return max_asym, {
-            "x_argmin": x_argmin.detach(),  # (B,)
-            "y_argmin": best_y.detach(),    # (B,)
-            "heatmap": dif.detach()
+            "x_argmin": x_mean,   # now soft coordinates
+            "y_argmin": y_mean,
+            "heatmap": dif        # keep gradients!
         }
     else:
         topk_vals, _ = torch.topk(dif.view(B, -1), topk, dim=-1)
