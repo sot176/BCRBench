@@ -70,8 +70,10 @@ class VMRAMaR(nn.Module):
         )
 
         # ── 3. Temporal Projection + VMRNN ───────────────────────────
-        self.temporal_proj = nn.Linear(args.embed_dim, args.embed_dim)
-
+        self.vmrnn_out_proj = nn.Sequential(
+            nn.Linear(args.embed_dim, args.embed_dim),
+            nn.LayerNorm(args.embed_dim),
+        )
         self.vmrnn = VMRNN(
             embed_dim=args.embed_dim,
             depths_downsample=args.depths_downsample,
