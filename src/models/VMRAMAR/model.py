@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .vmrnn import VMRNN
-from .image_aggregator import ImageAggregator
 from .sad import SpatialAsymmetryDetector
 from .lat import LongitudinalAsymmetryTracker
 from models.common_parts import CumulativeProbabilityLayer
