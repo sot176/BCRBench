@@ -112,12 +112,9 @@ def parse_arguments():
                             help='Number of output neurons, should be max_followup+1')
         parser.add_argument('--start_label', type=int, default=0,
                             help='Start label for ordinal learning')
-        parser.add_argument('--no-sto', action='store_true',
-                            help='Disable stochastic sampling')
         parser.add_argument('--use_poe', action='store_true', help='Enable POE functionality')
         parser.add_argument('--no_poe', action='store_false', dest='use_poe')
         parser.add_argument('--use_sto', action='store_true', help='Enable stochastic sampling in POE')
-        parser.add_argument('--no_sto', action='store_false', dest='use_sto')
         # For POE model
         # ---------------------------------
         parser.add_argument('--max-t', type=int, default=50,
