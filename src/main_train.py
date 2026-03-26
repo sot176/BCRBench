@@ -213,7 +213,7 @@ def parse_arguments():
         parser.add_argument('--use_sad_bias', action='store_true')
         parser.add_argument('--use_lat_bn', action='store_true')   
         parser.add_argument('--use_sad_bn', action='store_true')
-        parser.add_argument('--lat_dropout', type=float, default=0.0)
+        parser.add_argument('--lat_dropout', type=float, default=0.2)
         parser.add_argument('--initial_asym_mean', type=float, default=2000)
         parser.add_argument('--initial_asym_std', type=float, default=300)
         parser.add_argument("--asym_dim", type=int, default=0, help="Dimension of asymmetry features ")
