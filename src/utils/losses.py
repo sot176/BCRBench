@@ -324,7 +324,7 @@ class ProbOrdiLoss(nn.Module):
         class_dim = logit.shape[-1]
         target_ = target_label.detach()
         target_[target_ > (class_dim - 1)] = class_dim - 1
-        mask = 1 - ((target_ == (class_dim - 1)) & (years_last_followup < (class_dim - 1))).int()
+        mask = 1 - ((target_.cpu() == (class_dim - 1)) & (years_last_followup.cpu() < (class_dim - 1))).int()
         KLLoss = torch.mean(torch.sum(torch.pow(emb, 2) + torch.exp(log_var) - log_var - 1.0, dim=1) * 0.5)
 
         count = sum(mask)
@@ -336,7 +336,7 @@ class ProbOrdiLoss(nn.Module):
             var = torch.exp(log_var)
             batch_size = emb.shape[0]
 
-            target_dis = torch.abs(target[:, None] - target[None, :])
+            target_dis = torch.abs(target.view(-1, 1).repeat(1, batch_size) - target.view(1, -1).repeat(batch_size, 1))
             anchor_pos = [i for i in range(batch_size)]
             second_pos = [(i + 1) % batch_size for i in anchor_pos]
             target_dis = torch.abs(target_dis - torch.abs(target[anchor_pos] - target[second_pos]).view(-1, 1).repeat(1, batch_size))

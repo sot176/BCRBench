@@ -108,12 +108,10 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
             config=vars(args),
         )
     if args.model == "OA-BreaCR":
-        criterion_POE = ProbOrdiLoss(
-            distance=args.distance, alpha_coeff=args.alpha_coeff,
-            beta_coeff=args.beta_coeff, margin=args.margin,
-            main_loss_type='cls', criterion='l1',
-            start_label=args.start_label
-        )
+        criterion_POE = ProbOrdiLoss(distance=args.distance, alpha_coeff=args.alpha_coeff,
+                                 beta_coeff=args.beta_coeff, margin=args.margin,
+                                 main_loss_type='cls', criterion='l1',
+                                 start_label=args.start_label)
         criterion_MV = MeanVarianceLoss(
             cumpet_ce_loss=False, start_label=args.start_label
         )

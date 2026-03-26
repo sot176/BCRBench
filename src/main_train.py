@@ -112,20 +112,26 @@ def parse_arguments():
                             help='Number of output neurons, should be max_followup+1')
         parser.add_argument('--start_label', type=int, default=0,
                             help='Start label for ordinal learning')
-        parser.add_argument('--max-t', type=int, default=50,
-                            help='Number of samples during stochastic sampling')
         parser.add_argument('--no-sto', action='store_true',
                             help='Disable stochastic sampling')
-        parser.add_argument('--distance', type=str, default='Bhattacharyya',
-                            help='Distance metric between two Gaussian distributions')
-        parser.add_argument('--alpha-coeff', type=float, default=1e-5)
-        parser.add_argument('--beta-coeff', type=float, default=1e-4)
-        parser.add_argument('--margin', type=float, default=2)
         parser.add_argument('--use_poe', action='store_true', help='Enable POE functionality')
         parser.add_argument('--no_poe', action='store_false', dest='use_poe')
         parser.add_argument('--use_sto', action='store_true', help='Enable stochastic sampling in POE')
         parser.add_argument('--no_sto', action='store_false', dest='use_sto')
-        
+        # For POE model
+        # ---------------------------------
+        parser.add_argument('--max-t', type=int, default=50,
+                            help='number of samples during sto.')
+        parser.add_argument('--no-sto', action='store_true',
+                            help='not using stochastic sampling when training or testing.')
+        parser.add_argument('--distance', type=str, default='JDistance',
+                            help='distance metric between two gaussian distribution')
+        parser.add_argument('--alpha-coeff', type=float, default=1e-5, metavar='M',
+                            help='alpha_coeff (default: 0)')
+        parser.add_argument('--beta-coeff', type=float, default=1e-4, metavar='M',
+                            help='beta_coeff (default: 1.0)')
+        parser.add_argument('--margin', type=float, default=2, metavar='M',
+                            help='margin (default: 1.0)')
     # -------------------
     # Mirai-specific arguments
     # -------------------
