@@ -117,6 +117,9 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
         criterion_MV = MeanVarianceLoss(
             cumpet_ce_loss=False, start_label=args.start_label
         )
+    else:
+        criterion_POE = None
+        criterion_MV = None
 
     loss_fn = loss_factory(args, criterion_POE=criterion_POE, criterion_MV=criterion_MV)
 
