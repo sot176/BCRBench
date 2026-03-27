@@ -180,7 +180,7 @@ def bootstrap_confidence_interval(data, num_samples=2000, confidence_level=0.95)
     upper_bound = np.percentile(bootstrapped_means, 100 * (1 - alpha / 2))
     return lower_bound, upper_bound
 
-def bootstrap_auc(event_times, predictions, event_observed, n_bootstrap=2000, alpha=0.05, max_attempts=50):
+def bootstrap_auc(event_times, predictions, event_observed, n_bootstrap=2000, alpha=0.05):
     """
     Compute bootstrap confidence intervals for AUC at 5 yearly follow-ups.
     Ensures each year has at least one positive and one negative sample.
@@ -206,17 +206,22 @@ def bootstrap_auc(event_times, predictions, event_observed, n_bootstrap=2000, al
         sample_event_observed = event_observed[indices]
 
         yearly_aucs = compute_auc_x_year_auc(sample_predictions, sample_event_times, sample_event_observed)
-        
+
         for year, auc in yearly_aucs.items():
             auc_results[f"Year {year+1}"].append(auc)
 
+    # Compute mean and confidence intervals, ignoring NaNs
     auc_summary = {}
     for year, values in auc_results.items():
         vals = np.array(values)
-        mean_auc = np.mean(vals)
-        lower = np.percentile(vals, 100 * alpha / 2)
-        upper = np.percentile(vals, 100 * (1 - alpha / 2))
-        auc_summary[year] = (mean_auc, (lower, upper))
+        vals = vals[np.isfinite(vals)]  # <-- remove NaNs
+        if len(vals) == 0:
+            auc_summary[year] = (np.nan, (np.nan, np.nan))
+        else:
+            mean_auc = np.mean(vals)
+            lower = np.percentile(vals, 100 * alpha / 2)
+            upper = np.percentile(vals, 100 * (1 - alpha / 2))
+            auc_summary[year] = (mean_auc, (lower, upper))
 
     return auc_summary, auc_results
 
@@ -499,60 +504,40 @@ def bootstrap_auc_by_density(
     WITHOUT balancing cancer vs non-cancer during resampling.
     """
 
-    auc_results_by_density = {
-        d: {f"Year {i+1}": [] for i in range(5)} for d in ["A", "B", "C", "D"]
-    }
-
-    density_categories = np.array([map_density(v) for v in density_categories])
-
-    for density in ["A", "B", "C", "D"]:
-        density_indices = np.where(density_categories == density)[0]
-
-        if len(density_indices) == 0:
-            print(f"Skipping density '{density}': no samples.")
-            continue
-
-        event_times_density = event_times[density_indices]
-        predictions_density = predictions[density_indices]
-        event_observed_density = event_observed[density_indices]
-
-        n_density = len(density_indices)
-
-        for _ in range(n_bootstrap):
-            sample_indices = resample(
-                np.arange(n_density),
-                replace=True,
-                n_samples=n_density,
-            )
-
-            event_times_sample = event_times_density[sample_indices]
-            predictions_sample = predictions_density[sample_indices]
-            event_observed_sample = event_observed_density[sample_indices]
-
-            yearly_aucs_sample = compute_auc_x_year_auc(
-                predictions_sample,
-                event_times_sample,
-                event_observed_sample,
-            )
-
-            for year, auc in yearly_aucs_sample.items():
-                auc_results_by_density[density][f"Year {year + 1}"].append(auc)
-
-    auc_summary_by_density = {}
-    for density, auc_results in auc_results_by_density.items():
-        auc_summary_by_density[density] = {}
-        for year, auc_values in auc_results.items():
-            if auc_values:
-                lower = np.percentile(auc_values, 100 * alpha / 2)
-                upper = np.percentile(auc_values, 100 * (1 - alpha / 2))
-                auc_summary_by_density[density][year] = (
-                    np.mean(auc_values),
-                    (lower, upper),
-                )
+    densities = ["A", "B", "C", "D"]
+    auc_results = {d: {f"Year {i+1}": [] for i in range(5)} for d in densities}
+    
+    N = len(event_times)
+    
+    for _ in range(n_bootstrap):
+        indices = np.random.choice(N, N, replace=True)
+        preds_sample = [predictions[i] for i in indices]
+        times_sample = [event_times[i] for i in indices]
+        obs_sample = [event_observed[i] for i in indices]
+        density_sample = [density_categories[i] for i in indices]
+        
+        aucs_sample = compute_auc_by_density_category(preds_sample, times_sample, obs_sample, density_sample)
+        
+        for d in densities:
+            for year, auc in aucs_sample[d].items():
+                if np.isfinite(auc):  # skip NaNs
+                    auc_results[d][year].append(auc)
+    
+    # summarize: mean and CI
+    auc_summary = {}
+    for d in densities:
+        auc_summary[d] = {}
+        for year, vals in auc_results[d].items():
+            vals = np.array(vals)
+            if len(vals) == 0:
+                auc_summary[d][year] = (np.nan, (np.nan, np.nan))
             else:
-                auc_summary_by_density[density][year] = (None, (None, None))
-
-    return auc_summary_by_density
+                mean = np.mean(vals)
+                lower = np.percentile(vals, 100 * alpha / 2)
+                upper = np.percentile(vals, 100 * (1 - alpha / 2))
+                auc_summary[d][year] = (mean, (lower, upper))
+    
+    return auc_summary
 
 
 def bootstrap_c_index_by_density(
