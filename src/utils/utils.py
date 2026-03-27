@@ -505,6 +505,8 @@ def bootstrap_auc_by_density(
     """
 
     densities = ["A", "B", "C", "D"]
+    density_categories = np.array([map_density(v) for v in density_categories])
+
     auc_results = {d: {f"Year {i+1}": [] for i in range(5)} for d in densities}
     
     N = len(event_times)
