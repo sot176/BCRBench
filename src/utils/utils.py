@@ -413,14 +413,19 @@ def bootstrap_c_index_by_cancer_type(
         for _ in range(n_bootstrap):
             boot_idx = resample(idx, replace=True, n_samples=len(idx))
 
-            c = concordance_index_ipcw(
-                event_times[boot_idx],
-                predictions[boot_idx],
-                event_observed[boot_idx],
-                censoring_dist,
-            )
-            if np.isfinite(c):
+            try:
+                c = concordance_index_ipcw(
+                    event_times[boot_idx],
+                    predictions[boot_idx],
+                    event_observed[boot_idx],
+                    censoring_dist,
+                )
                 c_vals.append(c)
+            except ZeroDivisionError:
+                warnings.warn(
+                    f"Skipping bootstrap sample due to no admissible pairs."
+                )
+                continue
 
         c_vals = np.array(c_vals)
         lower = np.percentile(c_vals, 100 * alpha / 2)
