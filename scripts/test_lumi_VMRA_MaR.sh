@@ -51,6 +51,7 @@ accelerate launch  main_test.py \
   --use_asymmetry \
   --survival_analysis_setup \
   --id_training 1 \
+  --best_model "True" \
   --batch_size 1 \
   --num_workers 7 \
   --dataset "EMBED" \
