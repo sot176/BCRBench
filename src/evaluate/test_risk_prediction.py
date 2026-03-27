@@ -192,7 +192,5 @@ def test_risk(
         print(results)
         logger.info(f"Final Test Results: {results}")
 
-        # Save to JSON file
-        with open("results.json", "w") as f:
-            json.dump(results, f, indent=2, default=str)
+        
 
