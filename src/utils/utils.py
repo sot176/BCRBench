@@ -578,15 +578,16 @@ def bootstrap_c_index_by_density(
         event_times_density = event_times[density_indices]
         predictions_density = predictions[density_indices]
         event_observed_density = event_observed[density_indices]
+        n_events = event_observed_density.sum()
 
+        if n_events == 0:
+            print(f"[WARNING] Skipping density '{density}': no observed events.")
+            continue
+        
         for _ in range(n_bootstrap):
-            # Ensure at least one event per bootstrap sample
-            while True:
-                indices = resample(np.arange(len(density_indices)), replace=True)
-                event_observed_sample = event_observed_density[indices]
-                if event_observed_sample.sum() > 0:
-                    break
-
+            
+            indices = resample(np.arange(len(density_indices)), replace=True)
+            event_observed_sample = event_observed_density[indices]
             event_times_sample = event_times_density[indices]
             predictions_sample = predictions_density[indices]
 
