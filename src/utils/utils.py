@@ -1,11 +1,16 @@
+import logging
 import os
 import warnings
 import json
+import torch.nn.functional as F
 from sklearn import metrics
 from sklearn.utils import resample
 import numpy as np
-from .c_index import concordance_index_ipcw
+from sklearn.metrics import roc_auc_score
+from scipy import stats
+import torch
 
+from .c_index import concordance_index_ipcw
 
 RACES = [
     "Caucasian or White",
@@ -20,7 +25,6 @@ RACES = [
 
 RACE_TO_ID = {r: i for i, r in enumerate(RACES)}
 ID_TO_RACE = {i: r for r, i in RACE_TO_ID.items()}
- 
 
 def map_density( value):
     """Map numeric density values (1–4) to categorical labels A–D."""
@@ -32,7 +36,41 @@ def map_density( value):
     }
     return mapping.get(value, "NA")
 
- 
+
+def checkpoint(model, filename):
+    """
+    Save model state dictionary to a file.
+
+    Args:
+        model: PyTorch model whose state_dict will be saved.
+        filename: String path to save the model state dictionary.
+    """
+    torch.save(model.state_dict(), filename)
+
+
+def create_logger(log_path):
+    """
+    Create a logger that writes INFO-level logs to a specified file.
+
+    Args:
+        log_path: Path to the log file.
+
+    Returns:
+        logger: Configured logger instance.
+    """
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+
+    f_handler = logging.FileHandler(log_path)
+    f_format = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    f_handler.setFormatter(f_format)
+
+    if logger.hasHandlers():
+        logger.handlers.clear()
+
+    logger.addHandler(f_handler)
+    return logger
+
 
 def bootstrap_c_index(
     event_times,
@@ -58,9 +96,14 @@ def bootstrap_c_index(
         ci: Tuple of lower and upper confidence interval bounds
     """
     c_index_scores = []
+    cases = np.where(event_observed == 1)[0]
+    controls = np.where(event_observed == 0)[0]
 
     for _ in range(n_bootstrap):
-        indices = resample(np.arange(len(event_times)), replace=True)
+        sample_cases = resample(cases, replace=True, n_samples=len(cases))
+        sample_controls = resample(controls, replace=True, n_samples=len(controls))
+
+        indices = np.concatenate([sample_cases, sample_controls])
         event_times_sample = event_times[indices]
         predictions_sample = predictions[indices]
         event_observed_sample = event_observed[indices]
@@ -120,8 +163,14 @@ def bootstrap_c_index_by_density(
         predictions_density = predictions[density_indices]
         event_observed_density = event_observed[density_indices]
 
+        cases = np.where(event_observed == 1)[0]
+        controls = np.where(event_observed == 0)[0]
+
         for _ in range(n_bootstrap):
-            indices = resample(np.arange(len(density_indices)), replace=True)
+            sample_cases = resample(cases, replace=True, n_samples=len(cases))
+            sample_controls = resample(controls, replace=True, n_samples=len(controls))
+
+            indices = np.concatenate([sample_cases, sample_controls])
             event_times_sample = event_times_density[indices]
             predictions_sample = predictions_density[indices]
             event_observed_sample = event_observed_density[indices]
@@ -180,7 +229,7 @@ def bootstrap_confidence_interval(data, num_samples=2000, confidence_level=0.95)
     upper_bound = np.percentile(bootstrapped_means, 100 * (1 - alpha / 2))
     return lower_bound, upper_bound
 
-def bootstrap_auc(event_times, predictions, event_observed, n_bootstrap=2000, alpha=0.05):
+def bootstrap_auc(event_times, predictions, event_observed, n_bootstrap=2000, alpha=0.05, max_attempts=50):
     """
     Compute bootstrap confidence intervals for AUC at 5 yearly follow-ups.
     Ensures each year has at least one positive and one negative sample.
@@ -199,31 +248,47 @@ def bootstrap_auc(event_times, predictions, event_observed, n_bootstrap=2000, al
     N = len(event_times)
     auc_results = {f"Year {i+1}": [] for i in range(5)}
 
+    cases = np.where(event_observed == 1)[0]
+    controls = np.where(event_observed == 0)[0]
+
     for _ in range(n_bootstrap):
-        indices = np.random.choice(N, N, replace=True)
+        sample_cases = resample(cases, replace=True, n_samples=len(cases))
+        sample_controls = resample(controls, replace=True, n_samples=len(controls))
+
+        indices = np.concatenate([sample_cases, sample_controls])
         sample_event_times = event_times[indices]
         sample_predictions = predictions[indices]
         sample_event_observed = event_observed[indices]
 
         yearly_aucs = compute_auc_x_year_auc(sample_predictions, sample_event_times, sample_event_observed)
-
+        
         for year, auc in yearly_aucs.items():
             auc_results[f"Year {year+1}"].append(auc)
 
-    # Compute mean and confidence intervals, ignoring NaNs
     auc_summary = {}
     for year, values in auc_results.items():
         vals = np.array(values)
-        vals = vals[np.isfinite(vals)]  # <-- remove NaNs
-        if len(vals) == 0:
-            auc_summary[year] = (np.nan, (np.nan, np.nan))
-        else:
-            mean_auc = np.mean(vals)
-            lower = np.percentile(vals, 100 * alpha / 2)
-            upper = np.percentile(vals, 100 * (1 - alpha / 2))
-            auc_summary[year] = (mean_auc, (lower, upper))
+        mean_auc = np.mean(vals)
+        lower = np.percentile(vals, 100 * alpha / 2)
+        upper = np.percentile(vals, 100 * (1 - alpha / 2))
+        auc_summary[year] = (mean_auc, (lower, upper))
 
     return auc_summary, auc_results
+
+def print_results(results):
+    """
+    Nicely print nested dictionaries or key-value pairs.
+
+    Args:
+        results: Dict or nested dict to print.
+    """
+    for key, value in results.items():
+        if isinstance(value, dict):
+            print(f"{key}:")
+            for sub_key, sub_value in value.items():
+                print(f"  {sub_key}: {sub_value}")
+        else:
+            print(f"{key}: {value}")
 
 
 def compute_auc_x_year_auc(probs, censor_times, golds):
@@ -366,11 +431,14 @@ def bootstrap_auc_by_cancer_type(
         predictions_cat = predictions[cat_indices]
         event_observed_cat = event_observed[cat_indices]
 
+        cases = np.where(event_observed == 1)[0]
+        controls = np.where(event_observed == 0)[0]
+
         for _ in range(n_bootstrap):
-            # Resample until at least one positive and one negative exists
-            boot_idx = resample(
-                np.arange(len(event_times_cat)), replace=True, n_samples=len(event_times_cat)
-            )
+            sample_cases = resample(cases, replace=True, n_samples=len(cases))
+            sample_controls = resample(controls, replace=True, n_samples=len(controls))
+
+            boot_idx = np.concatenate([sample_cases, sample_controls])
 
             yearly_aucs_sample = compute_auc_x_year_auc(
                 predictions_cat[boot_idx], event_times_cat[boot_idx], event_observed_cat[boot_idx]
@@ -415,8 +483,14 @@ def bootstrap_c_index_by_cancer_type(
 
         c_vals = []
 
+        cases = np.where(event_observed == 1)[0]
+        controls = np.where(event_observed == 0)[0]
+
         for _ in range(n_bootstrap):
-            boot_idx = resample(idx, replace=True, n_samples=len(idx))
+            sample_cases = resample(cases, replace=True, n_samples=len(cases))
+            sample_controls = resample(controls, replace=True, n_samples=len(controls))
+
+            boot_idx = np.concatenate([sample_cases, sample_controls])
 
             try:
                 c = concordance_index_ipcw(
@@ -504,42 +578,62 @@ def bootstrap_auc_by_density(
     WITHOUT balancing cancer vs non-cancer during resampling.
     """
 
-    densities = ["A", "B", "C", "D"]
+    auc_results_by_density = {
+        d: {f"Year {i+1}": [] for i in range(5)} for d in ["A", "B", "C", "D"]
+    }
+
     density_categories = np.array([map_density(v) for v in density_categories])
 
-    auc_results = {d: {f"Year {i+1}": [] for i in range(5)} for d in densities}
-    
-    N = len(event_times)
-    
-    for _ in range(n_bootstrap):
-        indices = np.random.choice(N, N, replace=True)
-        preds_sample = [predictions[i] for i in indices]
-        times_sample = [event_times[i] for i in indices]
-        obs_sample = [event_observed[i] for i in indices]
-        density_sample = [density_categories[i] for i in indices]
-        
-        aucs_sample = compute_auc_by_density_category(preds_sample, times_sample, obs_sample, density_sample)
-        
-        for d in densities:
-            for year, auc in aucs_sample[d].items():
-                if np.isfinite(auc):  # skip NaNs
-                    auc_results[d][year].append(auc)
-    
-    # summarize: mean and CI
-    auc_summary = {}
-    for d in densities:
-        auc_summary[d] = {}
-        for year, vals in auc_results[d].items():
-            vals = np.array(vals)
-            if len(vals) == 0:
-                auc_summary[d][year] = (np.nan, (np.nan, np.nan))
+    for density in ["A", "B", "C", "D"]:
+        density_indices = np.where(density_categories == density)[0]
+
+        if len(density_indices) == 0:
+            print(f"Skipping density '{density}': no samples.")
+            continue
+
+        event_times_density = event_times[density_indices]
+        predictions_density = predictions[density_indices]
+        event_observed_density = event_observed[density_indices]
+
+        n_density = len(density_indices)
+
+        cases = np.where(event_observed == 1)[0]
+        controls = np.where(event_observed == 0)[0]
+
+        for _ in range(n_bootstrap):
+            sample_cases = resample(cases, replace=True, n_samples=len(cases))
+            sample_controls = resample(controls, replace=True, n_samples=len(controls))
+
+            sample_indices = np.concatenate([sample_cases, sample_controls])
+
+            event_times_sample = event_times_density[sample_indices]
+            predictions_sample = predictions_density[sample_indices]
+            event_observed_sample = event_observed_density[sample_indices]
+
+            yearly_aucs_sample = compute_auc_x_year_auc(
+                predictions_sample,
+                event_times_sample,
+                event_observed_sample,
+            )
+
+            for year, auc in yearly_aucs_sample.items():
+                auc_results_by_density[density][f"Year {year + 1}"].append(auc)
+
+    auc_summary_by_density = {}
+    for density, auc_results in auc_results_by_density.items():
+        auc_summary_by_density[density] = {}
+        for year, auc_values in auc_results.items():
+            if auc_values:
+                lower = np.percentile(auc_values, 100 * alpha / 2)
+                upper = np.percentile(auc_values, 100 * (1 - alpha / 2))
+                auc_summary_by_density[density][year] = (
+                    np.mean(auc_values),
+                    (lower, upper),
+                )
             else:
-                mean = np.mean(vals)
-                lower = np.percentile(vals, 100 * alpha / 2)
-                upper = np.percentile(vals, 100 * (1 - alpha / 2))
-                auc_summary[d][year] = (mean, (lower, upper))
-    
-    return auc_summary
+                auc_summary_by_density[density][year] = (None, (None, None))
+
+    return auc_summary_by_density
 
 
 def bootstrap_c_index_by_density(
@@ -576,9 +670,14 @@ def bootstrap_c_index_by_density(
             print(f"[WARNING] Skipping density '{density}': no observed events.")
             continue
         
+        cases = np.where(event_observed == 1)[0]
+        controls = np.where(event_observed == 0)[0]
+
         for _ in range(n_bootstrap):
-            
-            indices = resample(np.arange(len(density_indices)), replace=True)
+            sample_cases = resample(cases, replace=True, n_samples=len(cases))
+            sample_controls = resample(controls, replace=True, n_samples=len(controls))
+
+            indices = np.concatenate([sample_cases, sample_controls])
             event_observed_sample = event_observed_density[indices]
             event_times_sample = event_times_density[indices]
             predictions_sample = predictions_density[indices]
@@ -668,12 +767,14 @@ def bootstrap_auc_by_race(
         pred_r = predictions[idx]
         obs_r = event_observed[idx]
 
+        cases = np.where(event_observed == 1)[0]
+        controls = np.where(event_observed == 0)[0]
+
         for _ in range(n_bootstrap):
-            boot_idx = resample(
-                np.arange(len(et_r)),
-                replace=True,
-                n_samples=len(et_r),
-            )
+            sample_cases = resample(cases, replace=True, n_samples=len(cases))
+            sample_controls = resample(controls, replace=True, n_samples=len(controls))
+
+            boot_idx = np.concatenate([sample_cases, sample_controls])
 
             yearly_aucs = compute_auc_x_year_auc(
                 pred_r[boot_idx],
@@ -748,16 +849,19 @@ def bootstrap_c_index_by_race(
         pred_r = predictions[idx]
         obs_r = event_observed[idx]
 
+        cases = np.where(event_observed == 1)[0]
+        controls = np.where(event_observed == 0)[0]
+
         for _ in range(n_bootstrap):
-            boot_idx = resample(
-                np.arange(len(et_r)),
-                replace=True,
-                n_samples=len(et_r),
-            )
+            sample_cases = resample(cases, replace=True, n_samples=len(cases))
+            sample_controls = resample(controls, replace=True, n_samples=len(controls))
+
+            boot_idx = np.concatenate([sample_cases, sample_controls])
 
             et_sample = et_r[boot_idx]
             pred_sample = pred_r[boot_idx]
             obs_sample = obs_r[boot_idx]
+
            
             try:
                 cidx = concordance_index_ipcw(
@@ -795,5 +899,3 @@ def bootstrap_c_index_by_race(
             cindex_summary_by_race[race] = (None, (None, None))
 
     return cindex_summary_by_race, cindex_results_by_race
-
-
