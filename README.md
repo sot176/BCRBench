@@ -170,7 +170,8 @@ Special case:
 - The Time-to-Cancer label represents the time interval between:
 
 - The date of a screening mammogram and the corresponding breast cancer diagnosis.
-
+<sub>2015<sub> |                    | <sub>0<sub> |<sub>1<sub>|             | <sub>Caucasian or White<sub>  |
+</details>
 
 <details>
 <summary><b>Values for Cancer types</b></summary>
