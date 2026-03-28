@@ -37,41 +37,6 @@ def map_density( value):
     return mapping.get(value, "NA")
 
 
-def checkpoint(model, filename):
-    """
-    Save model state dictionary to a file.
-
-    Args:
-        model: PyTorch model whose state_dict will be saved.
-        filename: String path to save the model state dictionary.
-    """
-    torch.save(model.state_dict(), filename)
-
-
-def create_logger(log_path):
-    """
-    Create a logger that writes INFO-level logs to a specified file.
-
-    Args:
-        log_path: Path to the log file.
-
-    Returns:
-        logger: Configured logger instance.
-    """
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-
-    f_handler = logging.FileHandler(log_path)
-    f_format = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    f_handler.setFormatter(f_format)
-
-    if logger.hasHandlers():
-        logger.handlers.clear()
-
-    logger.addHandler(f_handler)
-    return logger
-
-
 def bootstrap_c_index(
     event_times,
     predictions,
@@ -163,8 +128,8 @@ def bootstrap_c_index_by_density(
         predictions_density = predictions[density_indices]
         event_observed_density = event_observed[density_indices]
 
-        cases = np.where(event_observed == 1)[0]
-        controls = np.where(event_observed == 0)[0]
+        cases = np.where(event_observed_density == 1)[0]
+        controls = np.where(event_observed_density==0)[0]
 
         for _ in range(n_bootstrap):
             sample_cases = resample(cases, replace=True, n_samples=len(cases))
@@ -274,21 +239,6 @@ def bootstrap_auc(event_times, predictions, event_observed, n_bootstrap=2000, al
         auc_summary[year] = (mean_auc, (lower, upper))
 
     return auc_summary, auc_results
-
-def print_results(results):
-    """
-    Nicely print nested dictionaries or key-value pairs.
-
-    Args:
-        results: Dict or nested dict to print.
-    """
-    for key, value in results.items():
-        if isinstance(value, dict):
-            print(f"{key}:")
-            for sub_key, sub_value in value.items():
-                print(f"  {sub_key}: {sub_value}")
-        else:
-            print(f"{key}: {value}")
 
 
 def compute_auc_x_year_auc(probs, censor_times, golds):
@@ -431,8 +381,8 @@ def bootstrap_auc_by_cancer_type(
         predictions_cat = predictions[cat_indices]
         event_observed_cat = event_observed[cat_indices]
 
-        cases = np.where(event_observed == 1)[0]
-        controls = np.where(event_observed == 0)[0]
+        cases = np.where(event_observed_cat == 1)[0]
+        controls = np.where(event_observed_cat == 0)[0]
 
         for _ in range(n_bootstrap):
             sample_cases = resample(cases, replace=True, n_samples=len(cases))
@@ -597,12 +547,12 @@ def bootstrap_auc_by_density(
 
         n_density = len(density_indices)
 
-        cases = np.where(event_observed == 1)[0]
-        controls = np.where(event_observed == 0)[0]
+        cases_density = np.where(event_observed_density == 1)[0]
+        controls_density = np.where(event_observed_density == 0)[0]
 
         for _ in range(n_bootstrap):
-            sample_cases = resample(cases, replace=True, n_samples=len(cases))
-            sample_controls = resample(controls, replace=True, n_samples=len(controls))
+            sample_cases = resample(cases_density, replace=True, n_samples=len(cases_density))
+            sample_controls = resample(controls_density, replace=True, n_samples=len(controls_density))
 
             sample_indices = np.concatenate([sample_cases, sample_controls])
 
@@ -670,12 +620,12 @@ def bootstrap_c_index_by_density(
             print(f"[WARNING] Skipping density '{density}': no observed events.")
             continue
         
-        cases = np.where(event_observed == 1)[0]
-        controls = np.where(event_observed == 0)[0]
+        cases_density = np.where(event_observed_density == 1)[0]
+        controls_density = np.where(event_observed_density == 0)[0]
 
         for _ in range(n_bootstrap):
-            sample_cases = resample(cases, replace=True, n_samples=len(cases))
-            sample_controls = resample(controls, replace=True, n_samples=len(controls))
+            sample_cases = resample(cases_density, replace=True, n_samples=len(cases_density))
+            sample_controls = resample(controls_density, replace=True, n_samples=len(controls_density))
 
             indices = np.concatenate([sample_cases, sample_controls])
             event_observed_sample = event_observed_density[indices]
@@ -767,8 +717,8 @@ def bootstrap_auc_by_race(
         pred_r = predictions[idx]
         obs_r = event_observed[idx]
 
-        cases = np.where(event_observed == 1)[0]
-        controls = np.where(event_observed == 0)[0]
+        cases = np.where(obs_r == 1)[0]
+        controls = np.where(obs_r == 0)[0]
 
         for _ in range(n_bootstrap):
             sample_cases = resample(cases, replace=True, n_samples=len(cases))
@@ -849,8 +799,8 @@ def bootstrap_c_index_by_race(
         pred_r = predictions[idx]
         obs_r = event_observed[idx]
 
-        cases = np.where(event_observed == 1)[0]
-        controls = np.where(event_observed == 0)[0]
+        cases = np.where(obs_r == 1)[0]
+        controls = np.where(obs_r == 0)[0]
 
         for _ in range(n_bootstrap):
             sample_cases = resample(cases, replace=True, n_samples=len(cases))
@@ -899,3 +849,4 @@ def bootstrap_c_index_by_race(
             cindex_summary_by_race[race] = (None, (None, None))
 
     return cindex_summary_by_race, cindex_results_by_race
+
