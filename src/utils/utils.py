@@ -681,7 +681,7 @@ def bootstrap_auc_by_race(
     predictions,
     event_observed,
     race_categories,
-    n_bootstrap=1000,
+    n_bootstrap=2000,
     alpha=0.05,
 ):
     """
@@ -723,7 +723,9 @@ def bootstrap_auc_by_race(
 
         cases = np.where(obs_r == 1)[0]
         controls = np.where(obs_r == 0)[0]
-
+        if len(cases) == 0 or len(controls) == 0:
+            print(f"[WARN] Skipping race '{race}' — no positive or negative samples")
+            continue
         for _ in range(n_bootstrap):
             sample_cases = resample(cases, replace=True, n_samples=len(cases))
             sample_controls = resample(controls, replace=True, n_samples=len(controls))
@@ -805,7 +807,9 @@ def bootstrap_c_index_by_race(
 
         cases = np.where(obs_r == 1)[0]
         controls = np.where(obs_r == 0)[0]
-
+        if len(cases) == 0 or len(controls) == 0:
+            print(f"[WARN] Skipping race '{race}' — no positive or negative samples")
+            continue
         for _ in range(n_bootstrap):
             sample_cases = resample(cases, replace=True, n_samples=len(cases))
             sample_controls = resample(controls, replace=True, n_samples=len(controls))
