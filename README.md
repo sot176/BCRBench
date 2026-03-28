@@ -10,10 +10,11 @@ We aim to encourage further research by providing a single, unified repository w
 1. 📘 [Overview](#overview)  
 2. ⚙️ [Models Implemented](#models-implemented)  
 3. 📚 [Comparison of Models](#comparison-of-models)  
-4. 🔍 [Dataset Format](#dataset-format)  
-5. ▶️ [Usage](#usage)  
-6. 📄 [Citation](#citation) 
-7. 📝 [License](#license) 
+4. 🗂️ [Datasets](#datasets)
+5. 📄 [CSV File Format](#csv-file-format)  
+6. ▶️ [Usage](#usage)  
+7. 📄 [Citation](#citation) 
+8. 📝 [License](#license) 
 
 ---
 
@@ -32,11 +33,11 @@ This repository provides implementations of several recent breast cancer risk pr
 
 | Model            | Conference/Journal      | Input Views & Timepoints                     | Key Idea                                                           |
 | ---------------- | --------------------- | -------------------------------------------- | ------------------------------------------------------------------ |
-| **[Mirai](https://doi.org/10.1126/scitranslmed.aba4373)**        | Sci. Transl. Med. 2021         | 4 screening mammograms (single timepoint)    | Learns breast cancer risk from all four views in a single visit         |
+| **[LMV-Net]()**      | submitted to MICCAI 2026  | Both views of 1 breast, 2 timepoints         | Multi-view longitudinal model with dual-stream attention leveraging both views of one breast. |
+| **[ImgFeatAlign](https://doi.org/10.1007/978-3-032-04937-7_47)** | MICCAI 2025             | 1 view of 1 breast                           | Uses image-based deformation (MammoRegNet) applied in feature space for improved longitudinal comparison.   |
 | **[VMRA-MaR](https://doi.org/10.1007/978-3-032-05182-0_64)**     | MICCAI 2025             | 4 screening mammograms (multiple timepoints) | Extends Mirai to longitudinal mammograms using Spatial Asymmetry Detector and Longitudinal Asymmetry Tracker.                     |
 | **[OA-BReaCR](https://doi.org/10.1007/978-3-031-72378-0_15)**    | MICCAI 2024             | 1 view of 1 breast, 2 timepoints             | Learns longitudinal changes using feature-based deformation fields for better temporal alignment.             |
-| **[ImgFeatAlign](https://doi.org/10.1007/978-3-032-04937-7_47)** | MICCAI 2025             | 1 view of 1 breast                           | Uses image-based deformation (MammoRegNet) applied in feature space for improved longitudinal comparison.   |
-| **[LMV-Net]()**      | submitted to MICCAI 2026  | Both views of 1 breast, 2 timepoints         | Multi-view longitudinal model with dual-stream attention leveraging both views of one breast. |
+| **[Mirai](https://doi.org/10.1126/scitranslmed.aba4373)**        | Sci. Transl. Med. 2021         | 4 screening mammograms (single timepoint)    | Learns breast cancer risk from all four views in a single visit         |
 
 
 Each model is implemented with a consistent API and unified training/evaluation pipeline.
@@ -53,7 +54,15 @@ Each model is implemented with a consistent API and unified training/evaluation 
 
 ---
 
-## Dataset Format
+## Datasets
+This repository integrates two large, publicly available mammography datasets:
+- **Emory Breast Imaging Dataset (EMBED)**: https://aws.amazon.com/marketplace/pp/prodview-unw4li5rkivs2#overview}
+- **Cohort of Screen-Aged Women Case Control (CSAW-CC)**: https://snd.se/en/catalogue/dataset/2021-204-1
+
+
+---
+
+## CSV File Format
 To use the models and dataset classes in this repository, the datasets must be organized as CSV files with specific columns.
 
 
@@ -199,17 +208,37 @@ Similarly, each model has its own evaluation script:
 
 If you use these implementations in your research, please cite the original papers for the models and this repository.
 
-### Model Papers
 
-- **Mirai**  
+### Repository 
 ```bibtex
-@article{mirai_2021,
-author = {Adam Yala  and Peter G. Mikhael  and Fredrik Strand  and Gigin Lin  and Kevin Smith  and Yung-Liang Wan  and Leslie Lamb  and Kevin Hughes  and Constance Lehman  and Regina Barzilay },
-title = {Toward robust mammography-based models for breast cancer risk},
-journal = {Science Translational Medicine},
-year={2021},
-volume={9},
-doi={doi.org/10.1126/scitranslmed.aba4373}
+@misc{breast_cancer_risk_github,
+  title = {BreastCancerRiskBenchmark},
+  year = {2026},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/sot176/BreastCancerRiskBenchmark}}
+}
+```
+
+### Model Papers
+- **LMV-Net**: 
+```bibtex
+@inproceedings{lmv_net_2026,
+author = {Thrun, Solveig and Sun, Zijun and  Salahuddin, Suaiba A. and Wickstrøm, Kristoffer and Wetzer, Elisabeth and Hansen, Stine, and Jenssen, Robert and Kampffmeyer, Michael},
+title={Longitudinal Multi-View Modeling for Breast Cancer Risk Prediction},
+booktitle={Under review for MICCAI 2026},
+year={2026}
+}
+```
+
+- **ImgFeatAlign**: 
+```bibtex
+@inproceedings{imgfeatalign_2025,
+author = {Thrun, Solveig and Hansen, Stine and Sun, Zijun and Blum, Nele and Salahuddin, Suaiba A. and Wickstrøm, Kristoffer and Wetzer, Elisabeth and Jenssen, Robert and Stille, Maik and Kampffmeyer, Michael},
+title = {Reconsidering Explicit Longitudinal Mammography Alignment for Enhanced Breast Cancer Risk Prediction},
+booktitle = {Medical Image Computing and Computer Assisted Intervention -- MICCAI 2025},
+year = {2025},
+doi = {10.1007/978-3-032-04937-7_47}
 }
 ```
 
@@ -234,35 +263,15 @@ doi = {https://doi.org/10.1007/978-3-031-72378-0_15}
 }
 ```
 
-- **ImgFeatAlign**: 
+- **Mirai**  
 ```bibtex
-@inproceedings{imgfeatalign_2025,
-author = {Thrun, Solveig and Hansen, Stine and Sun, Zijun and Blum, Nele and Salahuddin, Suaiba A. and Wickstrøm, Kristoffer and Wetzer, Elisabeth and Jenssen, Robert and Stille, Maik and Kampffmeyer, Michael},
-title = {Reconsidering Explicit Longitudinal Mammography Alignment for Enhanced Breast Cancer Risk Prediction},
-booktitle = {Medical Image Computing and Computer Assisted Intervention -- MICCAI 2025},
-year = {2025},
-doi = {10.1007/978-3-032-04937-7_47}
-}
-```
-
-- **LMV-Net**: 
-```bibtex
-@inproceedings{lmv_net_2026,
-author = {Thrun, Solveig and Sun, Zijun and  Salahuddin, Suaiba A. and Wickstrøm, Kristoffer and Wetzer, Elisabeth and Hansen, Stine, and Jenssen, Robert and Kampffmeyer, Michael},
-title={Longitudinal Multi-View Modeling for Breast Cancer Risk Prediction},
-booktitle={Under review for MICCAI 2026},
-year={2026}
-}
-```
-
-And please cite this repository:
-```bibtex
-@misc{breast_cancer_risk_github,
-  title = {BreastCancerRiskBenchmark},
-  year = {2026},
-  publisher = {GitHub},
-  journal = {GitHub repository},
-  howpublished = {\url{https://github.com/sot176/BreastCancerRiskBenchmark}}
+@article{mirai_2021,
+author = {Adam Yala  and Peter G. Mikhael  and Fredrik Strand  and Gigin Lin  and Kevin Smith  and Yung-Liang Wan  and Leslie Lamb  and Kevin Hughes  and Constance Lehman  and Regina Barzilay },
+title = {Toward robust mammography-based models for breast cancer risk},
+journal = {Science Translational Medicine},
+year={2021},
+volume={9},
+doi={doi.org/10.1126/scitranslmed.aba4373}
 }
 ```
 
