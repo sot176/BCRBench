@@ -87,6 +87,90 @@ To use the models and dataset classes in this repository, the datasets must be o
 </div>
 </details>
 
+<details>
+<summary><b>Dataset Curation and Label Generation</b></summary>
+
+### EMBED labelling
+**Positive cases:**
+- BI-RADS score = 6 (biopsy-proven cancer)
+- Pathological severity score = 0 or 1 (invasive or non-invasive cancer)
+
+
+**Negative cases:**
+- BI-RADS scores = 1 or 2 (negative or benign)
+- BI-RADS 0 cases later reclassified as BI-RADS 1 or 2
+
+
+**Column references:**
+- BI-RADS scores correspond to the column `asses` in the original CSV file
+
+**Cancer diagnosis date:**
+- Defined as the pathology result date (biopsy confirmation)
+- Corresponds to the column `procdate_anon` in the original CSV file
+
+#### 🧾 Example (EMBED – One Patient)
+| exam_year | asses (BI-RADS) | procdate_anon    | time_to_cancer |
+|----------|----------------|---------------|----------------|
+| 2016     | 1              | —               | 3 |
+| 2017     | 2              | —               | 2 |
+| 2018     | 1              | —               | 1 |
+| 2019     | 6              | 2019-06-15      | 0 |
+
+- Cancer is confirmed in 2019 (`procdate_anon`)  
+- Time-to-Cancer is computed backward for prior screenings:
+  - 2016 → 3 years  
+  - 2017 → 2 years  
+  - 2018 → 1 year  
+- The cancer-year exam (2019) has Time-to-Cancer = 0
+
+
+### CSAW-CC labeling
+
+**Positive cases (based on `rad_timing`):**
+- `rad_timing` = 1 → Screen-detected cancer
+- `rad_timing` = 2 → Interval cancer
+
+**Negative cases:**
+- No recorded `rad_timing`
+- Indicates no cancer diagnosis during the study period
+
+**Important note:**
+Biopsy dates are not available
+`rad_timing` is used as a proxy for cancer timing
+
+
+**Cancer Year Assignment (CSAW-CC)**
+- Data grouped by patient ID
+- The latest exam year per patient is selected
+- Screen-detected (rad_timing = 1) → Same year as exam
+- Interval cancer (rad_timing = 2) → Exam year + 1
+
+Special case:
+- If latest exam year = 2016 → Cancer year set to 2016
+(Final year of CSAW-CC study)
+
+
+#### 🧾 Example (CSAW-CC – Single Patient History)
+| exam_year | rad_timing | cancer_year      | time_to_cancer |
+|----------|------------|-------------|----------------|
+| 2013     | —          | —        | 4 |
+| 2014     | —          | —         | 3 |
+| 2015     | —          | —           | 2 |
+| 2016     | 2          | 2017       | 1 |
+
+- Latest exam: 2016 with `rad_timing = 2` (interval cancer)  
+- Cancer year = 2016 + 1 = 2017  
+- Time-to-Cancer is computed as:
+  - 2013 → 4 years  
+  - 2014 → 3 years  
+  - 2015 → 2 years  
+  - 2016 → 1 year  
+
+### Time-to-Cancer Definition
+- The Time-to-Cancer label represents the time interval between:
+
+- The date of a screening mammogram and the corresponding breast cancer diagnosis.
+
 
 <details>
 <summary><b>Values for Cancer types</b></summary>
