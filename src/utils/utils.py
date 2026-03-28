@@ -383,7 +383,9 @@ def bootstrap_auc_by_cancer_type(
 
         cases = np.where(event_observed_cat == 1)[0]
         controls = np.where(event_observed_cat == 0)[0]
-
+        if len(cases) == 0 or len(controls) == 0:
+            warnings.warn(f"Skipping cancer category {cat}: no positive or negative cases for bootstrapping.")
+            continue
         for _ in range(n_bootstrap):
             sample_cases = resample(cases, replace=True, n_samples=len(cases))
             sample_controls = resample(controls, replace=True, n_samples=len(controls))
@@ -435,7 +437,9 @@ def bootstrap_c_index_by_cancer_type(
 
         cases = np.where(event_observed == 1)[0]
         controls = np.where(event_observed == 0)[0]
-
+        if len(cases) == 0 or len(controls) == 0:
+            warnings.warn(f"Skipping cancer category {cat}: no positive or negative cases for bootstrapping.")
+            continue
         for _ in range(n_bootstrap):
             sample_cases = resample(cases, replace=True, n_samples=len(cases))
             sample_controls = resample(controls, replace=True, n_samples=len(controls))
