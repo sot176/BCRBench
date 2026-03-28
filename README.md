@@ -150,7 +150,7 @@ Special case:
 (Final year of CSAW-CC study)
 
 
-#### 🧾 Example (CSAW-CC – Single Patient History)
+#### 🧾 Example (CSAW-CC – One Patient)
 | exam_year | rad_timing | cancer_year      | time_to_cancer |
 |----------|------------|-------------|----------------|
 | 2013     | —          | —        | 4 |
