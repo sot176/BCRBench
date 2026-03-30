@@ -518,7 +518,6 @@ def auc_by_cancer_type(
         auc_summary_by_cancer[cat] = {f"Year {year + 1}": auc for year, auc in yearly_aucs.items()}
 
     return auc_summary_by_cancer
-
 def bootstrap_auc_by_density(
     event_times,
     predictions,
