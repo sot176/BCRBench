@@ -552,7 +552,9 @@ def bootstrap_auc_by_density(
 
         cases_density = np.where(event_observed_density == 1)[0]
         controls_density = np.where(event_observed_density == 0)[0]
-
+        if len(cases_density) == 0 or len(controls_density) == 0:
+            print(f"Skipping density '{density}': insufficient class balance.")
+            continue
         for _ in range(n_bootstrap):
             sample_cases = resample(cases_density, replace=True, n_samples=len(cases_density))
             sample_controls = resample(controls_density, replace=True, n_samples=len(controls_density))
@@ -625,7 +627,9 @@ def bootstrap_c_index_by_density(
         
         cases_density = np.where(event_observed_density == 1)[0]
         controls_density = np.where(event_observed_density == 0)[0]
-
+        if len(cases_density) == 0 or len(controls_density) == 0:
+            print(f"Skipping density '{density}': insufficient class balance.")
+            continue
         for _ in range(n_bootstrap):
             sample_cases = resample(cases_density, replace=True, n_samples=len(cases_density))
             sample_controls = resample(controls_density, replace=True, n_samples=len(controls_density))
