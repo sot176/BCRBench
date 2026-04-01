@@ -145,10 +145,7 @@ class risk_BCE_loss(nn.Module):
         pred = F.softmax(pred, dim=1)
         batch_size, num_pred_years = pred.shape
         followup = num_pred_years - 1
-        print("pred", pred)
-        print("risk label", risk_label)
-        print("years last followup", years_last_followup)
-        risk_label = risk_label.cpu().detach().numpy()
+        
         years_last_followup = years_last_followup.cpu().detach().numpy()
         device = pred.device  # or self.device
         risk_mask = torch.ones((batch_size, self.num_pred_years), device=device)
@@ -161,7 +158,9 @@ class risk_BCE_loss(nn.Module):
             # fa = years_last_followup[i]
             if risk_label[i] == followup and years_last_followup[i] < followup:
                 risk_mask[i, years_last_followup[i] + 1:] = 0
-
+            print("followup:", years_last_followup[i])
+            print("mask:", risk_mask[i])
+            print("risk label:", risk_label[i])
         if torch.sum(risk_mask.float()) == 0:
             print('wrong!!!!!!!!!', torch.sum(risk_mask.float()))
 
