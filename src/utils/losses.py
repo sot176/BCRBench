@@ -153,14 +153,19 @@ class risk_BCE_loss(nn.Module):
 
         risk_label[risk_label > (num_pred_years - 1)] = num_pred_years - 1
         for i in range(batch_size):
-            y_seq[i, risk_label[i]] = 1
-            # ra = risk_label[i]
-            # fa = years_last_followup[i]
+            # set target
+            if risk_label[i] < followup:
+                y_seq[i, risk_label[i]] = 1
+            # censoring
             if risk_label[i] == followup and years_last_followup[i] < followup:
-                risk_mask[i, years_last_followup[i] + 1:] = 0
+                risk_mask[i, years_last_followup[i]+1:] = 0
+            # mask after event
+            if risk_label[i] < followup:
+                risk_mask[i, risk_label[i]+1:] = 0
             print("followup:", years_last_followup[i])
             print("mask:", risk_mask[i])
             print("risk label:", risk_label[i])
+            print("y_seq:", y_seq[i])
         if torch.sum(risk_mask.float()) == 0:
             print('wrong!!!!!!!!!', torch.sum(risk_mask.float()))
 
