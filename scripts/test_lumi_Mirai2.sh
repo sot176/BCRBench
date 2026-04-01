@@ -52,7 +52,6 @@ accelerate launch  main_test.py \
   --batch_size 1 \
   --survival_analysis_setup \
   --num_workers 7 \
-  --best_model "True" \
   --dataset "EMBED" \
   --seed 2023 \
 
