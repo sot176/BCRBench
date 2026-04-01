@@ -145,6 +145,9 @@ class risk_BCE_loss(nn.Module):
         pred = F.softmax(pred, dim=1)
         batch_size, num_pred_years = pred.shape
         followup = num_pred_years - 1
+        print("pred", pred)
+        print("risk label", risk_label)
+        print("years last followup", years_last_followup)
         risk_label = risk_label.cpu().detach().numpy()
         years_last_followup = years_last_followup.cpu().detach().numpy()
         device = pred.device  # or self.device
