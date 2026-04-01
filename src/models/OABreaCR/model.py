@@ -1,9 +1,23 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
 from models.common_parts  import ContinuousPosEncoding, SpatialTransformerBlock
 from .model_utils import Simple_AttentionPool, POELatent, Feedforward, BaselineModel
+
+def prob_to_score(prob, max_followup=5):
+    # print('prob')
+    # for i in range(15):
+    score = np.zeros_like(prob)[:, 0:max_followup]
+    for i in range(max_followup):
+        # i_ = -(i + 1)
+        # score[:, i] = prob[:, i_]
+        for i_in in range(i+1):
+            i_ = i_in
+            # i_ = -(i_in + 1)
+            score[:, i] += prob[:, i_]
+    return score
 
 
 class OA_BreaCR(nn.Module):
@@ -138,10 +152,20 @@ class OA_BreaCR(nn.Module):
         Returns the main prediction head used for evaluation.
         """
         risk = outputs["final"]
-        if risk.dim()==3:
-            risk = risk.mean(dim=0)    # average over stochastic dimension
+
+        if risk.dim() == 3:
+            risk = risk.mean(dim=0)  # average over stochastic dimension
+
         pred_risk = F.softmax(risk, dim=-1)
 
-        return pred_risk
-    
+        # Convert to numpy for prob_to_score
+        prob_np = pred_risk.detach().cpu().numpy()
+
+        score_np = prob_to_score(prob_np, max_followup=5)
+
+        # Convert back to torch tensor
+        score = torch.from_numpy(score_np).to(pred_risk.device).float()
+
+        return score
+        
     
