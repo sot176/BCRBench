@@ -45,7 +45,7 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
         print(f"Total params (M):            {total_params / 1e6:.2f} M")
 
     # Set up optimizer with parameter groups for differential learning rates (lower LR for pretrained encoder, higher LR for new modules)
-    param_groups = get_param_groups(model_risk, base_lr=args.learning_rate, finetune_lr_scale=0.1)
+    param_groups = get_param_groups(args, model_risk, base_lr=args.learning_rate)
 
     optimizer = torch.optim.AdamW(param_groups, weight_decay=args.weight_decay)
 

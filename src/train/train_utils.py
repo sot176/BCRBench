@@ -126,9 +126,14 @@ def linear_warmup(step, warmup_steps):
     return 1.0
 
 
-def get_param_groups(model, base_lr, finetune_lr_scale=0.1):
+def get_param_groups(args, model, base_lr, finetune_lr_scale=0.1):
     encoder_params = []
     new_module_params = []
+    
+    if args.model == "OA-BreaCR":
+        finetune_lr_scale = 1.0
+    else:
+        finetune_lr_scale = 0.1
 
     for name, param in model.named_parameters():
         if not param.requires_grad:
