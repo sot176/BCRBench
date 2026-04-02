@@ -54,6 +54,7 @@ accelerate launch  main_train.py \
             --weight_decay 1e-6 \
             --model "OA-BreaCR" \
             --use_poe \
+            --use_sto \
             --lr_decay 0.5 \
             --patience_lr_scheduler 5 \
             --num_epochs 30 \
