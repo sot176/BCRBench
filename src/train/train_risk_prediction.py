@@ -126,10 +126,10 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
     # --------------------------------------------------
     for epoch in range(start_epoch, args.num_epochs):
         # --- Training ---
-        avg_train_loss, train_c_index, auc_results_train = train_one_epoch(args, model_risk, train_loader, optimizer, accelerator,  warmup_scheduler, global_step, warmup_steps, loss_fn )
+        avg_train_loss, train_c_index, auc_results_train = train_one_epoch(model_risk, train_loader, optimizer, accelerator,  warmup_scheduler, global_step, warmup_steps, loss_fn )
 
         # --- Validation ---
-        val_risk_loss, val_c_index, auc_results = evaluate(args, model_risk, valid_loader, accelerator, loss_fn )
+        val_risk_loss, val_c_index, auc_results = evaluate(model_risk, valid_loader, accelerator, loss_fn )
 
         # --- Logging, Checkpointing, and Early Stopping (on main process) ---
         if accelerator.is_main_process:

@@ -72,16 +72,12 @@ class BaselineModel(nn.Module):
         # print(model)
         if 'densenet' in arch:
             num_feat = model.classifier.in_features
-            # model.classifier = nn.Identity()
         elif 'resnet' in arch:
             num_feat = model.fc.in_features
-            # model.fc = nn.Identity()
         elif 'vgg' in arch:
             num_feat = model.classifier[-1].in_features
-            # model.classifier[-1] = nn.Identity()
         elif 'convnext' in arch:
             num_feat = model.classifier[-1].in_features
-            # model.classifier[-1] = nn.Identity()
         elif 'efficientnet' in arch:
             num_feat = model.classifier[-1].in_features
 
@@ -106,7 +102,6 @@ class BaselineModel(nn.Module):
         self.num_feat = num_feat
 
     def forward(self, x):
-        # x = torch.cat([x, x, x], dim=1)
         return self.model(x)
 
     def get_num_feat(self):
@@ -136,7 +131,6 @@ class Simple_AttentionPool(nn.Module):
         '''
         output = {}
         B, C, W, H = x.shape
-        # spatially_flat_size = (*x.size()[:2], -1)  # B, C, N
 
         spatially_flat_size = (B, C, -1)
         x = x.view(spatially_flat_size)

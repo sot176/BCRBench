@@ -7,15 +7,10 @@ from models.common_parts  import ContinuousPosEncoding, SpatialTransformerBlock
 from .model_utils import Simple_AttentionPool, POELatent, Feedforward, BaselineModel
 
 def prob_to_score(prob, max_followup=5):
-    # print('prob')
-    # for i in range(15):
     score = np.zeros_like(prob)[:, 0:max_followup]
     for i in range(max_followup):
-        # i_ = -(i + 1)
-        # score[:, i] = prob[:, i_]
         for i_in in range(i+1):
             i_ = i_in
-            # i_ = -(i_in + 1)
             score[:, i] += prob[:, i_]
     return score
 
@@ -23,13 +18,13 @@ def prob_to_score(prob, max_followup=5):
 class OA_BreaCR(nn.Module):
     def __init__(self,  args):
         super(OA_BreaCR, self).__init__()
-        # create model
+       
         model = BaselineModel(arch=args.arch)  # Encoder
         num_feat = model.get_num_feat()
         self.model = model
         self.final = nn.Sequential(
             nn.Linear(num_feat, args.num_output_neurons),
-        )  # output layer
+        )  
 
         self.pooling = Simple_AttentionPool(
             num_chan=num_feat,
@@ -54,11 +49,11 @@ class OA_BreaCR(nn.Module):
 
         self.final_single = nn.Sequential(
             nn.Linear(num_feat, args.num_output_neurons),
-        )  # output layer
+        ) 
 
         self.difference_single = nn.Sequential(
             nn.Linear(num_feat, args.num_output_neurons),
-        )  # output layer
+        )  
         self.max_t = getattr(args, 'max_t', 50)
         self.use_sto = getattr(args, 'use_sto', False)
 
