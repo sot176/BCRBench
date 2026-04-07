@@ -23,7 +23,7 @@ def train_one_epoch(model_risk, train_loader, optimizer, accelerator,  warmup_sc
         base_model = accelerator.unwrap_model(model_risk)
         risk_loss = loss_fn(outputs, batch, base_model)
 
-        running_risk_loss += risk_loss.item()
+        running_risk_loss += accelerator.gather(risk_loss.detach()).mean().item()
         optimizer.zero_grad()
         accelerator.backward(risk_loss)
         optimizer.step()
@@ -45,6 +45,8 @@ def train_one_epoch(model_risk, train_loader, optimizer, accelerator,  warmup_sc
 
     avg_risk_loss = running_risk_loss / len(train_loader)
     c_index, auc_results = 0, {}
+
+    accelerator.wait_for_everyone()
 
     # Calculate metrics on the main process
     if accelerator.is_main_process:
@@ -77,7 +79,7 @@ def evaluate(model_risk, valid_loader, accelerator, loss_fn):
 
             risk_loss_val = loss_fn(outputs_val, batch_val, base_model)
 
-            running_risk_loss += risk_loss_val.item()
+            running_risk_loss += accelerator.gather(risk_loss_val.detach()).mean().item()
 
             pred_risk = base_model.get_primary_risk_head(outputs_val)
 
@@ -89,6 +91,8 @@ def evaluate(model_risk, valid_loader, accelerator, loss_fn):
 
     avg_risk_loss = running_risk_loss / len(valid_loader)
     c_index, auc_results = 0, {}
+
+    accelerator.wait_for_everyone()
 
     # Calculate metrics on the main process
     if accelerator.is_main_process:
