@@ -1,6 +1,5 @@
 import torch.nn as nn
 from .factory import RegisterBlock
-import pdb
 
 def conv3x3(inplanes, outplanes, stride=1, groups=1):
     """Builds a 3x3 convolution layer with padding.

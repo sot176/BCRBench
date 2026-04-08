@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import sys
 
-# ── Register onconet aliases BEFORE any import from factory ──────────
+# ── Register onconet aliases before any import from factory ──────────
 from . import onconet as _onconet
 sys.modules.setdefault("onconet", _onconet)
 for _key in list(sys.modules.keys()):
@@ -18,59 +18,97 @@ from config.config import cfg
 
 @RegisterModel("mirai_full")
 class Mirai(nn.Module):
+    """
+    Full Mirai model combining image encoder + transformer for longitudinal risk prediction.
+    """
     def __init__(self, args):
         super().__init__()
         self.args = args
 
-        if args.img_encoder_snapshot is not None:
-            self.image_encoder = load_model(
-                args.img_encoder_snapshot, args, do_wrap_model=False
-            )
-            if getattr(args, "replace_snapshot_pool", True):
-                non_trained_encoder = get_model_by_name("custom_resnet", False, args)
-                # Replace pool, fc, and prob_of_failure_layer — all depend on hidden dim
-                self.image_encoder._model.pool               = non_trained_encoder._model.pool
-                self.image_encoder._model.fc                 = non_trained_encoder._model.fc
-                self.image_encoder._model.prob_of_failure_layer = non_trained_encoder._model.prob_of_failure_layer
-                self.image_encoder._model.args               = non_trained_encoder._model.args
-        else:
-            self.image_encoder = get_model_by_name("custom_resnet", False, args)
+        # -------------------------
+        # Image Encoder
+        # -------------------------
+        self.image_encoder = self._init_image_encoder(args)
 
+        # Freeze encoder if requested
         if getattr(args, "freeze_image_encoder", False):
-            for param in self.image_encoder.parameters():
-                param.requires_grad = False
+            self._freeze_encoder(self.image_encoder)
 
         self.image_repr_dim = self.image_encoder._model.args.img_only_dim
 
-        # ── Transformer ───────────────────────────────────────────────
+        # -------------------------
+        # Transformer
+        # -------------------------
         args.precomputed_hidden_dim = self.image_repr_dim
+        self.transformer = self._init_transformer(args)
 
-        if args.transformer_snapshot is not None:
-            self.transformer = load_model(
-                args.transformer_snapshot, args, do_wrap_model=False
-            )
-        else:
-            self.transformer = get_model_by_name("transformer", False, args)
-
+        # Update transformer output dim
         args.img_only_dim = self.transformer.args.transfomer_hidden_dim
 
+    # -------------------------
+    # Helper methods
+    # -------------------------
+    def _init_image_encoder(self, args):
+        """Initialize the image encoder, optionally loading a snapshot."""
+        if getattr(args, "img_encoder_snapshot", None):
+            encoder = load_model(args.img_encoder_snapshot, args, do_wrap_model=False)
+            if getattr(args, "replace_snapshot_pool", True):
+                new_encoder = get_model_by_name("custom_resnet", train=False, args=args)
+                # Replace pool, fc, prob_of_failure_layer, and args
+                encoder._model.pool = new_encoder._model.pool
+                encoder._model.fc = new_encoder._model.fc
+                encoder._model.prob_of_failure_layer = new_encoder._model.prob_of_failure_layer
+                encoder._model.args = new_encoder._model.args
+        else:
+            encoder = get_model_by_name("custom_resnet", train=False, args=args)
+        return encoder
+
+    @staticmethod
+    def _freeze_encoder(encoder):
+        """Freeze all parameters of the encoder."""
+        for param in encoder.parameters():
+            param.requires_grad = False
+        encoder.eval()
+        print("[INFO] Image encoder frozen.")
+
+    def _init_transformer(self, args):
+        """Initialize the transformer, optionally loading a snapshot."""
+        if getattr(args, "transformer_snapshot", None):
+            transformer = load_model(args.transformer_snapshot, args, do_wrap_model=False)
+        else:
+            transformer = get_model_by_name("transformer", train=False, args=args)
+        return transformer
+
+    # -------------------------
+    # Forward
+    # -------------------------
     def forward(self, batch):
-        x = batch["images"]                              # (B, C, N, H, W)
-        B, C, N, H, W = x.size()
+        """
+        Forward pass: images → encoder → transformer → logits.
+
+        Args:
+            batch (dict): Batch dictionary containing:
+                "images": (B, C, N, H, W)
+        Returns:
+            tuple: (logit, transformer_hidden, activ_dict)
+        """
+        images = batch["images"]  # (B, C, N, H, W)
+        B, C, N, H, W = images.size()
 
         # Flatten views for encoder
-        x = x.transpose(1, 2).contiguous().view(B * N, C, H, W)
+        images_flat = images.transpose(1, 2).contiguous().view(B * N, C, H, W)
 
-        # Encode
-        _, img_x, _ = self.image_encoder(x, None, batch)
-        img_x = img_x.view(B, N, -1)[:, :, :self.image_repr_dim]
+        # Encode images
+        _, img_features, _ = self.image_encoder(images_flat, None, batch)
+        img_features = img_features.view(B, N, -1)[:, :, :self.image_repr_dim]
 
-        # Transformer
-        logit, transformer_hidden, activ_dict = self.transformer(
-            img_x, None, batch
-        )
+        # Pass through transformer
+        logit, transformer_hidden, activ_dict = self.transformer(img_features, None, batch)
         return logit, transformer_hidden, activ_dict
 
+    # -------------------------
+    # Risk head helpers
+    # -------------------------
     def get_risk_heads(self, outputs, batch):
         logit, _, _ = outputs
         return {
@@ -79,6 +117,4 @@ class Mirai(nn.Module):
 
     def get_primary_risk_head(self, outputs):
         logit, _, _ = outputs
-        pred_risk = torch.sigmoid(logit)
-
-        return pred_risk
+        return torch.sigmoid(logit)

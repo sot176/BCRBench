@@ -6,7 +6,6 @@ from .abstract_pool import AbstractPool
 from .factory import RegisterPool
 from .factory import get_pool
 from onconet.utils.risk_factors import RiskFactorVectorizer
-import pdb
 
 MLP_HIDDEN_DIM = 100
 

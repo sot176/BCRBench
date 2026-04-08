@@ -4,7 +4,6 @@ from .abstract_pool import AbstractPool
 from .factory import RegisterPool
 from .factory import get_pool
 from utils.risk_factors import RiskFactorVectorizer
-import pdb
 
 @RegisterPool('DeepRiskFactorPool')
 class RiskFactorPool(AbstractPool):
