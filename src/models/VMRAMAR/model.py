@@ -19,22 +19,32 @@ for _key in list(sys.modules.keys()):
         )
 
 
-def _disable_inplace_relu(module):
+def _disable_inplace_relu(module: nn.Module):
+    """Disable inplace ReLU to avoid autograd issues."""
     for m in module.modules():
         if isinstance(m, nn.ReLU):
             m.inplace = False
 
+
 from models.Mirai.onconet.models.factory import get_model_by_name, load_model
 
+
 class IdentityPool(nn.Module):
-    def forward(self, x):
-        # Return dummy "logit" and hidden to match the old interface
+    """Dummy pool layer for snapshot encoders."""
+
+    def forward(self, x: torch.Tensor):
         return None, x  # logit=None, hidden=feature_map
-    def replaces_fc(self):
+
+    def replaces_fc(self) -> bool:
         return False
+
+
 class VMRAMaR(nn.Module):
     """
     Stable reimplementation of VMRNN-Asymmetry Mammogram Risk model.
+
+    Args:
+        args: configuration object
     """
 
     def __init__(self, args):
@@ -48,14 +58,14 @@ class VMRAMaR(nn.Module):
             )
             if getattr(args, "replace_snapshot_pool", True):
                 non_trained_encoder = get_model_by_name("custom_resnet", False, args)
-                # Replace pool, fc, and prob_of_failure_layer — all depend on hidden dim
-                self.image_encoder._model.pool               = non_trained_encoder._model.pool
-                self.image_encoder._model.fc                 = non_trained_encoder._model.fc
+                self.image_encoder._model.pool = non_trained_encoder._model.pool
+                self.image_encoder._model.fc = non_trained_encoder._model.fc
                 self.image_encoder._model.prob_of_failure_layer = non_trained_encoder._model.prob_of_failure_layer
-                self.image_encoder._model.args               = non_trained_encoder._model.args
+                self.image_encoder._model.args = non_trained_encoder._model.args
         else:
             self.image_encoder = get_model_by_name("custom_resnet", False, args)
 
+        # Replace pooling / fc layers with identity to extract features
         self.image_encoder._model.pool = IdentityPool()
         self.image_encoder._model.fc = nn.Identity()
         self.image_encoder._model.prob_of_failure_layer = nn.Identity()
@@ -83,14 +93,11 @@ class VMRAMaR(nn.Module):
 
         # ── 4. Asymmetry Branch ──────────────────────────────────────
         self.use_asymmetry = getattr(args, "use_asymmetry", False)
-
         if self.use_asymmetry:
             self.sad = SpatialAsymmetryDetector(args)
             self.lat = LongitudinalAsymmetryTracker(args)
-
             latent_h = getattr(args, "latent_h", 5)
             latent_w = getattr(args, "latent_w", 5)
-
             self.asym_proj = nn.Sequential(
                 nn.Linear(latent_h * latent_w, 512),
                 nn.ReLU(),
@@ -99,84 +106,71 @@ class VMRAMaR(nn.Module):
 
         # ── 5. Final Fusion + AHL ────────────────────────────────────
         final_dim = args.embed_dim + (512 if self.use_asymmetry else 0)
-
         self.fusion_norm = nn.LayerNorm(final_dim)
+        self.ahl = CumulativeProbabilityLayer(final_dim, max_followup=5)
 
-        self.ahl = CumulativeProbabilityLayer(
-            final_dim, max_followup=5
-        )
+    def forward(self, batch: dict) -> dict:
+        """
+        Forward pass.
 
-    # ── Forward ─────────────────────────────────────────────────────
+        Args:
+            batch: dict containing keys:
+                images: (B, T, V, C, H, W)
 
-    def forward(self, batch):
+        Returns:
+            dict with key "logit" (B, max_followup)
+        """
         x = batch["images"]  # (B, T, V, C, H, W)
         B, T, C, V, H, W = x.size()
-
         x = x.view(B * T * V, C, H, W)
 
-        # ── Encode ──────────────────────────────────────────────────
+        # ── Encode images ─────────────────────────────
         _, img_feats, _ = self.image_encoder(x, None, batch)
         C_feat, H_feat, W_feat = img_feats.shape[1:]
         img_feats = img_feats.view(B, T, V, C_feat, H_feat, W_feat)
 
-        # ── Spatial pool ─────────────────────────────────────────────
-        feats = img_feats.mean(dim=(-2, -1))   # (B, T, V, C_feat)
+        # ── Spatial pooling ───────────────────────────
+        feats = img_feats.mean(dim=(-2, -1))  # (B, T, V, C_feat)
 
-        # ── View aggregation — matches figure ─────────────────────────
-        # view_fc projects each view, then attention fuses CC/MLO
-        feats = self.view_fc(feats)            # (B, T, V, D)
+        # ── View aggregation ──────────────────────────
+        feats = self.view_fc(feats)             # (B, T, V, D)
         feats_bt = feats.view(B * T, V, -1)
         attn_out, _ = self.view_attn(feats_bt, feats_bt, feats_bt)
         visit_embeddings = attn_out.mean(dim=1).view(B, T, -1)  # (B, T, D)
 
-
-         # ── VMRNN ────────────────────────────────────────────────────
-        out, _, _ = self.vmrnn(visit_embeddings)   # (B, T, D)
+        # ── VMRNN temporal processing ───────────────
+        out, _, _ = self.vmrnn(visit_embeddings)  # (B, T, D)
         temporal_feature = self.vmrnn_out_proj(out.mean(dim=1))  # (B, D)
 
         features = [temporal_feature]
 
-        # ── Asymmetry branch ─────────────────────────────────────────
+        # ── Asymmetry branch ─────────────────────────
         if self.use_asymmetry and V >= 2:
-            left_feats  = img_feats[:, :, 0]   # (B, T, C, Hf, Wf)
-            right_feats = img_feats[:, :, 1]   # (B, T, C, Hf, Wf)
+            left_feats = img_feats[:, :, 0]   # (B, T, C, Hf, Wf)
+            right_feats = img_feats[:, :, 1]  # (B, T, C, Hf, Wf)
 
-            sad_out     = self.sad(left_feats, right_feats)
-            asym_maps   = sad_out["heatmap"]   # (B, T, H_lat, W_lat)
+            sad_out = self.sad(left_feats, right_feats)
+            asym_maps = sad_out["heatmap"]        # (B, T, H_lat, W_lat)
             asym_coords = sad_out["asymmetry_coords"]
 
-            if asym_coords.dim() == 2:
-                asym_coords = asym_coords.view(B, T, 2)
-            if asym_maps.dim() == 3:
-                _, H_lat, W_lat = asym_maps.shape
-                asym_maps = asym_maps.view(B, T, H_lat, W_lat)
-
+            # Project to 512-dim features
             B_a, T_a, H_lat, W_lat = asym_maps.shape
-            asym_feature = self.asym_proj(
-                asym_maps.view(B_a, T_a, H_lat * W_lat)   # (B, T, H*W)
-            )                                               # (B, T, 512)
+            asym_feature = self.asym_proj(asym_maps.view(B_a, T_a, H_lat * W_lat))  # (B, T, 512)
 
-            asym_feature = self.lat(
-                asym_feature, asym_coords, asym_maps
-            )                                               # (B, 512)
+            # Longitudinal aggregation
+            asym_feature = self.lat(asym_feature, asym_coords, asym_maps)  # (B, 512)
             features.append(asym_feature)
 
-        # ── Fusion + risk ─────────────────────────────────────────────
+        # ── Fusion + risk prediction ────────────────
         combined = self.fusion_norm(torch.cat(features, dim=1))
-        risk     = self.ahl(combined)
+        risk = self.ahl(combined)
 
         return {"logit": risk}
 
-    # ── Loss helpers ────────────────────────────────────────────────
+    # ── Risk helpers ─────────────────────────────
 
-    def get_risk_heads(self, outputs, batch):
-        return {
-            "logit_output": (
-                outputs["logit"],
-                batch["target"],
-                batch["y_mask"],
-            )
-        }
+    def get_risk_heads(self, outputs: dict, batch: dict) -> dict:
+        return {"logit_output": (outputs["logit"], batch["target"], batch["y_mask"])}
 
-    def get_primary_risk_head(self, outputs):
+    def get_primary_risk_head(self, outputs: dict) -> torch.Tensor:
         return torch.sigmoid(outputs["logit"])
