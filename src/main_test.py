@@ -36,7 +36,7 @@ def parse_test_args():
 
     # ---------------- Model-specific YAML ----------------
     try:
-        yaml_path = f"config/model/{temp_args.model.lower().replace('-', '_')}.yaml"
+        yaml_path = f"config/models/{temp_args.model.lower().replace('-', '_')}.yaml"
         with open(yaml_path, "r") as f:
             model_config = yaml.safe_load(f)
 
