@@ -3,6 +3,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 from typing import Tuple, Dict
+import numpy as np
+
+
+def prob_to_score(prob: np.ndarray, max_followup: int = 5) -> np.ndarray:
+    """Convert probability outputs to cumulative scores over follow-up periods."""
+    score = np.zeros_like(prob)[:, :max_followup]
+    for i in range(max_followup):
+        score[:, i] = prob[:, :i+1].sum(axis=1)
+    return score
 
 
 # -------------------------
