@@ -74,7 +74,7 @@ def parse_arguments():
     parser.add_argument("--path_out_dir", type=str, required=True)
     parser.add_argument("--resume_from", type=str)
     parser.add_argument("--wandb_id", type=str, default=None)
-    parser.add_argument("--id_training", type=int, required=True)
+    parser.add_argument("--id_training", type=int, default=1)
     parser.add_argument("--augmentations", type=str, required=True)
     parser.add_argument("--use_scheduler", type=str, required=True)
     parser.add_argument("--optimizer", type=str)
