@@ -1,115 +1,159 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import sys
 
 from config.config import cfg
-from models.common_parts import extract_mirai_backbone
-from .model_utils import  RiskModelWithAttention
-from models.common_parts import SpatialTransformerBlock
+from models.common_parts import extract_mirai_backbone, SpatialTransformerBlock
+from .model_utils import RiskModelWithAttention
 
 
 class ImgFeatAlign(nn.Module):
     """
-    Combines downsampled deformation field applied to feature maps for risk prediction.
+    Feature-level alignment using deformation fields for longitudinal risk prediction.
     """
+
     def __init__(self, mammo_reg_net: nn.Module, finetune_all: bool = False):
         super().__init__()
-        sys.path.append(cfg["paths"]["asymMirai_master_onconet"])
-        self.encoder = extract_mirai_backbone(
-            cfg["paths"]["mirai_path"]
-        )
-        if finetune_all:
-            print("Finetuning all layers of the encoder")
-            for param in self.encoder.parameters():
-                param.requires_grad = True
-            self.encoder.train()
 
-        else:
-            for param in self.encoder.parameters():
-                param.requires_grad = False
-            self.encoder.eval()
+        # -------------------------
+        # Encoder
+        # -------------------------
+        self.encoder = extract_mirai_backbone(cfg["paths"]["mirai_path"])
 
-        self.risk_prediction_model = RiskModelWithAttention()
-        self.feat_transformer = SpatialTransformerBlock(mode='bilinear')
+        self._set_encoder_trainable(finetune_all)
 
-        self.mammo_reg_net = mammo_reg_net
+        # -------------------------
+        # Modules
+        # -------------------------
+        self.risk_model = RiskModelWithAttention()
+        self.spatial_transform = SpatialTransformerBlock(mode="bilinear")
+
+        # Registration network (frozen)
+        self.mammo_reg_net = mammo_reg_net.eval()
         self.mammo_reg_net.requires_grad_(False)
-        self.mammo_reg_net.eval()
+
+    # -------------------------
+    # Helpers
+    # -------------------------
+
+    def _set_encoder_trainable(self, finetune: bool):
+        """Enable/disable encoder training."""
+        for p in self.encoder.parameters():
+            p.requires_grad = finetune
+
+        self.encoder.train(mode=finetune)
+
+        if finetune:
+            print("Finetuning encoder")
+        else:
+            print("Freezing encoder")
+
+    @staticmethod
+    def _to_3ch(x):
+        """Convert (B,1,H,W) → (B,3,H,W)"""
+        return x.expand(-1, 3, -1, -1)
+
+    @staticmethod
+    def _resize_flow(flow, target_shape, src_shape):
+        """
+        Resize and rescale deformation field to match feature resolution.
+        """
+        B, _, Hf, Wf = target_shape
+        _, _, Hi, Wi = src_shape
+
+        flow = F.interpolate(
+            flow,
+            size=(Hf, Wf),
+            mode="bilinear",
+            align_corners=True,
+        )
+
+        scale_x = Wf / Wi
+        scale_y = Hf / Hi
+
+        flow = flow.clone()  # avoid in-place ops on shared tensors
+        flow[:, 0] *= scale_x
+        flow[:, 1] *= scale_y
+
+        return flow
+
+    # -------------------------
+    # Forward
+    # -------------------------
 
     def forward(self, batch):
         """
         Args:
-            img_cur (Tensor): Current image (B, 1, H, W)
-            img_pri (Tensor): Prior image (B, 1, H, W)
-            warped_pri_img (Tensor): Warped prior image after registration (B, 1, H, W)
-            time_gap (Tensor): Time gap vector (B, T)
-            deformation_field (Tensor): Deformation field used for warping (B, 2, H, W)
-
-        Returns:
-            dict: Risk prediction and related intermediate features
+            batch: dict with keys:
+                - current_image: (B,1,H,W)
+                - previous_image: (B,1,H,W)
+                - time_gap: (B,)
         """
+
         img_cur = batch["current_image"]
         img_pri = batch["previous_image"]
         time_gap = batch["time_gap"]
 
-        img_cur_3c = img_cur.repeat(1, 3, 1, 1)
-        img_pri_3c = img_pri.repeat(1, 3, 1, 1)
+        # -------------------------
+        # 1. Feature extraction
+        # -------------------------
+        f_cur = self.encoder(self._to_3ch(img_cur))
+        f_pri = self.encoder(self._to_3ch(img_pri))
 
-        # --- Step 1: Feature extraction ---
-        f_cur = self.encoder(img_cur_3c)
-        f_pri = self.encoder(img_pri_3c)
+        # -------------------------
+        # 2. Registration
+        # -------------------------
+        _, flow = self.mammo_reg_net(img_cur, img_pri)
 
-        # --- Step 2: Temporal Feature Alignment ---
-        # Get deformation field from the registration network using original images
-        registration_outputs = self.mammo_reg_net(img_cur, img_pri)  # MammoRegNet may take B,1,H,W
-        deformation_field = registration_outputs[1]
-        # Downsample deformation field to match the feature map's resolution
-        deformation_field_downsampled = F.interpolate(
-            deformation_field.detach(),  # Detach to prevent gradients from flowing into RegNet
-            size=(f_cur.shape[2], f_cur.shape[3]),
-            mode='bilinear',
-            align_corners=True
+        flow = flow.detach()
+        flow_resized = self._resize_flow(
+            flow,
+            target_shape=f_cur.shape,
+            src_shape=img_cur.shape,
         )
 
-        # Rescale the displacement values in the deformation field
-        scaling_factor_y = f_cur.shape[2] / img_cur.shape[2]
-        scaling_factor_x = f_cur.shape[3] / img_cur.shape[3]
+        # -------------------------
+        # 3. Feature alignment
+        # -------------------------
+        f_pri_aligned = self.spatial_transform(f_pri, flow_resized)
 
-        deformation_field_downsampled[:, 0, :, :] *= scaling_factor_x  # x-displacements
-        deformation_field_downsampled[:, 1, :, :] *= scaling_factor_y  # y-displacements
-
-        # Apply the alignment to the prior feature map
-        f_pri_aligned = self.feat_transformer(f_pri, deformation_field_downsampled)
-
-        # --- Step 3: Temporal Subtraction ---
+        # -------------------------
+        # 4. Temporal difference
+        # -------------------------
         f_diff = torch.abs(f_cur - f_pri_aligned)
 
+        # -------------------------
+        # 5. Risk prediction
+        # -------------------------
+        risk_outputs = self.risk_model(
+            f_cur,
+            f_pri,
+            f_pri_aligned,
+            f_diff,
+            time_gap,
+        )
+
         return {
-            'risk_prediction': self.risk_prediction_model(f_cur, f_pri, f_pri_aligned, f_diff, time_gap),
-            'deformation_field': deformation_field,
-            'aligned_prior_feature': f_pri_aligned,
-            'prior_feature_before_alignment': f_pri,
-            'current_feature': f_cur,
-            'diff_feature': f_diff,
+            "risk_prediction": risk_outputs,
+            "deformation_field": flow,
+            "aligned_prior_feature": f_pri_aligned,
+            "prior_feature": f_pri,
+            "current_feature": f_cur,
+            "diff_feature": f_diff,
         }
 
+    # -------------------------
+    # Heads
+    # -------------------------
+
     def get_risk_heads(self, outputs, batch):
-        risk_pred = outputs["risk_prediction"]
+        risk = outputs["risk_prediction"]
 
         return {
-            "fused": (
-                risk_pred["pred_fused"],
-                batch["target"],
-                batch["y_mask"],
-            ),
-            "cur": (
-                risk_pred["pred_cur"],
-                batch["target"],
-                batch["y_mask"],
-            ),
+            "fused": (risk["pred_fused"], batch["target"], batch["y_mask"]),
+            "cur": (risk["pred_cur"], batch["target"], batch["y_mask"]),
             "pri": (
-                risk_pred["pred_pri"],
+                risk["pred_pri"],
                 batch["target_prior"],
                 batch["y_mask_prior"],
             ),
@@ -117,7 +161,4 @@ class ImgFeatAlign(nn.Module):
 
     def get_primary_risk_head(self, outputs):
         logits = outputs["risk_prediction"]["pred_fused"]
-        pred_risk = torch.sigmoid(logits)
-
-        return pred_risk
-    
+        return torch.sigmoid(logits)
