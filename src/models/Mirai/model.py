@@ -13,7 +13,6 @@ for _key in list(sys.modules.keys()):
         )
 
 from .onconet.models.factory import get_model_by_name, load_model, RegisterModel
-from config.config import cfg
 
 
 @RegisterModel("mirai_full")
@@ -53,14 +52,14 @@ class Mirai(nn.Module):
         if getattr(args, "img_encoder_snapshot", None):
             encoder = load_model(args.img_encoder_snapshot, args, do_wrap_model=False)
             if getattr(args, "replace_snapshot_pool", True):
-                new_encoder = get_model_by_name("custom_resnet", train=False, args=args)
+                new_encoder = get_model_by_name("custom_resnet", False, args)
                 # Replace pool, fc, prob_of_failure_layer, and args
                 encoder._model.pool = new_encoder._model.pool
                 encoder._model.fc = new_encoder._model.fc
                 encoder._model.prob_of_failure_layer = new_encoder._model.prob_of_failure_layer
                 encoder._model.args = new_encoder._model.args
         else:
-            encoder = get_model_by_name("custom_resnet", train=False, args=args)
+            encoder = get_model_by_name("custom_resnet",False, args)
         return encoder
 
     @staticmethod
