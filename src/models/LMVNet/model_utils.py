@@ -1,119 +1,83 @@
 import torch
 import torch.nn as nn
-import sys
 import torch.nn.functional as F
+from typing import Dict
 
 from config.config import cfg
-from models.common_parts import extract_mirai_backbone
-from models.common_parts  import ContinuousPosEncoding, SpatialTransformerBlock
+from models.common_parts import extract_mirai_backbone, ContinuousPosEncoding, SpatialTransformerBlock
 
 
 class LongitudinalFeatureProcessor(nn.Module):
     """
-    Implements Steps 1-4 of the longitudinal risk prediction pipeline.
-    This module extracts, aligns, subtracts, and concatenates features from
-    current and prior mammogram views.
+    Processes current and prior mammogram views (CC and MLO):
+    - Extracts features via pretrained encoder
+    - Aligns prior features to current via deformation field
+    - Computes temporal differences
+    - Concatenates current, prior, and difference features
     """
-
-    def __init__(self, mammo_reg_net: nn.Module,  finetune_all: bool = False):
+    def __init__(self, mammo_reg_net: nn.Module, finetune_all: bool = False):
         super().__init__()
-        sys.path.append(cfg["paths"]["asymMirai_master_onconet"])
-        self.encoder = extract_mirai_backbone(
-            cfg["paths"]["mirai_path"]
-        )
-        self.mammo_reg_net = mammo_reg_net
-
-        # The block responsible for applying the deformation field to feature maps
+        self.encoder = extract_mirai_backbone(cfg["paths"]["mirai_path"])
+        self.mammo_reg_net = mammo_reg_net.eval()  # frozen by default
         self.feat_transformer = SpatialTransformerBlock(mode='bilinear')
-
         self.positional_encoding = ContinuousPosEncoding(dim=512)
 
-        # It's good practice to freeze models that are not being trained
+        # Freeze encoder by default
         self.encoder.requires_grad_(False)
-        self.mammo_reg_net.requires_grad_(False)
         self.encoder.eval()
-        self.mammo_reg_net.eval()
-
-        # Unfreeze if finetuning is enabled
         if finetune_all:
-            print("Finetuning all layers of the encoder")
-            for param in self.encoder.parameters():
-                param.requires_grad = True
+            for p in self.encoder.parameters():
+                p.requires_grad = True
             self.encoder.train()
 
-        else:
-            for param in self.encoder.parameters():
-                param.requires_grad = False
-            self.encoder.eval()
+    @staticmethod
+    def _to_3ch(x: torch.Tensor) -> torch.Tensor:
+        """Convert grayscale (B,1,H,W) → 3-channel (B,3,H,W)."""
+        return x.expand(-1, 3, -1, -1)
 
-    def _process_view(self, img_cur: torch.Tensor, img_pri: torch.Tensor, time_gap):
-        """
-        Helper function to run the feature processing pipeline on a single view (CC or MLO).
+    def _process_view(self, img_cur: torch.Tensor, img_pri: torch.Tensor, time_gap: torch.Tensor) -> torch.Tensor:
+        """Process one view (CC or MLO) and return longitudinal features."""
+        # Convert to 3-channel
+        f_cur = self.encoder(self._to_3ch(img_cur))
+        f_pri = self.encoder(self._to_3ch(img_pri))
 
-        Args:
-            img_cur (Tensor): Current image (B, 1, H, W).
-            img_pri (Tensor): Prior image (B, 1, H, W).
-
-        Returns:
-            f_long (Tensor): The concatenated longitudinal feature tensor.
-        """
-        # Ensure images have 3 channels for pre-trained encoders
-
-        img_cur_3c = img_cur.repeat(1, 3, 1, 1)
-        img_pri_3c = img_pri.repeat(1, 3, 1, 1)
-
-        # --- Step 1: Feature extraction ---
-        f_cur = self.encoder(img_cur_3c)
-        f_pri = self.encoder(img_pri_3c)
-
-        # --- Step 2: Temporal Feature Alignment ---
-        # Get deformation field from the registration network using original images
-        registration_outputs = self.mammo_reg_net(img_cur, img_pri)  # MammoRegNet may take B,1,H,W
+        # --- Alignment ---
+        registration_outputs = self.mammo_reg_net(img_cur, img_pri)   
         deformation_field = registration_outputs[1]
-        # Downsample deformation field to match the feature map's resolution
-        deformation_field_downsampled = F.interpolate(
-            deformation_field.detach(),  # Detach to prevent gradients from flowing into RegNet
-            size=(f_cur.shape[2], f_cur.shape[3]),
-            mode='bilinear',
-            align_corners=True
-        )
+        deformation_field = self._resize_flow(deformation_field, f_cur.shape, img_cur.shape)
+        f_pri_aligned = self.feat_transformer(f_pri, deformation_field)
 
-        # Rescale the displacement values in the deformation field
-        scaling_factor_y = f_cur.shape[2] / img_cur.shape[2]
-        scaling_factor_x = f_cur.shape[3] / img_cur.shape[3]
-
-        deformation_field_downsampled[:, 0, :, :] *= scaling_factor_x  # x-displacements
-        deformation_field_downsampled[:, 1, :, :] *= scaling_factor_y  # y-displacements
-
-        # Apply the alignment to the prior feature map
-        f_pri_aligned = self.feat_transformer(f_pri, deformation_field_downsampled)
-
-        # --- Step 3: Temporal Subtraction ---
+        # --- Temporal difference ---
         f_diff = torch.abs(f_cur - f_pri_aligned)
         B, C, H, W = f_diff.shape
-        # Apply positional encoding to the difference map
-        flattened_feats = f_diff.flatten(start_dim=2).permute(2, 0, 1)  # [N, B, C]
-        fdif_with_time = self.positional_encoding(flattened_feats, time_gap)
-        f_diff = fdif_with_time.permute(1, 2, 0).view(B, C, H, W)
+        f_diff_flat = f_diff.flatten(2).permute(2, 0, 1)  # [N, B, C]
+        f_diff_encoded = self.positional_encoding(f_diff_flat, time_gap)
+        f_diff = f_diff_encoded.permute(1, 2, 0).view(B, C, H, W)
 
-        # --- Step 4: Concatenation ---
-        f_long = torch.cat([f_cur, f_pri, f_diff], dim=1)  # [B, 1536, H, W]
+        # --- Concatenate features ---
+        f_long = torch.cat([f_cur, f_pri, f_diff], dim=1)  # [B, 3*C, H, W]
         return f_long
 
-    def forward(self, img_cur_cc, img_pri_cc, img_cur_mlo, img_pri_mlo, time_gap):
-        """
-        Main forward pass to process both CC and MLO views.
-        """
+    @staticmethod
+    def _resize_flow(flow: torch.Tensor, target_shape, src_shape) -> torch.Tensor:
+        """Resizes and rescales deformation field to match feature map resolution."""
+        B, C, Hf, Wf = target_shape
+        _, _, Hi, Wi = src_shape
 
+        flow_resized = F.interpolate(flow.detach(), size=(Hf, Wf), mode='bilinear', align_corners=True)
+        flow_resized[:, 0] *= Wf / Wi
+        flow_resized[:, 1] *= Hf / Hi
+        return flow_resized
+
+    def forward(self, img_cur_cc, img_pri_cc, img_cur_mlo, img_pri_mlo, time_gap) -> Dict[str, torch.Tensor]:
         f_cc_long = self._process_view(img_cur_cc, img_pri_cc, time_gap)
         f_mlo_long = self._process_view(img_cur_mlo, img_pri_mlo, time_gap)
-
-        return {
-            'f_cc_long': f_cc_long,
-            'f_mlo_long': f_mlo_long
-        }
+        return {"f_cc_long": f_cc_long, "f_mlo_long": f_mlo_long}
 
 
+# -------------------------
+# DropPath
+# -------------------------
 class DropPath(nn.Module):
     """Drop paths (Stochastic Depth) per sample when applied in main path of residual blocks."""
     def __init__(self, drop_prob=0.):
@@ -131,12 +95,15 @@ class DropPath(nn.Module):
         return x.div(keep_prob) * random_tensor
 
 
-class FFN(nn.Module):  # Defined outside for clarity, or can be an inner class
+# -------------------------
+# Feedforward Network
+# -------------------------
+class FFN(nn.Module):
     def __init__(self, dim, hidden_dim, dropout=0.):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(dim, hidden_dim),
-            nn.GELU(),  # Modern choice, or nn.ReLU()
+            nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(hidden_dim, dim),
             nn.Dropout(dropout)
@@ -146,66 +113,56 @@ class FFN(nn.Module):  # Defined outside for clarity, or can be an inner class
         return self.net(x)
 
 
+# -------------------------
+# Cross-Attention Block
+# -------------------------
 class CrossAttentionBlock(nn.Module):
+    """Cross-attention between CC and MLO views with residual FFN and drop path."""
     def __init__(self, in_channels, reduced_channels, heads=4,
                  dropout=0.1, drop_path=0.1, ffn_expansion_factor=4):
         super().__init__()
         self.dim = reduced_channels
         self.num_heads = heads
 
-        # MultiheadAttention for self and cross attention
-        self.mha_self = nn.MultiheadAttention(embed_dim=self.dim, num_heads=self.num_heads, dropout=dropout, batch_first=True)
-        self.mha_cross = nn.MultiheadAttention(embed_dim=self.dim, num_heads=self.num_heads, dropout=dropout, batch_first=True)
+        # MultiheadAttention
+        self.mha_self = nn.MultiheadAttention(embed_dim=self.dim, num_heads=heads, dropout=dropout, batch_first=True)
+        self.mha_cross = nn.MultiheadAttention(embed_dim=self.dim, num_heads=heads, dropout=dropout, batch_first=True)
 
-        # Dropout & DropPath
-        self.proj_drop = nn.Dropout(dropout)
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-
-        # LayerNorms
+        # LayerNorm & FFN
         self.norm1_cc = nn.LayerNorm(self.dim)
         self.norm1_mlo = nn.LayerNorm(self.dim)
         self.norm2_cc = nn.LayerNorm(self.dim)
         self.norm2_mlo = nn.LayerNorm(self.dim)
-
-        # FFN
         hidden_dim = int(self.dim * ffn_expansion_factor)
         self.ffn_cc = FFN(self.dim, hidden_dim, dropout)
         self.ffn_mlo = FFN(self.dim, hidden_dim, dropout)
+        self.proj_drop = nn.Dropout(dropout)
+        self.drop_path = DropPath(drop_path) if drop_path > 0 else nn.Identity()
 
-    def forward(self, f_cc, f_mlo):
+    def forward(self, f_cc: torch.Tensor, f_mlo: torch.Tensor):
         B, C, H, W = f_cc.shape
         N = H * W
 
-        # Flatten spatial dimensions: [B, C, H, W] -> [B, N, C]
+        # Flatten spatial dims
         x_cc = f_cc.flatten(2).transpose(1, 2)
         x_mlo = f_mlo.flatten(2).transpose(1, 2)
         skip_cc, skip_mlo = x_cc, x_mlo
 
-        # --- CC view attention ---
-        out_cc_self, _ = self.mha_self(x_cc, x_cc, x_cc)
-        out_cc_cross, _ = self.mha_cross(x_cc, x_mlo, x_mlo)
-        out_cc = out_cc_self + out_cc_cross
-        out_cc = self.drop_path(self.proj_drop(out_cc))
-        x_cc_post_attn = self.norm1_cc(skip_cc + out_cc)
+        # --- Attention ---
+        def attend(x, y):
+            self_attn, _ = self.mha_self(x, x, x)
+            cross_attn, _ = self.mha_cross(x, y, y)
+            out = self.drop_path(self.proj_drop(self_attn + cross_attn))
+            return out
 
-        # --- MLO view attention ---
-        out_mlo_self, _ = self.mha_self(x_mlo, x_mlo, x_mlo)
-        out_mlo_cross, _ = self.mha_cross(x_mlo, x_cc, x_cc)
-        out_mlo = out_mlo_self + out_mlo_cross
-        out_mlo = self.drop_path(self.proj_drop(out_mlo))
-        x_mlo_post_attn = self.norm1_mlo(skip_mlo + out_mlo)
+        x_cc_post = self.norm1_cc(skip_cc + attend(x_cc, x_mlo))
+        x_mlo_post = self.norm1_mlo(skip_mlo + attend(x_mlo, x_cc))
 
         # --- FFN ---
-        ffn_cc_out = self.ffn_cc(x_cc_post_attn)
-        ffn_mlo_out = self.ffn_mlo(x_mlo_post_attn)
-
-        out_cc = self.norm2_cc(x_cc_post_attn + self.drop_path(ffn_cc_out))
-        out_mlo = self.norm2_mlo(x_mlo_post_attn + self.drop_path(ffn_mlo_out))
+        x_cc_post = self.norm2_cc(x_cc_post + self.drop_path(self.ffn_cc(x_cc_post)))
+        x_mlo_post = self.norm2_mlo(x_mlo_post + self.drop_path(self.ffn_mlo(x_mlo_post)))
 
         # Reshape back to [B, C, H, W]
-        out_cc = out_cc.transpose(1, 2).view(B, C, H, W)
-        out_mlo = out_mlo.transpose(1, 2).view(B, C, H, W)
-
-        return out_cc, out_mlo
-
-
+        f_cc_out = x_cc_post.transpose(1, 2).view(B, C, H, W)
+        f_mlo_out = x_mlo_post.transpose(1, 2).view(B, C, H, W)
+        return f_cc_out, f_mlo_out
