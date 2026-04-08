@@ -81,6 +81,7 @@ def parse_cli_args():
     # ---------------- Model-specific YAML ----------------
     try:
         yaml_path = f"configs/model/{temp_args.model.lower().replace('-', '_')}.yaml"
+        print("yaml path", yaml_path)
         with open(yaml_path, "r") as f:
             model_config = yaml.safe_load(f)
 
