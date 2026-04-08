@@ -10,7 +10,7 @@
 #SBATCH --cpus-per-task=56
 #SBATCH --mem=480G
 #SBATCH --time=15:59:00               # Run time (hh:mm:ss)
-#SBATCH --account=project_465002309     # Project for billing
+#SBATCH --account=project_465002861     # Project for billing
 
 
 # Directories for data and output
