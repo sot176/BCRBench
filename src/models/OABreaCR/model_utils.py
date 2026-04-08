@@ -130,32 +130,34 @@ class SimpleAttentionPool(nn.Module):
     Learn attention over spatial dimensions (e.g., slices or patches).
     Adapted from: https://github.com/reginabarzilaygroup/Sybil
     """
-    def __init__(self, num_chan: int, num_dim: int):
-        super().__init__()
-        self.attention_fc = nn.Linear(num_chan, 1)
+    def __init__(self, **kwargs):
+        super(SimpleAttentionPool, self).__init__()
+        self.attention_fc = nn.Linear(kwargs['num_chan'], 1)
         self.softmax = nn.Softmax(dim=-1)
         self.logsoftmax = nn.LogSoftmax(dim=-1)
-        self.norm = nn.LayerNorm(num_dim)
+        self.norm = nn.LayerNorm(kwargs['num_dim'])
 
-    def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
-        """
-        Args:
-            x: Tensor of shape [B, C, H, W]
-        Returns:
-            dict with keys:
-                - 'attention_map': [B, 1, H, W]
-                - 'hidden': [B, C]
-        """
-        B, C, H, W = x.shape
-        x_flat = x.view(B, C, -1)  # [B, C, N]
-        attn_scores = self.attention_fc(x_flat.transpose(1, 2))  # [B, N, 1]
+    def forward(self, x):
+        '''
+        args:
+            - x: tensor of shape (B, C, N)
+        returns:
+            - output: dict
+                + output['attention_scores']: tensor (B, C)
+                + output['hidden']: tensor (B, C)
+        '''
+        output = {}
+        B, C, W, H = x.shape
+        # spatially_flat_size = (*x.size()[:2], -1)  # B, C, N
 
-        # Compute normalized attention map
-        attn_map = self.norm(self.logsoftmax(attn_scores.transpose(1, 2)).view(B, 1, H, W))
-        attn_weights = self.softmax(attn_scores.transpose(1, 2))  # [B, 1, N]
+        spatially_flat_size = (B, C, -1)
+        x = x.view(spatially_flat_size)
+        attention_scores = self.attention_fc(x.transpose(1, 2))  # B, N, 1
 
-        # Weighted sum of features
-        weighted_x = x_flat * attn_weights
-        hidden = weighted_x.sum(dim=-1)  # [B, C]
+        attention_map = self.norm(self.logsoftmax(attention_scores.transpose(1, 2)).view(B, -1)).view(B, 1, W, H)
+        output['attention_map'] = attention_map
+        attention_scores = self.softmax(attention_scores.transpose(1, 2))  # B, 1, N
 
-        return {'attention_map': attn_map, 'hidden': hidden}
+        x = x * attention_scores  # B, C, N
+        output['hidden'] = torch.sum(x, dim=-1)
+        return output
