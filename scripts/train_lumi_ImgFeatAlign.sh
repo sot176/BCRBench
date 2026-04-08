@@ -58,7 +58,6 @@ accelerate launch  main_train.py \
             --num_epochs 30 \
             --patience 15 \
             --dataset "EMBED" \
-            --finetune_all \
             --seed 2023
 
 
