@@ -59,7 +59,7 @@ class Mirai(nn.Module):
                 encoder._model.prob_of_failure_layer = new_encoder._model.prob_of_failure_layer
                 encoder._model.args = new_encoder._model.args
         else:
-            encoder = get_model_by_name("custom_resnet",False, args)
+            encoder = get_model_by_name("custom_resnet", False, args)
         return encoder
 
     @staticmethod
@@ -75,7 +75,7 @@ class Mirai(nn.Module):
         if getattr(args, "transformer_snapshot", None):
             transformer = load_model(args.transformer_snapshot, args, do_wrap_model=False)
         else:
-            transformer = get_model_by_name("transformer", train=False, args=args)
+            transformer = get_model_by_name("transformer",False, args)
         return transformer
 
     # -------------------------
