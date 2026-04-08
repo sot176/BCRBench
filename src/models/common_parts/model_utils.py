@@ -4,74 +4,71 @@ import torch.nn.functional as F
 import math
 
 
-class SpatialTransformerBlock(nn.Module):
-    def __init__(self, mode="bilinear"):
-        """
-        Applies a deformation field to an input tensor using grid sampling.
+# -------------------------
+# Spatial Transformer
+# -------------------------
 
-        Args:
-            mode (str): Interpolation mode to use ('bilinear' or 'nearest')
-        """
+class SpatialTransformerBlock(nn.Module):
+    def __init__(self, mode: str = "bilinear"):
         super().__init__()
         self.mode = mode
 
-    def forward(self, f_pri, deformation_field):
+    def _create_base_grid(self, B, H, W, device):
+        """Create normalized base grid."""
+        y, x = torch.meshgrid(
+            torch.linspace(-1, 1, H, device=device),
+            torch.linspace(-1, 1, W, device=device),
+            indexing="ij",
+        )
+        grid = torch.stack((x, y), dim=-1)  # [H, W, 2]
+        return grid.unsqueeze(0).expand(B, -1, -1, -1)  # [B, H, W, 2]
+
+    def forward(self, x, flow):
         """
         Args:
-            f_pri (Tensor): Prior feature map of shape [B, C, H, W]
-            deformation_field (Tensor): Flow field of shape [B, 2, H, W] (dx, dy)
+            x:     [B, C, H, W]
+            flow:  [B, 2, H, W] (dx, dy in pixel space)
 
         Returns:
-            Tensor: Warped feature map of shape [B, C, H, W]
+            Warped tensor: [B, C, H, W]
         """
-        B, _, H, W = f_pri.shape
+        B, _, H, W = x.shape
+        device = x.device
 
-        # Generate identity grid
-        grid_y, grid_x = torch.meshgrid(
-            torch.arange(H, device=f_pri.device),
-            torch.arange(W, device=f_pri.device),
-            indexing="ij"
-        )
-        grid = torch.stack((grid_y, grid_x), dim=0).float()  # [2, H, W]
-        grid = grid.unsqueeze(0).repeat(B, 1, 1, 1)           # [B, 2, H, W]
+        base_grid = self._create_base_grid(B, H, W, device)
 
-        # Add deformation
-        new_grid = grid + deformation_field.to(f_pri.device)  # [B, 2, H, W]
+        # Normalize flow to [-1, 1]
+        flow_norm = torch.zeros_like(flow)
+        flow_norm[:, 0] = flow[:, 0] * 2 / (W - 1)  # dx
+        flow_norm[:, 1] = flow[:, 1] * 2 / (H - 1)  # dy
 
-        # Normalize to [-1, 1]
-        new_grid[:, 0, :, :] = 2.0 * (new_grid[:, 0, :, :] / (H - 1) - 0.5)
-        new_grid[:, 1, :, :] = 2.0 * (new_grid[:, 1, :, :] / (W - 1) - 0.5)
+        flow_norm = flow_norm.permute(0, 2, 3, 1)  # [B, H, W, 2]
 
-        # Reshape to [B, H, W, 2] and flip last dim to match grid_sample format
-        new_grid = new_grid.permute(0, 2, 3, 1)[..., [1, 0]]  # [B, H, W, 2]
+        sampling_grid = base_grid + flow_norm
 
-        # Apply spatial transformation
-        f_pri_aligned = F.grid_sample(
-            f_pri, new_grid, mode=self.mode, align_corners=True
+        return F.grid_sample(
+            x,
+            sampling_grid,
+            mode=self.mode,
+            align_corners=True,
         )
 
-        return f_pri_aligned
 
+# -------------------------
+# Continuous Positional Encoding
+# -------------------------
 
 class ContinuousPosEncoding(nn.Module):
-    def __init__(self, dim, drop=0.1, maxtime=5, num_steps=240):
-        """
-        Continuous sinusoidal positional encoding with linear interpolation over time.
-
-        Args:
-            dim (int): Dimension of the encoding.
-            drop (float): Dropout rate.
-            maxtime (float): Maximum time value for normalization.
-            num_steps (int): Number of discrete time steps for encoding table.
-        """
+    def __init__(self, dim, drop=0.1, max_time=5.0, num_steps=240):
         super().__init__()
         self.dropout = nn.Dropout(drop)
-        self.maxtime = maxtime
+        self.max_time = max_time
         self.num_steps = num_steps
 
-        # Precompute sinusoidal encodings
-        position = torch.linspace(0, maxtime, steps=num_steps).unsqueeze(1)  # (S, 1)
-        div_term = torch.exp(torch.arange(0, dim, 2).float() * (-math.log(10000.0) / dim))
+        position = torch.linspace(0, max_time, steps=num_steps).unsqueeze(1)
+        div_term = torch.exp(
+            torch.arange(0, dim, 2).float() * (-math.log(10000.0) / dim)
+        )
 
         pe = torch.zeros(num_steps, dim)
         pe[:, 0::2] = torch.sin(position * div_term)
@@ -79,59 +76,59 @@ class ContinuousPosEncoding(nn.Module):
 
         self.register_buffer("pe", pe)
 
-    def forward(self, xs, times):
+    def forward(self, x, times):
         """
         Args:
-            xs (Tensor): Input tensor of shape (N, B, C).
-            times (Tensor): Time values of shape (B,).
-
-        Returns:
-            Tensor: Time-encoded input of shape (N, B, C).
+            x:     (N, B, C)
+            times: (B,)
         """
-        times = torch.clamp(times, 0, self.maxtime) * (self.num_steps - 1) / self.maxtime
-        t_floor = torch.floor(times).long()
-        t_ceil = torch.ceil(times).long()
-        alpha = (times - t_floor).unsqueeze(1)  # (B, 1)
+        # Normalize to index space
+        t = torch.clamp(times, 0, self.max_time)
+        t = t * (self.num_steps - 1) / self.max_time
 
-        # Linear interpolation
-        pe_floor = self.pe[t_floor]  # (B, C)
-        pe_ceil = self.pe[t_ceil]  # (B, C)
-        pe_interp = (1 - alpha) * pe_floor + alpha * pe_ceil  # (B, C)
+        t_floor = torch.floor(t).long()
+        t_ceil = torch.ceil(t).long().clamp(max=self.num_steps - 1)
 
-        return self.dropout(xs + pe_interp.unsqueeze(0))  # (N, B, C)
+        alpha = (t - t_floor).unsqueeze(1)
 
+        pe_floor = self.pe[t_floor]
+        pe_ceil = self.pe[t_ceil]
+
+        pe_interp = (1 - alpha) * pe_floor + alpha * pe_ceil
+
+        return self.dropout(x + pe_interp.unsqueeze(0))
+
+
+# -------------------------
+# Cumulative Probability Layer
+# -------------------------
 
 class CumulativeProbabilityLayer(nn.Module):
     def __init__(self, num_features, max_followup):
-        super(CumulativeProbabilityLayer, self).__init__()
+        super().__init__()
+
         self.hazard_fc = nn.Linear(num_features, max_followup)
-        self.base_hazard_fc = nn.Linear(num_features, 1)  # could also be (num_features → max_followup)
+        self.base_hazard_fc = nn.Linear(num_features, 1)
         self.relu = nn.ReLU(inplace=True)
 
-        # proper lower-triangular mask
-        mask = torch.ones([max_followup, max_followup])
-        mask = torch.tril(mask, diagonal=0)
-        mask = torch.nn.Parameter(torch.t(mask), requires_grad=False)
-        self.register_parameter("upper_triagular_mask", mask)
+        # Register mask as buffer (not parameter!)
+        mask = torch.tril(torch.ones(max_followup, max_followup))
+        self.register_buffer("triangular_mask", mask.T)
 
     def hazards(self, x):
-        raw_hazard = self.hazard_fc(x)
-        pos_hazard = self.relu(raw_hazard)
-        return pos_hazard
+        return self.relu(self.hazard_fc(x))
 
     def forward(self, x):
         """
         Returns:
-            hazards: [B, T] probabilities per year
+            cumulative logits: [B, T]
         """
-        hazards = self.hazards(x)  # [B, T] logits
-        B, T = hazards.size()
+        hazards = self.hazards(x)  # [B, T]
+        B, T = hazards.shape
 
-        expanded = hazards.unsqueeze(-1).expand(B, T, T)  # [B, T, T]
-        masked = expanded * self.upper_triagular_mask  # [B, T, T]
+        expanded = hazards.unsqueeze(-1).expand(B, T, T)
+        masked = expanded * self.triangular_mask
 
-        cum_logits = torch.sum(masked, dim=1) + self.base_hazard_fc(x)  # [B, T]
+        cum_logits = masked.sum(dim=1) + self.base_hazard_fc(x)
+
         return cum_logits
-
-
-
