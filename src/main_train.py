@@ -112,14 +112,14 @@ def parse_cli_args():
      
 def main():
     args = parse_cli_args()
-    if accelerator.is_main_process:
-        print("Arguments", args)
+    
     ddp_kwargs = DistributedDataParallelKwargs(
         find_unused_parameters=True
     )
 
     accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
-
+    if accelerator.is_main_process:
+        print("Arguments", args)
     if args.seed is not None:
         random.seed(args.seed)
         torch.manual_seed(args.seed)

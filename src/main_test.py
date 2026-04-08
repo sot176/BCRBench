@@ -63,11 +63,10 @@ def parse_test_args():
 
 def main():
     args = parse_test_args()
-    if accelerator.is_main_process:    
-        print("Arguments", args)
     
     accelerator = Accelerator()
-
+    if accelerator.is_main_process:    
+        print("Arguments", args)
     # Set seed for reproducibility on all processes
     if args.seed is not None:
         random.seed(args.seed)
