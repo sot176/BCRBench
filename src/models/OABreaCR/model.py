@@ -40,17 +40,17 @@ class OA_BreaCR(nn.Module):
         # -------------------------
         # Optional POE latent
         # -------------------------
-        self.POE = getattr(args, "use_poe", False)
+        self.POE = getattr(args, "use_poe", True)
         if self.POE:
             self.POELatent = POELatent(num_feat=num_feat)
         self.max_t = getattr(args, "max_t", 50)
-        self.use_sto = getattr(args, "use_sto", False)
+        self.use_sto = getattr(args, "use_sto", True)
 
         # -------------------------
         # Registration and alignment
         # -------------------------
         self.reg_transformer = SpatialTransformerBlock(mode='bilinear')
-        self.flew = Feedforward(inplace=2, outplace=2)
+        self.flew = Feedforward(in_channels=2, out_channels=2)
         self.pos_encoding = ContinuousPosEncoding(dim=num_feat)
 
         # -------------------------
