@@ -36,7 +36,7 @@ def parse_test_args():
 
     # ---------------- Model-specific YAML ----------------
     try:
-        yaml_path = f"configs/model/{temp_args.model.lower()}.yaml"
+        yaml_path = f"configs/model/{args.model.lower().replace('-', '_')}.yaml"
         with open(yaml_path, "r") as f:
             model_config = yaml.safe_load(f)
 
@@ -57,12 +57,6 @@ def parse_test_args():
 
     # ---------------- Final parse ----------------
     args = parser.parse_args()
-
-    # ---------------- Results directory ----------------
-    args.results_dir = (
-        f"{args.path_out_dir}_Model_{args.model}_lr_{args.learning_rate}_wd_{args.weight_decay}"
-        f"_epochs_{args.num_epochs}_bs_{args.batch_size}_{datetime.now().strftime('%Y-%m-%d-%H-%M')}/"
-    )
 
     return args
 
