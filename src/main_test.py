@@ -4,6 +4,7 @@ import random
 import torch
 from torch.utils.data import DataLoader
 from accelerate import Accelerator
+import yaml
 
 from evaluate import test_risk
 from datasets import get_dataset_and_loader
@@ -11,16 +12,16 @@ from datasets import get_dataset_and_loader
 
 
 def parse_test_args():
-    parser = argparse.ArgumentParser()
-    
-    # Required paths
+    parser = argparse.ArgumentParser(description="Test-time arguments for risk prediction models")
+
+    # ---------------- Required paths ----------------
     parser.add_argument("--csv_file", type=str, required=True)
     parser.add_argument("--data_root", type=str, required=True)
     parser.add_argument("--path_out_dir", type=str, required=True)
     parser.add_argument("--id_training", type=int, required=True)
     parser.add_argument("--path_test_folder", type=str, required=True)
 
-    # Basic dataset & model options
+    # ---------------- Basic dataset & model options ----------------
     parser.add_argument("--batch_size", type=int, default=20)
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--shuffle", type=bool, default=False)
@@ -30,18 +31,25 @@ def parse_test_args():
                         help="Model name (mirai, ImgFeatAlign, VMRA-MaR, OA-BreaCR, LMV-Net, etc.)")
     parser.add_argument("--dataset", type=str, required=True)
 
+    # ---------------- Temporary parse ----------------
+    # Only parse known args to detect the model
+    temp_args, _ = parser.parse_known_args()
+
+    # ---------------- Model-specific YAML ----------------
+    yaml_path = f"configs/model/{temp_args.model.lower()}.yaml"
+    if os.path.exists(yaml_path):
+        with open(yaml_path, "r") as f:
+            model_config = yaml.safe_load(f)
+
+        # Merge YAML defaults (CLI args take precedence)
+        for k, v in model_config.items():
+            if not hasattr(temp_args, k):
+                parser.add_argument(f"--{k}", default=v)
+    else:
+        print(f"[WARNING] YAML config not found for model '{temp_args.model}'. Using CLI/default values.")
+
+    # ---------------- Final parse ----------------
     args = parser.parse_args()
-
-    # --- Load model YAML and merge ---
-    with open(f"configs/model/{args.model.lower()}.yaml", "r") as f:
-        model_config = yaml.safe_load(f)
-    
-    # Convert to a simple namespace for easier attribute access
-    model_args = SimpleNamespace(**model_config)
-
-    # Merge YAML attributes into CLI args
-    for k, v in vars(model_args).items():
-        setattr(args, k, v)
 
     return args
 
