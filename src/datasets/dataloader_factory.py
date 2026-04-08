@@ -58,10 +58,10 @@ def get_dataset_and_loader(
     print(f"Using {dataset_name} dataset for {split} split with model {model_name}")
 
     dataset = dataset_class(
-        csv_file=csv_file,
-        data_root=data_root,
-        split=split,
-        transforms=transforms,
+        csv_file,
+        data_root,
+        split,
+        transforms,
     )
 
     loader = DataLoader(
