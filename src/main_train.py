@@ -112,7 +112,8 @@ def parse_cli_args():
      
 def main():
     args = parse_cli_args()
-    print("Arguments", args)
+    if accelerator.is_main_process:
+        print("Arguments", args)
     ddp_kwargs = DistributedDataParallelKwargs(
         find_unused_parameters=True
     )
