@@ -112,7 +112,7 @@ def parse_cli_args():
      
 def main():
     args = parse_cli_args()
-
+    print("Arguments", args)
     ddp_kwargs = DistributedDataParallelKwargs(
         find_unused_parameters=True
     )

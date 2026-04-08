@@ -69,6 +69,8 @@ def parse_test_args():
 
 def main():
     args = parse_test_args()
+    print("Arguments", args)
+    
     accelerator = Accelerator()
 
     # Set seed for reproducibility on all processes
