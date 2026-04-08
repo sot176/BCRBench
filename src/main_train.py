@@ -15,8 +15,6 @@ warnings.filterwarnings("ignore", category=SourceChangeWarning)
 import argparse
 from datetime import datetime
 import yaml
-from argparse import Namespace
-
 from accelerate import Accelerator
 from accelerate.utils import DistributedDataParallelKwargs
 
@@ -47,10 +45,6 @@ def setup_logging(path_logger, is_main_process):
 
  
 def parse_cli_args():
-    import argparse
-    import yaml
-    from argparse import Namespace
-    from datetime import datetime
 
     parser = argparse.ArgumentParser()
 

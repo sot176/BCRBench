@@ -11,7 +11,6 @@ from evaluate import test_risk
 from datasets import get_dataset_and_loader
 
 
-
 def parse_test_args():
 
     parser = argparse.ArgumentParser()
