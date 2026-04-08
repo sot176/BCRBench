@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from typing import Dict
 
 from models.common_parts import ContinuousPosEncoding, SpatialTransformerBlock
-from .model_utils import Simple_AttentionPool, POELatent, Feedforward, BaselineModel, prob_to_score
+from .model_utils import SimpleAttentionPool, POELatent, Feedforward, BaselineModel, prob_to_score
 
 
 class OA_BreaCR(nn.Module):
@@ -30,7 +30,7 @@ class OA_BreaCR(nn.Module):
         # -------------------------
         # Attention pooling
         # -------------------------
-        self.pooling = Simple_AttentionPool(
+        self.pooling = SimpleAttentionPool(
             num_chan=num_feat,
             conv_pool_kernel_size=7,
             stride=1,
