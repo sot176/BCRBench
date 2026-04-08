@@ -47,53 +47,61 @@ def setup_logging(path_logger, is_main_process):
 
  
 def parse_cli_args():
+    import argparse
+    import yaml
+    from argparse import Namespace
+    from datetime import datetime
+
     parser = argparse.ArgumentParser()
 
-    # ---------------- Paths ----------------
+    # ---------------- General CLI args ----------------
     parser.add_argument("--csv_file", type=str, required=True)
     parser.add_argument("--data_root", type=str, required=True)
     parser.add_argument("--path_out_dir", type=str, required=True)
+    parser.add_argument("--model", type=str, required=True)
+    parser.add_argument("--dataset", type=str, required=True)
 
-    # ---------------- Experiment controls ----------------
-    parser.add_argument("--model", type=str, required=True, help="Model to run (Mirai, LMV-Net, OA-BreaCR, etc.)")
-    parser.add_argument("--dataset", type=str, required=True, help="Dataset to use (EMBED, CSAW-CC, etc.)")
-
-    # ---------------- Training params ----------------
     parser.add_argument("--batch_size", type=int, default=12)
     parser.add_argument("--learning_rate", type=float, default=5e-5)
     parser.add_argument("--weight_decay", type=float, default=1e-4)
     parser.add_argument("--num_epochs", type=int, default=100)
     parser.add_argument("--num_workers", type=int, default=7)
-    parser.add_argument("--lr_decay", default=0.5, type=float)
-    parser.add_argument("--warmup_steps", default=5000, type=int)
-    parser.add_argument("--patience_lr_scheduler", default=5, type=int)
-    parser.add_argument("--patience", default=15, type=int)
+    parser.add_argument("--lr_decay", type=float, default=0.5)
+    parser.add_argument("--warmup_steps", type=int, default=5000)
+    parser.add_argument("--patience_lr_scheduler", type=int, default=5)
+    parser.add_argument("--patience", type=int, default=15)
 
-    # ---------------- Flags ----------------
     parser.add_argument("--augmentations", action="store_true")
     parser.add_argument("--use_scheduler", action="store_true")
     parser.add_argument("--finetune_all", action="store_true")
     parser.add_argument("--resume_from", type=str)
     parser.add_argument("--wandb_id", type=str)
-    parser.add_argument("--seed", type=int,  default=2023 )
+    parser.add_argument("--seed", type=int, default=2023)
     parser.add_argument("--id_training", type=int, default=1)
     parser.add_argument("--shuffle", type=bool, default=True)
     parser.add_argument("--pin_memory", type=bool, default=True)
 
     # ---------------- Temporary parse ----------------
-    # Only parse known args to detect the model
     temp_args, _ = parser.parse_known_args()
 
     # ---------------- Model-specific YAML ----------------
     try:
-        with open(f"configs/model/{temp_args.model.lower()}.yaml", "r") as f:
-            model_config_dict = yaml.safe_load(f)
-        # Convert dict to Namespace
-        model_args = Namespace(**model_config_dict)
-        # Merge YAML into parser defaults
-        for k, v in vars(model_args).items():
-            if not hasattr(temp_args, k):
-                parser.add_argument(f"--{k}", default=v)
+        yaml_path = f"configs/model/{temp_args.model.lower()}.yaml"
+        with open(yaml_path, "r") as f:
+            model_config = yaml.safe_load(f)
+
+        # Dynamically add YAML args to the parser
+        for k, v in model_config.items():
+            # Determine argument type from the YAML value
+            arg_type = type(v) if not isinstance(v, bool) else None
+            if isinstance(v, bool):
+                # For booleans, create store_true/store_false flags
+                if v:
+                    parser.add_argument(f"--{k}", action="store_true")
+                else:
+                    parser.add_argument(f"--{k}", action="store_false")
+            else:
+                parser.add_argument(f"--{k}", type=arg_type, default=v)
     except FileNotFoundError:
         print(f"[WARNING] YAML config for {temp_args.model} not found. Using CLI/default values.")
 

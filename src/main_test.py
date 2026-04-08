@@ -1,4 +1,5 @@
 import argparse
+from email import parser
 import os
 import random
 import torch
@@ -12,9 +13,10 @@ from datasets import get_dataset_and_loader
 
 
 def parse_test_args():
-    parser = argparse.ArgumentParser(description="Test-time arguments for risk prediction models")
 
-    # ---------------- Required paths ----------------
+    parser = argparse.ArgumentParser()
+
+    # ---------------- General CLI args ----------------
     parser.add_argument("--csv_file", type=str, required=True)
     parser.add_argument("--data_root", type=str, required=True)
     parser.add_argument("--path_out_dir", type=str, required=True)
@@ -26,30 +28,42 @@ def parse_test_args():
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--shuffle", type=bool, default=False)
     parser.add_argument("--pin_memory", type=bool, default=True)
-    parser.add_argument("--seed", type=int, default=2023)
     parser.add_argument("--model", type=str, required=True, 
                         help="Model name (mirai, ImgFeatAlign, VMRA-MaR, OA-BreaCR, LMV-Net, etc.)")
     parser.add_argument("--dataset", type=str, required=True, help="Dataset to use (EMBED, CSAW-CC, etc.)")
 
     # ---------------- Temporary parse ----------------
-    # Only parse known args to detect the model
     temp_args, _ = parser.parse_known_args()
 
     # ---------------- Model-specific YAML ----------------
-    yaml_path = f"configs/model/{temp_args.model.lower()}.yaml"
-    if os.path.exists(yaml_path):
+    try:
+        yaml_path = f"configs/model/{temp_args.model.lower()}.yaml"
         with open(yaml_path, "r") as f:
             model_config = yaml.safe_load(f)
 
-        # Merge YAML defaults (CLI args take precedence)
+        # Dynamically add YAML args to the parser
         for k, v in model_config.items():
-            if not hasattr(temp_args, k):
-                parser.add_argument(f"--{k}", default=v)
-    else:
-        print(f"[WARNING] YAML config not found for model '{temp_args.model}'. Using CLI/default values.")
+            # Determine argument type from the YAML value
+            arg_type = type(v) if not isinstance(v, bool) else None
+            if isinstance(v, bool):
+                # For booleans, create store_true/store_false flags
+                if v:
+                    parser.add_argument(f"--{k}", action="store_true")
+                else:
+                    parser.add_argument(f"--{k}", action="store_false")
+            else:
+                parser.add_argument(f"--{k}", type=arg_type, default=v)
+    except FileNotFoundError:
+        print(f"[WARNING] YAML config for {temp_args.model} not found. Using CLI/default values.")
 
     # ---------------- Final parse ----------------
     args = parser.parse_args()
+
+    # ---------------- Results directory ----------------
+    args.results_dir = (
+        f"{args.path_out_dir}_Model_{args.model}_lr_{args.learning_rate}_wd_{args.weight_decay}"
+        f"_epochs_{args.num_epochs}_bs_{args.batch_size}_{datetime.now().strftime('%Y-%m-%d-%H-%M')}/"
+    )
 
     return args
 
