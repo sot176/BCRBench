@@ -88,8 +88,6 @@ class RiskModelWithAttention(nn.Module):
         # -------------------------
         # Time-aware encoding
         # -------------------------
-        seq_len = H * W
-
         fdif_flat = f_dif.flatten(2).transpose(1, 2)   # (B, N, C)
         fdif_flat = fdif_flat.transpose(0, 1)          # (N, B, C)
 

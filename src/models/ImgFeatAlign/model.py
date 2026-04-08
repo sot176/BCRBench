@@ -103,7 +103,8 @@ class ImgFeatAlign(nn.Module):
         # -------------------------
         # 2. Registration
         # -------------------------
-        _, flow = self.mammo_reg_net(img_cur, img_pri)
+        registration_outputs = self.mammo_reg_net(img_cur, img_pri)  # MammoRegNet may take B,1,H,W
+        flow = registration_outputs[1]
 
         flow = flow.detach()
         flow_resized = self._resize_flow(
