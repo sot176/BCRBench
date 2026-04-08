@@ -1,14 +1,9 @@
-import logging
 import os
 import warnings
 import json
-import torch.nn.functional as F
 from sklearn import metrics
 from sklearn.utils import resample
 import numpy as np
-from sklearn.metrics import roc_auc_score
-from scipy import stats
-import torch
 
 from .c_index import concordance_index_ipcw
 
@@ -86,89 +81,6 @@ def bootstrap_c_index(
 
     return np.mean(c_index_scores), (lower, upper),  np.array(c_index_scores)
 
-
-def bootstrap_c_index_by_density(
-    event_times,
-    predictions,
-    event_observed,
-    density_categories,
-    censoring_dist,
-    n_bootstrap=2000,
-    alpha=0.05,
-    save_json_path=None,
-):
-    """
-    Compute bootstrap confidence intervals for concordance index by density categories,
-    optionally saving the bootstrap samples to a JSON file.
-
-    Args:
-        event_times: Array of event/censoring times (N,)
-        predictions: Array of predicted risk scores (N,)
-        event_observed: Binary array indicating event occurrence (N,)
-        density_categories: Array of categorical density labels (N,), values in ["A", "B", "C", "D"]
-        censoring_dist: Censoring distribution for IPCW calculation
-        n_bootstrap: Number of bootstrap samples (default=1000)
-        alpha: Significance level for confidence intervals (default=0.05)
-        save_json_path: Optional path to save bootstrap results JSON file (default=None)
-
-    Returns:
-        c_index_summary_by_density: Dict mapping density categories to
-                                   (mean_c_index, (lower_CI, upper_CI)) tuples.
-    """
-
-    c_index_results_by_density = {density: [] for density in ["A", "B", "C", "D"]}
-    density_categories = np.array([map_density(v) for v in density_categories])
-
-    for density in ["A", "B", "C", "D"]:
-        density_indices = np.where(density_categories == density)[0]
-        if len(density_indices) == 0:
-            continue
-
-        event_times_density = event_times[density_indices]
-        predictions_density = predictions[density_indices]
-        event_observed_density = event_observed[density_indices]
-
-        cases = np.where(event_observed_density == 1)[0]
-        controls = np.where(event_observed_density==0)[0]
-
-        for _ in range(n_bootstrap):
-            sample_cases = resample(cases, replace=True, n_samples=len(cases))
-            sample_controls = resample(controls, replace=True, n_samples=len(controls))
-
-            indices = np.concatenate([sample_cases, sample_controls])
-            event_times_sample = event_times_density[indices]
-            predictions_sample = predictions_density[indices]
-            event_observed_sample = event_observed_density[indices]
-
-            c_index = concordance_index_ipcw(
-                event_times_sample,
-                predictions_sample,
-                event_observed_sample,
-                censoring_dist,
-            )
-            c_index_results_by_density[density].append(c_index)
-
-    if save_json_path is not None:
-        filename = "mbox_plots_c_index_density_results.json"
-        file_path = os.path.join(save_json_path, filename)
-        c_index_serializable = {
-            density: list(map(float, values))
-            for density, values in c_index_results_by_density.items()
-        }
-        with open(file_path, "w") as f:
-            json.dump(c_index_serializable, f)
-        print(f"[INFO] Saved bootstrap C-index samples to {file_path}")
-
-    c_index_summary_by_density = {}
-    for density, c_index_values in c_index_results_by_density.items():
-        if c_index_values:
-            lower = np.percentile(c_index_values, 100 * alpha / 2)
-            upper = np.percentile(c_index_values, 100 * (1 - alpha / 2))
-            c_index_summary_by_density[density] = (np.mean(c_index_values), (lower, upper))
-        else:
-            c_index_summary_by_density[density] = (None, (None, None))
-
-    return c_index_summary_by_density, c_index_results_by_density
 
 
 def bootstrap_confidence_interval(data, num_samples=2000, confidence_level=0.95):
@@ -272,72 +184,11 @@ def compute_auc_x_year_auc(probs, censor_times, golds):
     return aucs_per_year
 
 
-def compute_auc_by_density_category(predictions, event_times, event_observed, density_categories):
-    """
-    Compute AUC for each density category (A, B, C, D) and each follow-up year.
-
-    Args:
-        predictions: List or array of predicted probabilities (N, 5).
-        event_times: List or array of event/censor times (N,).
-        event_observed: List or array of event indicators (N,).
-        density_categories: List or array of density categories (N,), values in {"A","B","C","D"}.
-
-    Returns:
-        aucs_by_density: Dict with keys 'A','B','C','D', each mapping to a dict of yearly AUCs.
-    """
-    aucs_by_density = {"A": {}, "B": {}, "C": {}, "D": {}}
-    density_categories = np.array([map_density(v) for v in density_categories])
-
-    for density in ["A", "B", "C", "D"]:
-        idx = [i for i, cat in enumerate(density_categories) if cat == density]
-        probs = [predictions[i] for i in idx]
-        event_times_filtered = [event_times[i] for i in idx]
-        event_observed_filtered = [event_observed[i] for i in idx]
-
-        aucs_by_density[density] = compute_auc_x_year_auc(probs, event_times_filtered, event_observed_filtered)
-
-    return aucs_by_density
 
 
-def compute_c_index_by_density(event_times, predictions, event_observed, density_categories, censoring_dist):
-    """
-    Compute the concordance index (C-index) for each density category without bootstrapping.
-
-    Args:
-        event_times: Array of event/censoring times (N,).
-        predictions: Array of predicted risk scores (N,).
-        event_observed: Array of binary event indicators (N,).
-        density_categories: Array of density categories (N,), values in {"A","B","C","D"}.
-        censoring_dist: Censoring distribution used for IPCW calculation.
-
-    Returns:
-        c_indexes_by_density: Dict mapping density categories to their corresponding C-index values.
-    """
-    c_indexes_by_density = {"A": None, "B": None, "C": None, "D": None}
-    density_categories = np.array([map_density(v) for v in density_categories])
-
-    for density in ["A", "B", "C", "D"]:
-        density_indices = np.where(density_categories == density)[0]
-        event_times_density = event_times[density_indices]
-        predictions_density = predictions[density_indices]
-        event_observed_density = event_observed[density_indices]
-
-        try:
-            c_index = concordance_index_ipcw(
-                event_times_density,
-                predictions_density,
-                event_observed_density,
-                censoring_dist,
-            )
-        except Exception as e:
-            print(f"Error calculating C-index for density {density}: {e}")
-            c_index = None
-
-        c_indexes_by_density[density] = c_index
-
-    return c_indexes_by_density
-
-
+# --------------------------------------
+# Performance acorss cancer subtypes
+# ---------------------------------------
 
 def bootstrap_auc_by_cancer_type(
     event_times,
@@ -412,6 +263,8 @@ def bootstrap_auc_by_cancer_type(
             else:
                 auc_summary_by_cancer[cat][year] = (None, (None, None))
     return auc_summary_by_cancer
+
+
 
 def bootstrap_c_index_by_cancer_type(
     event_times,
@@ -518,6 +371,163 @@ def auc_by_cancer_type(
         auc_summary_by_cancer[cat] = {f"Year {year + 1}": auc for year, auc in yearly_aucs.items()}
 
     return auc_summary_by_cancer
+
+# --------------------------------------
+# Performance acorss density categories
+# ---------------------------------------
+
+
+def compute_auc_by_density_category(predictions, event_times, event_observed, density_categories):
+    """
+    Compute AUC for each density category (A, B, C, D) and each follow-up year.
+
+    Args:
+        predictions: List or array of predicted probabilities (N, 5).
+        event_times: List or array of event/censor times (N,).
+        event_observed: List or array of event indicators (N,).
+        density_categories: List or array of density categories (N,), values in {"A","B","C","D"}.
+
+    Returns:
+        aucs_by_density: Dict with keys 'A','B','C','D', each mapping to a dict of yearly AUCs.
+    """
+    aucs_by_density = {"A": {}, "B": {}, "C": {}, "D": {}}
+    density_categories = np.array([map_density(v) for v in density_categories])
+
+    for density in ["A", "B", "C", "D"]:
+        idx = [i for i, cat in enumerate(density_categories) if cat == density]
+        probs = [predictions[i] for i in idx]
+        event_times_filtered = [event_times[i] for i in idx]
+        event_observed_filtered = [event_observed[i] for i in idx]
+
+        aucs_by_density[density] = compute_auc_x_year_auc(probs, event_times_filtered, event_observed_filtered)
+
+    return aucs_by_density
+
+
+def compute_c_index_by_density(event_times, predictions, event_observed, density_categories, censoring_dist):
+    """
+    Compute the concordance index (C-index) for each density category without bootstrapping.
+
+    Args:
+        event_times: Array of event/censoring times (N,).
+        predictions: Array of predicted risk scores (N,).
+        event_observed: Array of binary event indicators (N,).
+        density_categories: Array of density categories (N,), values in {"A","B","C","D"}.
+        censoring_dist: Censoring distribution used for IPCW calculation.
+
+    Returns:
+        c_indexes_by_density: Dict mapping density categories to their corresponding C-index values.
+    """
+    c_indexes_by_density = {"A": None, "B": None, "C": None, "D": None}
+    density_categories = np.array([map_density(v) for v in density_categories])
+
+    for density in ["A", "B", "C", "D"]:
+        density_indices = np.where(density_categories == density)[0]
+        event_times_density = event_times[density_indices]
+        predictions_density = predictions[density_indices]
+        event_observed_density = event_observed[density_indices]
+
+        try:
+            c_index = concordance_index_ipcw(
+                event_times_density,
+                predictions_density,
+                event_observed_density,
+                censoring_dist,
+            )
+        except Exception as e:
+            print(f"Error calculating C-index for density {density}: {e}")
+            c_index = None
+
+        c_indexes_by_density[density] = c_index
+
+    return c_indexes_by_density
+
+
+def bootstrap_c_index_by_density(
+    event_times,
+    predictions,
+    event_observed,
+    density_categories,
+    censoring_dist,
+    n_bootstrap=2000,
+    alpha=0.05,
+    save_json_path=None,
+):
+    """
+    Compute bootstrap confidence intervals for concordance index by density categories,
+    optionally saving the bootstrap samples to a JSON file.
+
+    Args:
+        event_times: Array of event/censoring times (N,)
+        predictions: Array of predicted risk scores (N,)
+        event_observed: Binary array indicating event occurrence (N,)
+        density_categories: Array of categorical density labels (N,), values in ["A", "B", "C", "D"]
+        censoring_dist: Censoring distribution for IPCW calculation
+        n_bootstrap: Number of bootstrap samples (default=1000)
+        alpha: Significance level for confidence intervals (default=0.05)
+        save_json_path: Optional path to save bootstrap results JSON file (default=None)
+
+    Returns:
+        c_index_summary_by_density: Dict mapping density categories to
+                                   (mean_c_index, (lower_CI, upper_CI)) tuples.
+    """
+
+    c_index_results_by_density = {density: [] for density in ["A", "B", "C", "D"]}
+    density_categories = np.array([map_density(v) for v in density_categories])
+
+    for density in ["A", "B", "C", "D"]:
+        density_indices = np.where(density_categories == density)[0]
+        if len(density_indices) == 0:
+            continue
+
+        event_times_density = event_times[density_indices]
+        predictions_density = predictions[density_indices]
+        event_observed_density = event_observed[density_indices]
+
+        cases = np.where(event_observed_density == 1)[0]
+        controls = np.where(event_observed_density==0)[0]
+
+        for _ in range(n_bootstrap):
+            sample_cases = resample(cases, replace=True, n_samples=len(cases))
+            sample_controls = resample(controls, replace=True, n_samples=len(controls))
+
+            indices = np.concatenate([sample_cases, sample_controls])
+            event_times_sample = event_times_density[indices]
+            predictions_sample = predictions_density[indices]
+            event_observed_sample = event_observed_density[indices]
+
+            c_index = concordance_index_ipcw(
+                event_times_sample,
+                predictions_sample,
+                event_observed_sample,
+                censoring_dist,
+            )
+            c_index_results_by_density[density].append(c_index)
+
+    if save_json_path is not None:
+        filename = "mbox_plots_c_index_density_results.json"
+        file_path = os.path.join(save_json_path, filename)
+        c_index_serializable = {
+            density: list(map(float, values))
+            for density, values in c_index_results_by_density.items()
+        }
+        with open(file_path, "w") as f:
+            json.dump(c_index_serializable, f)
+        print(f"[INFO] Saved bootstrap C-index samples to {file_path}")
+
+    c_index_summary_by_density = {}
+    for density, c_index_values in c_index_results_by_density.items():
+        if c_index_values:
+            lower = np.percentile(c_index_values, 100 * alpha / 2)
+            upper = np.percentile(c_index_values, 100 * (1 - alpha / 2))
+            c_index_summary_by_density[density] = (np.mean(c_index_values), (lower, upper))
+        else:
+            c_index_summary_by_density[density] = (None, (None, None))
+
+    return c_index_summary_by_density, c_index_results_by_density
+
+
+
 def bootstrap_auc_by_density(
     event_times,
     predictions,
@@ -677,6 +687,10 @@ def bootstrap_c_index_by_density(
             c_index_summary_by_density[density] = (None, (None, None))
 
     return c_index_summary_by_density, c_index_results_by_density
+
+# --------------------------------------
+# Performance acorss race categories
+# ---------------------------------------
 
 
 def bootstrap_auc_by_race(
