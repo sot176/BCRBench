@@ -1,0 +1,28 @@
+name: OA-BreaCR
+
+# ----------------------------
+# Backbone / architecture
+# ----------------------------
+arch: resnet18
+img_size: [2048, 1664]
+
+# ----------------------------
+# Output / ordinal settings
+# ----------------------------
+num_output_neurons: 6
+start_label: 0
+
+# ----------------------------
+# POE / stochastic options
+# ----------------------------
+use_poe: true
+use_sto: true
+max_t: 50
+distance: JDistance
+
+# ----------------------------
+# POE coefficients / margin
+# ----------------------------
+alpha_coeff: 1e-5
+beta_coeff: 1e-4
+margin: 2

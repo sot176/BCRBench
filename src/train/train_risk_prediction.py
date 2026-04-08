@@ -55,7 +55,7 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
     
     # Optional validation-based scheduler
     scheduler = None
-    if args.use_scheduler == "True":
+    if args.use_scheduler:
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=args.lr_decay,
                                                                patience=args.patience_lr_scheduler,min_lr=1e-7, verbose=True)
 

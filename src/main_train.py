@@ -41,206 +41,76 @@ def setup_logging(path_logger, is_main_process):
         logger.addHandler(console_handler)
     return logger
 
-def parse_block_layout(raw_block_layout):
-    """
-    Convert CLI strings like ['BasicBlock,2', 'BasicBlock,2', ...]
-    into a proper nested list of tuples:
-    [
-        [('BasicBlock', 2)],
-        [('BasicBlock', 2)],
-        [('BasicBlock', 2)],
-        [('BasicBlock', 2)]
-    ]
-    Each stage is a list of (block_name, num_repeats) tuples.
-    """
-    block_layout = []
-    for stage_str in raw_block_layout:
-        stage_blocks = []
-        for block_spec in stage_str.split('-'):
-            name, repeats = block_spec.split(',')
-            stage_blocks.append((name, int(repeats)))
-        block_layout.append(stage_blocks)
-    return block_layout
+import argparse
+from datetime import datetime
+import yaml
+from argparse import Namespace
 
-
-def parse_arguments():
+def parse_cli_args():
     parser = argparse.ArgumentParser()
-    
-    # -------------------
-    # Common arguments for all models
-    # -------------------
+
+    # ---------------- Paths ----------------
     parser.add_argument("--csv_file", type=str, required=True)
     parser.add_argument("--data_root", type=str, required=True)
     parser.add_argument("--path_out_dir", type=str, required=True)
-    parser.add_argument("--resume_from", type=str)
-    parser.add_argument("--wandb_id", type=str, default=None)
-    parser.add_argument("--id_training", type=int, default=1)
-    parser.add_argument("--augmentations", type=str, required=True)
-    parser.add_argument("--use_scheduler", type=str, required=True)
-    parser.add_argument("--optimizer", type=str)
+
+    # ---------------- Experiment controls ----------------
+    parser.add_argument("--model", type=str, required=True, help="Model to run (Mirai, LMV-Net, OA-BreaCR, etc.)")
+    parser.add_argument("--dataset", type=str, required=True, help="Dataset to use (EMBED, CSAW-CC, etc.)")
+
+    # ---------------- Training params ----------------
+    parser.add_argument("--batch_size", type=int, default=12)
+    parser.add_argument("--learning_rate", type=float, default=5e-5)
+    parser.add_argument("--weight_decay", type=float, default=1e-4)
+    parser.add_argument("--num_epochs", type=int, default=100)
+    parser.add_argument("--num_workers", type=int, default=7)
+    parser.add_argument("--lr_decay", default=0.5, type=float)
     parser.add_argument("--warmup_steps", default=5000, type=int)
-    parser.add_argument("--finetune_all", action="store_true")
     parser.add_argument("--patience_lr_scheduler", default=5, type=int)
     parser.add_argument("--patience", default=15, type=int)
-    parser.add_argument("--batch_size", default=12, type=int)
-    parser.add_argument("--num_workers", default=2, type=int)
-    parser.add_argument("--shuffle", default=True, type=bool)
-    parser.add_argument("--pin_memory", default=True, type=bool)
-    parser.add_argument("--dataset", type=str)
-    parser.add_argument("--lr_decay", default=0.5, type=float)
-    parser.add_argument("--learning_rate", default=1e-4, type=float)
-    parser.add_argument("--num_epochs", default=100, type=int)
-    parser.add_argument("--seed", default=2023, type=int)
-    parser.add_argument("--weight_decay", default=1e-5, type=float)
-    parser.add_argument("--model", type=str, required=True,
-                        help="Model name (mirai, ImgFeatAlign, VMRA-MaR, OA-BreaCR, LMV-Net, etc.)")
 
-    # -------------------
-    # Parse first to check the model
-    # -------------------
-    temp_args, _ = parser.parse_known_args()  # Only parse known args for now
+    # ---------------- Flags ----------------
+    parser.add_argument("--augmentations", action="store_true")
+    parser.add_argument("--use_scheduler", action="store_true")
+    parser.add_argument("--finetune_all", action="store_true")
+    parser.add_argument("--resume_from", type=str)
+    parser.add_argument("--wandb_id", type=str)
+    parser.add_argument("--seed", type=int,  default=2023 )
+    parser.add_argument("--id_training", type=int, default=1)
+    parser.add_argument("--shuffle", type=bool, default=True)
+    parser.add_argument("--pin_memory", type=bool, default=True)
 
-    # -------------------
-    # OA-BreaCR-specific arguments
-    # -------------------
-    if temp_args.model == "OA-BreaCR":
-        parser.add_argument('-a', '--arch', default='resnet18',
-                    help='resnet18, resnet50')
-        parser.add_argument('--img_size', type=int, nargs='+', default=[2048, 1664],
-                    help='Height and width of image in pixels. [default: [2048,1664]]')
-        parser.add_argument('--num_output_neurons', type=int, default=6,
-                            help='Number of output neurons, should be max_followup+1')
-        parser.add_argument('--start_label', type=int, default=0,
-                            help='Start label for ordinal learning')
-        parser.add_argument('--use_poe', action='store_true', help='Enable POE functionality')
-        parser.add_argument('--no_poe', action='store_false', dest='use_poe')
-        parser.add_argument('--use_sto', action='store_true', help='Enable stochastic sampling in POE')
-        # For POE model
-        # ---------------------------------
-        parser.add_argument('--max-t', type=int, default=50,
-                            help='number of samples during sto.')
-        parser.add_argument('--no-sto', action='store_true',
-                            help='not using stochastic sampling when training or testing.')
-        parser.add_argument('--distance', type=str, default='JDistance',
-                            help='distance metric between two gaussian distribution')
-        parser.add_argument('--alpha-coeff', type=float, default=1e-5, metavar='M',
-                            help='alpha_coeff (default: 0)')
-        parser.add_argument('--beta-coeff', type=float, default=1e-4, metavar='M',
-                            help='beta_coeff (default: 1.0)')
-        parser.add_argument('--margin', type=float, default=2, metavar='M',
-                            help='margin (default: 1.0)')
-    # -------------------
-    # Mirai-specific arguments
-    # -------------------
-    if temp_args.model == "Mirai" or temp_args.model == "VMRA-MaR":
-        # Snapshots / Pretrained weights
-        parser.add_argument('--img_encoder_snapshot', type=str, default=None,
-                            help='Filename of image feature extractor snapshot for mirai_full models')
-        parser.add_argument('--transformer_snapshot', type=str, default=None,
-                            help='Filename of transformer snapshot for mirai_full models')
-        parser.add_argument('--snapshot', type=str, default=None, help='filename of model snapshot to load[default: None]')
+    # ---------------- Temporary parse ----------------
+    # Only parse known args to detect the model
+    temp_args, _ = parser.parse_known_args()
 
-        # Training / Fine-tuning options
-        parser.add_argument('--freeze_image_encoder',   action='store_true',
-                            help='Whether to freeze image encoder during training')
+    # ---------------- Model-specific YAML ----------------
+    try:
+        with open(f"configs/model/{temp_args.model.lower()}.yaml", "r") as f:
+            model_config_dict = yaml.safe_load(f)
+        # Convert dict to Namespace
+        model_args = Namespace(**model_config_dict)
+        # Merge YAML into parser defaults
+        for k, v in vars(model_args).items():
+            if not hasattr(temp_args, k):
+                parser.add_argument(f"--{k}", default=v)
+    except FileNotFoundError:
+        print(f"[WARNING] YAML config for {temp_args.model} not found. Using CLI/default values.")
 
-        # Transformer architecture
-        parser.add_argument('--transfomer_hidden_dim', type=int, default=512, help='start hidden dim for transformer')
-        parser.add_argument('--use_precomputed_hiddens', action='store_true', default=False, help='Whether to only use hiddens from a pretrained model.')
-        parser.add_argument('--num_layers', type=int, default=3)
-        parser.add_argument('--num_heads', type=int, default=4, help='Num heads for transformer')
-        parser.add_argument('--dropout', type=float, default=0.1)
-        parser.add_argument('--num_chan', type=int, default=3, help='Number of channels in img. [default:3]')
-        parser.add_argument('--multi_image', action='store_true', default=True, help='Whether image will contain multiple slices. Slices could indicate different times, depths, or views')  
-
-        # resnet-specific
-        parser.add_argument('--model_name', type=str, default='mirai_full', help="Form of model, i.e resnet18, aggregator, revnet, etc.")
-        parser.add_argument('--block_layout', type=str, nargs='+', default=["BasicBlock,2", "BasicBlock,2", "BasicBlock,2", "BasicBlock,2"], help='Layout of blocks for a ResNet model. Must be a list of length 4. Each of the 4 elements is a string of form "block_name,num_repeats-block_name,num_repeats-...". [default: resnet18 layout]')
-        parser.add_argument('--block_widening_factor', type=int, default=1, help='Factor by which to widen blocks.')
-        parser.add_argument('--num_groups', type=int, default=1, help='Num groups per conv in Resnet blocks.')
-        parser.add_argument('--pool_name', type=str, default='GlobalMaxPool', help='Pooling mechanism')
-        parser.add_argument('--deep_risk_factor_pool', action='store_true',  help='make risk factor pool use several layers to fuse image and rf info')
-        parser.add_argument('--replace_snapshot_pool', type=bool, default=True,  help='Use detached models')
-        parser.add_argument('--pretrained_on_imagenet', action='store_true',  help='Pretrain the model on imagenet. Only relevant for default models like VGG, resnet etc')
-        parser.add_argument('--pretrained_imagenet_model_name', type=str, default='resnet18', help='Name of pretrained model to load for custom resnets.')
-        parser.add_argument('--make_fc', action='store_true',  help='Replace last linear layer with convolutional layer')
-        parser.add_argument('--replace_bn_with_gn', action='store_true', help='Use group normalization instead of batch norm.')
-
-        # Risk factors
-        parser.add_argument('--use_risk_factors',type=bool, default=False, help='Whether to feed risk factors into last FC of model.') 
-        parser.add_argument('--pred_risk_factors', type=bool,default=False, help='Whether to predict value of all RF from image.') 
-        parser.add_argument('--pred_both_sides', type=bool,default=False, help='Simulatenously pred both sides for multi-img model')
-        parser.add_argument('--predict_birads',  type=bool,default=False, help='Wether to predict birads label for negative mammos in risk dataset objects. Note, preds, probs, and labels converted to binary (cancer vs negative) after prediction for logging purposes')
-        parser.add_argument('--pred_missing_mammos',type=bool, default=False, help='Whether to predict missing images when doing image dropout.') 
-        parser.add_argument('--also_pred_given_mammos',type=bool, default=False, help='Whether to predict given images.') 
-        
-        # regularization
-        parser.add_argument('--use_region_annotation', action='store_true', default=False, help='Wether to add a loss factoring in the collected cancer region annotations .')
-
-        #survival analysis setup
-        parser.add_argument('--survival_analysis_setup', action='store_true',  help='Whether to modify model, eval and training for survival analysis.') 
-        parser.add_argument('--max_followup', type=int, default=5, help='Max followup to predict over')
-        parser.add_argument('--state_dict_path', type=str, default=None,
-                        help='filename of model snapshot to load[default: None]')
-        # Other Optional Configs
-        parser.add_argument('--num_images', type=int, default=4,
-                        help='In multi image setting, the number of images per single sample.')
-        parser.add_argument('--num_classes', type=int, default=2)
-        parser.add_argument('--cuda', action='store_true', default=False, help='enable the gpu')
-        parser.add_argument('--num_gpus', type=int, default=1, help='Num GPUs to use in data_parallel.')
-        parser.add_argument('--num_shards', type=int, default=1, help='Num GPUs to shard a single model.')
-        parser.add_argument('--data_parallel', action='store_true', default=False,
-                            help='spread batch size across all available gpus. Set to false when using model parallelism. The combo of model and data parallelism may result in unexpected behavior')
-        parser.add_argument('--model_parallel', action='store_true', default=False,
-                            help='spread single model across num_shards. Note must have num_shards > 1 to take effect and only support in specific models. So far supported in all models that extend Resnet-base, i.e resnet-[n], nonlocal-resnet[n], custom-resnet models')
-        parser.add_argument('--wrap_model', action='store_true', default=False,
-                            help='Whether to strip last layer of model, and add layers to fit to new task.')
-        # VMRNN architecture parameters
-        parser.add_argument('--depths_downsample', nargs='+', type=int,
-                            default=[2, 2, 6, 2],
-                            help='Depths for downsample blocks')
-        parser.add_argument('--depths_upsample', nargs='+', type=int,
-                            default=[2, 2, 6, 2],
-                            help='Depths for upsample blocks')
-        parser.add_argument('--embed_dim', type=int, default=512,
-                            help='Embedding dimension')
-
-        # Asymmetry module parameters
-        parser.add_argument('--use_asymmetry', action='store_true',
-                            help='Enable asymmetry module')
-        parser.add_argument('--latent_h', type=int, default=5)
-        parser.add_argument('--latent_w', type=int, default=5)
-        parser.add_argument('--use_sad_bias', action='store_true')
-        parser.add_argument('--use_lat_bn', action='store_true')   
-        parser.add_argument('--use_sad_bn', action='store_true')
-        parser.add_argument('--lat_dropout', type=float, default=0.2)
-        parser.add_argument('--initial_asym_mean', type=float, default=2000)
-        parser.add_argument('--initial_asym_std', type=float, default=300)
-        parser.add_argument("--asym_dim", type=int, default=0, help="Dimension of asymmetry features ")
- 
-
-    # -------------------
-    # Parse final args
-    # -------------------
+    # ---------------- Final parse ----------------
     args = parser.parse_args()
 
-    # Add a results dir for logging/output
+    # ---------------- Results directory ----------------
     args.results_dir = (
         f"{args.path_out_dir}_Model_{args.model}_lr_{args.learning_rate}_wd_{args.weight_decay}"
         f"_epochs_{args.num_epochs}_bs_{args.batch_size}_{datetime.now().strftime('%Y-%m-%d-%H-%M')}/"
     )
-     # --- Mirai-specific post-processing ---
-    if args.model == "Mirai" or  args.model == "VMRA-MaR":
-        # Convert block layout strings into nested tuples/lists
-        args.block_layout = parse_block_layout(args.block_layout)
 
     return args
-
-
-
+     
 def main():
+    args = parse_cli_args()
 
-    args = parse_arguments()
     ddp_kwargs = DistributedDataParallelKwargs(
         find_unused_parameters=True
     )
@@ -257,7 +127,7 @@ def main():
     torch.backends.cudnn.enabled = True
 
     # Define datasets and dataloader
-    if args.augmentations == "True":  ### For newest and oldest mammograms
+    if args.augmentations:  ### For newest and oldest mammograms
         train_transform = K_C.AugmentationSequential(
             K_A.RandomCrop(size=(1946, 1581), p=0.2),
             K_A.Resize((2048, 1664), resample=Resample.NEAREST.name),
@@ -269,7 +139,6 @@ def main():
             print("Train augmentations :", train_transform)
     else:
         train_transform = None
-
 
 
     train_loader = get_dataset_and_loader(
@@ -300,7 +169,6 @@ def main():
     # Setup the path to save the model and the logger.
     model_path = f"model_risk_prediction_training_id_{args.id_training}_last_epoch.pth"
     logg_path = f"train_risk_prediction_training_id_{args.id_training}.log"
-
 
     path_out_model = os.path.join(args.results_dir, model_path)
     path_logger = os.path.join(args.results_dir, logg_path)

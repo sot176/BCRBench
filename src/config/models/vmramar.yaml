@@ -1,0 +1,25 @@
+defaults:
+  - mirai
+
+name: VMRA-MaR
+
+# ----------------------------
+# VMRNN architecture
+# ----------------------------
+depths_downsample: [2, 2, 6, 2]
+depths_upsample: [2, 2, 6, 2]
+embed_dim: 512
+
+# ----------------------------
+# Asymmetry module
+# ----------------------------
+use_asymmetry: true
+latent_h: 5
+latent_w: 5
+use_sad_bias: false
+use_lat_bn: false
+use_sad_bn: false
+lat_dropout: 0.2
+initial_asym_mean: 2000
+initial_asym_std: 300
+asym_dim: 0
