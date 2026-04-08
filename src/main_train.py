@@ -12,6 +12,10 @@ import kornia.augmentation.container as K_C
 import warnings
 from torch.serialization import SourceChangeWarning
 warnings.filterwarnings("ignore", category=SourceChangeWarning)
+import argparse
+from datetime import datetime
+import yaml
+from argparse import Namespace
 
 from accelerate import Accelerator
 from accelerate.utils import DistributedDataParallelKwargs
@@ -41,11 +45,7 @@ def setup_logging(path_logger, is_main_process):
         logger.addHandler(console_handler)
     return logger
 
-import argparse
-from datetime import datetime
-import yaml
-from argparse import Namespace
-
+ 
 def parse_cli_args():
     parser = argparse.ArgumentParser()
 
