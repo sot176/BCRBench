@@ -46,9 +46,9 @@ accelerate launch  main_train.py \
             --data_root /scratch/project_465002861/thrunsol/embed_datasets/risk_dataset_1664_2048 \
             --path_out_dir /scratch/project_465002861/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/$SLURM_JOB_NAME-$SLURM_JOB_ID \
             --id_training 1 \
-            --use_scheduler "True" \
+            --use_scheduler \
             --batch_size 4 \
-            --augmentations "True" \
+            --augmentations \
             --num_workers 7 \
             --learning_rate 5e-5 \
             --weight_decay 1e-4 \

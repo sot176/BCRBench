@@ -29,7 +29,7 @@ def parse_test_args():
     parser.add_argument("--seed", type=int, default=2023)
     parser.add_argument("--model", type=str, required=True, 
                         help="Model name (mirai, ImgFeatAlign, VMRA-MaR, OA-BreaCR, LMV-Net, etc.)")
-    parser.add_argument("--dataset", type=str, required=True)
+    parser.add_argument("--dataset", type=str, required=True, help="Dataset to use (EMBED, CSAW-CC, etc.)")
 
     # ---------------- Temporary parse ----------------
     # Only parse known args to detect the model

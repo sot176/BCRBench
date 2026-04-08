@@ -62,7 +62,7 @@ use_region_annotation: false
 # ----------------------------
 # Survival analysis
 # ----------------------------
-survival_analysis_setup: false
+survival_analysis_setup: true
 max_followup: 5
 
 # ----------------------------
