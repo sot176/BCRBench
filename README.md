@@ -296,12 +296,10 @@ If you use these implementations in your research, please cite the original pape
 
 ### Repository 
 ```bibtex
-@misc{breast_cancer_risk_github,
-  title = {BreastCancerRiskBenchmark},
-  year = {2026},
-  publisher = {GitHub},
-  journal = {GitHub repository},
-  howpublished = {\url{https://github.com/sot176/BreastCancerRiskBenchmark}}
+@software{Thrun_BreastCancerRiskBenchmark,
+author = {Thrun, Solveig},
+title = {{BreastCancerRiskBenchmark}},
+url = {https://github.com/sot176/BreastCancerRiskBenchmark}
 }
 ```
 
