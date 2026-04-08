@@ -5,11 +5,24 @@ import torch.nn.functional as F
 from models.common_parts import ContinuousPosEncoding, CumulativeProbabilityLayer
 
 
+# -------------------------
+# Temporal Attention Layer
+# -------------------------
+
 class TemporalAttentionLayer(nn.Module):
     def __init__(self, dim, num_heads, dropout=0.1):
         super().__init__()
-        self.attn = nn.MultiheadAttention(embed_dim=dim, num_heads=num_heads, dropout=dropout)
-        self.norm = nn.LayerNorm(dim)
+
+        self.attn = nn.MultiheadAttention(
+            embed_dim=dim,
+            num_heads=num_heads,
+            dropout=dropout,
+            batch_first=False,  # we use (S, B, C)
+        )
+
+        self.norm1 = nn.LayerNorm(dim)
+        self.norm2 = nn.LayerNorm(dim)
+
         self.ff = nn.Sequential(
             nn.Linear(dim, dim * 4),
             nn.ReLU(),
@@ -17,54 +30,100 @@ class TemporalAttentionLayer(nn.Module):
         )
 
     def forward(self, x):
-        # Multi-head self-attention with residual connection and feedforward
-        attn_output, _ = self.attn(x, x, x)
-        x = self.norm(x + attn_output)
-        return self.norm(x + self.ff(x))
+        """
+        Args:
+            x: (S, B, C)
+        """
+        attn_out, _ = self.attn(x, x, x)
+        x = self.norm1(x + attn_out)
 
+        ff_out = self.ff(x)
+        return self.norm2(x + ff_out)
+
+
+# -------------------------
+# Risk Model
+# -------------------------
 
 class RiskModelWithAttention(nn.Module):
-    def __init__(self, num_years=5, time_encoding_dim=512):
+    def __init__(self, feature_dim=512, num_years=5, num_heads=8):
         super().__init__()
-        self.positional_encoding = ContinuousPosEncoding(dim=time_encoding_dim)
-        self.attention_layer = TemporalAttentionLayer(dim=512, num_heads=8)
-        self.feature_projection = nn.Linear(512, 512)
+
+        self.feature_dim = feature_dim
+
+        self.positional_encoding = ContinuousPosEncoding(dim=feature_dim)
+        self.attention_layer = TemporalAttentionLayer(dim=feature_dim, num_heads=num_heads)
+
+        self.feature_projection = nn.Linear(feature_dim, feature_dim)
 
         # Prediction heads
-        self.cumulative_prob_layer_fused = CumulativeProbabilityLayer(512, num_years)
-        self.cumulative_prob_layer_cur = CumulativeProbabilityLayer(512, num_years)
-        self.cumulative_prob_layer_pri = CumulativeProbabilityLayer(512, num_years)
+        self.head_fused = CumulativeProbabilityLayer(feature_dim, num_years)
+        self.head_cur = CumulativeProbabilityLayer(feature_dim, num_years)
+        self.head_pri = CumulativeProbabilityLayer(feature_dim, num_years)
+
+    # -------------------------
+    # Helpers
+    # -------------------------
+
+    @staticmethod
+    def global_pool(x):
+        """Global average pooling → (B, C)"""
+        return F.adaptive_avg_pool2d(x, 1).flatten(1)
+
+    # -------------------------
+    # Forward
+    # -------------------------
 
     def forward(self, f_cur, f_pri, f_pri_aligned, f_dif, time_gap):
         """
         Args:
-            f_cur: Current image features (B, C, H, W)
-            f_pri: Prior image features (B, C, H, W)
-            f_pri_aligned: Spatially aligned prior features (B, C, H, W)
-            f_dif: Difference map (B, C, H, W)
-            time_gap: Time gap (tensor) (B, 1)
+            f_cur:         (B, C, H, W)
+            f_pri:         (B, C, H, W)
+            f_pri_aligned: (B, C, H, W)
+            f_dif:         (B, C, H, W)
+            time_gap:      (B,) or (B, 1)
         """
         B, C, H, W = f_dif.shape
 
-        # Time-aware encoding of difference map
-        flattened_feats = f_dif.flatten(start_dim=2).permute(2, 0, 1)  # [N, B, C]
-        fdif_with_time = self.positional_encoding(flattened_feats, time_gap)
-        fdif_with_time = fdif_with_time.permute(1, 2, 0).view(B, C, H, W)
+        # -------------------------
+        # Time-aware encoding
+        # -------------------------
+        seq_len = H * W
 
-        # Global average pooling
-        f_cur_pooled = F.adaptive_avg_pool2d(f_cur, (1, 1)).view(B, C)
-        f_pri_pooled = F.adaptive_avg_pool2d(f_pri, (1, 1)).view(B, C)
-        f_pri_aligned_pooled = F.adaptive_avg_pool2d(f_pri_aligned, (1, 1)).view(B, C)
-        fdif_pooled = F.adaptive_avg_pool2d(fdif_with_time, (1, 1)).view(B, C)
+        fdif_flat = f_dif.flatten(2).transpose(1, 2)   # (B, N, C)
+        fdif_flat = fdif_flat.transpose(0, 1)          # (N, B, C)
 
-        # Temporal attention
-        stacked = torch.stack([f_pri_aligned_pooled, fdif_pooled, f_cur_pooled], dim=1)  # [B, 3, C]
-        attended = self.attention_layer(stacked.permute(1, 0, 2))  # [3, B, C]
-        attended = attended.permute(1, 0, 2).mean(dim=1)  # [B, C]
-        fused_feat = self.feature_projection(attended)
+        fdif_time = self.positional_encoding(fdif_flat, time_gap)
 
+        fdif_time = fdif_time.transpose(0, 1).transpose(1, 2)  # (B, C, N)
+        fdif_time = fdif_time.view(B, C, H, W)
+
+        # -------------------------
+        # Pooling
+        # -------------------------
+        f_cur_pooled = self.global_pool(f_cur)
+        f_pri_pooled = self.global_pool(f_pri)
+        f_pri_aligned_pooled = self.global_pool(f_pri_aligned)
+        fdif_pooled = self.global_pool(fdif_time)
+
+        # -------------------------
+        # Temporal attention fusion
+        # -------------------------
+        sequence = torch.stack(
+            [f_pri_aligned_pooled, fdif_pooled, f_cur_pooled],
+            dim=0,  # (S=3, B, C)
+        )
+
+        attended = self.attention_layer(sequence)  # (3, B, C)
+        fused = attended.mean(dim=0)               # (B, C)
+
+        fused = self.feature_projection(fused)
+
+        # -------------------------
+        # Outputs
+        # -------------------------
         return {
-            "pred_fused": self.cumulative_prob_layer_fused(fused_feat),
-            "pred_cur": self.cumulative_prob_layer_cur(f_cur_pooled),
-            "pred_pri": self.cumulative_prob_layer_pri(f_pri_pooled),
+            "pred_fused": self.head_fused(fused),
+            "pred_cur": self.head_cur(f_cur_pooled),
+            "pred_pri": self.head_pri(f_pri_pooled),
         }
