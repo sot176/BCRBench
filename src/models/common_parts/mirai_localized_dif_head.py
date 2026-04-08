@@ -1,5 +1,4 @@
 import torch
-
 import sys
 
 def extract_mirai_backbone(path):
