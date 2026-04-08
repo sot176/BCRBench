@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+title: "BreastCancerRiskBenchmark"
+message: "If you use this repository, please cite it as follows:"
+type: software
+
+authors:
+  - family-names: "Thrun"
+    given-names: "Solveig"
+
+year: 2026
+
+repository-code: "https://github.com/sot176/BreastCancerRiskBenchmark"
+url: "https://github.com/sot176/BreastCancerRiskBenchmark"
+
+abstract: "Unified repository implementing state-of-the-art image-based breast cancer risk prediction models."
+
