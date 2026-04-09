@@ -159,20 +159,32 @@ class OA_BreaCR(BaseRiskModel):
         """MSE loss for registration alignment."""
         return torch.mean((x - target_x_source) ** 2) * 1e-2
 
-    # -------------------------
-    # Auxiliary outputs
-    # -------------------------
-    @staticmethod
-    def get_auxiliary_outputs(outputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        return {
-            "emb": outputs.get("emb_final"),
-            "log_var": outputs.get("log_var_final"),
-        }
 
     # -------------------------
     # Risk head
     # -------------------------
-    @staticmethod
+    def get_risk_heads(self, outputs: Dict, batch: Dict) -> Dict:
+        """
+        Builds targets and masks for all heads.
+        Used by both loss computation and evaluation.
+        """
+        y_true, y_mask = self.compute_risk_target_and_mask(
+            outputs["final"],
+            batch["years_to_cancer"],
+            batch["years_to_last_followup"],
+        )
+        y_true_pri, y_mask_pri = self.compute_risk_target_and_mask(
+            outputs["final"],
+            batch["years_to_cancer_prior"],
+            batch["years_to_last_followup_prior"],
+        )
+        return {
+            "final":      (outputs.get("final"),      y_true,     y_mask),
+            "current":    (outputs.get("current"),    y_true,     y_mask),
+            "prior":      (outputs.get("prior"),      y_true_pri, y_mask_pri),
+            "difference": (outputs.get("difference"), y_true,     y_mask),
+        }
+    
     def get_primary_risk_head(outputs: Dict[str, torch.Tensor], max_followup: int = 5) -> torch.Tensor:
         """Return softmax-normalized cumulative risk score."""
         risk = outputs["final"]
@@ -181,3 +193,26 @@ class OA_BreaCR(BaseRiskModel):
         prob = F.softmax(risk, dim=-1)
         score = prob_to_score(prob.detach().cpu().numpy(), max_followup=max_followup)
         return torch.tensor(score, device=prob.device, dtype=torch.float)
+    
+    @staticmethod
+    def compute_risk_target_and_mask(pred, years_to_cancer,
+                                     years_last_followup):
+        if pred.dim() == 3:
+            pred = pred.mean(dim=0)
+        B, num_pred_years = pred.shape
+        followup = num_pred_years - 1
+        device   = years_to_cancer.device
+
+        risk_label          = years_to_cancer.cpu().detach().numpy().copy()
+        years_last_followup = years_last_followup.cpu().detach().numpy().copy()
+        risk_label[risk_label > followup] = followup
+
+        y_true = torch.zeros(B, num_pred_years, device=device)
+        y_mask = torch.ones(B, num_pred_years, device=device)
+
+        for i in range(B):
+            y_true[i, int(risk_label[i])] = 1
+            if risk_label[i] == followup and years_last_followup[i] < followup:
+                y_mask[i, int(years_last_followup[i]) + 1:] = 0
+
+        return y_true, y_mask
