@@ -15,17 +15,17 @@ class LongitudinalFeatureProcessor(nn.Module):
     - Computes temporal differences
     - Concatenates current, prior, and difference features
     """
-    def __init__(self, mammo_reg_net: nn.Module, finetune_all: bool = False):
+    def __init__(self, mammo_reg_net: nn.Module,args):
         super().__init__()
         self.encoder = extract_mirai_backbone(cfg["paths"]["mirai_path"])
         self.mammo_reg_net = mammo_reg_net.eval()  # frozen by default
         self.feat_transformer = SpatialTransformerBlock(mode='bilinear')
-        self.positional_encoding = ContinuousPosEncoding(dim=512)
+        self.positional_encoding = ContinuousPosEncoding(dim=args.pos_encoding_dim)
 
         # Freeze encoder by default
         self.encoder.requires_grad_(False)
         self.encoder.eval()
-        if finetune_all:
+        if args.finetune_all:
             for p in self.encoder.parameters():
                 p.requires_grad = True
             self.encoder.train()
