@@ -40,11 +40,11 @@ def get_model(model_name: str, args=None, path_saved_reg_model=None, **kwargs):
 
     elif model_name == "ImgFeatAlign":
         from models.ImgFeatAlign.model import ImgFeatAlign
-        return _build_model(ImgFeatAlign, mammo_reg_net=mammo_reg_net, **kwargs)
+        return _build_model(ImgFeatAlign, mammo_reg_net=mammo_reg_net,args=args, **kwargs)
 
     elif model_name == "LMV-Net":
         from models.LMVNet.model import LMVNet
-        return _build_model(LMVNet, mammo_reg_net=mammo_reg_net, **kwargs)
+        return _build_model(LMVNet, mammo_reg_net=mammo_reg_net, args=args,**kwargs)
 
     elif model_name == "VMRA-MaR":
         from models.VMRAMAR.model import VMRAMaR

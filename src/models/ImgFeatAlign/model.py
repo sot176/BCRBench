@@ -12,7 +12,7 @@ class ImgFeatAlign(nn.Module):
     Feature-level alignment using deformation fields for longitudinal risk prediction.
     """
 
-    def __init__(self, mammo_reg_net: nn.Module, finetune_all: bool = False):
+    def __init__(self, mammo_reg_net: nn.Module, args):
         super().__init__()
 
         # -------------------------
@@ -20,7 +20,7 @@ class ImgFeatAlign(nn.Module):
         # -------------------------
         self.encoder = extract_mirai_backbone(cfg["paths"]["mirai_path"])
 
-        self._set_encoder_trainable(finetune_all)
+        self._set_encoder_trainable(args.finetune_all)
 
         # -------------------------
         # Modules
