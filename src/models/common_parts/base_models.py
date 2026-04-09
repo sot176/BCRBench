@@ -7,12 +7,15 @@ import torch.nn as nn
 # ══════════════════════════════════════════════════════════════════
 # Abstract Base Model — defines the interface all models must follow
 # ══════════════════════════════════════════════════════════════════
-
 class BaseRiskModel(nn.Module, ABC):
     """
     Abstract base class for all breast cancer risk prediction models.
     Defines the interface that training/evaluation code depends on.
     """
+
+    def __init__(self, args):
+        super().__init__()
+        self.args = args   
 
     @abstractmethod
     def forward(self, batch: Dict) -> Dict:
@@ -30,4 +33,3 @@ class BaseRiskModel(nn.Module, ABC):
     def get_primary_risk_head(self, outputs: Dict) -> torch.Tensor:
         """Returns the main risk prediction tensor for evaluation metrics (AUC, C_index)."""
         pass
-

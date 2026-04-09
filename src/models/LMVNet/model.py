@@ -19,7 +19,7 @@ class LMVNet(BaseRiskModel):
         mammo_reg_net: nn.Module,
         args
     ):
-        super().__init__()
+        super().__init__(args)
        
         # Longitudinal feature processor
         self.longitudinal_feat_processor = LongitudinalFeatureProcessor(

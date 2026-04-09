@@ -14,7 +14,7 @@ class ImgFeatAlign(BaseRiskModel):
     """
 
     def __init__(self, mammo_reg_net: nn.Module, args):
-        super().__init__()
+        super().__init__(args)
 
         # -------------------------
         # Encoder

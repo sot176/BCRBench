@@ -49,8 +49,8 @@ class VMRAMaR(BaseRiskModel):
     """
 
     def __init__(self, args):
-        super().__init__()
-        self.args = args
+        super().__init__(args)
+
 
         # -------------------------
         # Image Encoder

@@ -22,8 +22,7 @@ class Mirai(BaseRiskModel):
     Full Mirai model combining image encoder + transformer for longitudinal risk prediction.
     """
     def __init__(self, args):
-        super().__init__()
-        self.args = args
+        super().__init__(args)
 
         # -------------------------
         # Image Encoder

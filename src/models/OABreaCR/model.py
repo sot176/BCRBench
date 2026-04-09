@@ -13,7 +13,7 @@ class OA_BreaCR(BaseRiskModel):
     Longitudinal breast cancer risk prediction model with optional probabilistic latent embeddings.
     """
     def __init__(self, args):
-        super().__init__()
+        super().__init__(args)
 
         # -------------------------
         # Backbone Encoder
