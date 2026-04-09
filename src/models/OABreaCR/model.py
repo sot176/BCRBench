@@ -18,15 +18,15 @@ class OA_BreaCR(BaseRiskModel):
         # -------------------------
         # Backbone Encoder
         # -------------------------
-        self.model = BaselineModel(arch=args.arch)
+        self.model = BaselineModel(arch=self.args.arch)
         num_feat = self.model.get_num_feat()
 
         # -------------------------
         # Output heads
         # -------------------------
-        self.final = nn.Linear(num_feat, args.num_output_neurons)
-        self.final_single = nn.Linear(num_feat, args.num_output_neurons)
-        self.difference_single = nn.Linear(num_feat, args.num_output_neurons)
+        self.final = nn.Linear(num_feat, self.args.num_output_neurons)
+        self.final_single = nn.Linear(num_feat, self.args.num_output_neurons)
+        self.difference_single = nn.Linear(num_feat, self.args.num_output_neurons)
 
         # -------------------------
         # Attention pooling
@@ -35,17 +35,17 @@ class OA_BreaCR(BaseRiskModel):
             num_chan=num_feat,
             conv_pool_kernel_size=7,
             stride=1,
-            num_dim=(args.img_size[0] // 32) * (args.img_size[1] // 32),
+            num_dim=(self.args.img_size[0] // 32) * (self.args.img_size[1] // 32),
         )
 
         # -------------------------
         # Optional POE latent
         # -------------------------
-        self.POE = getattr(args, "use_poe", True)
+        self.POE = getattr(self.args, "use_poe", True)
         if self.POE:
             self.POELatent = POELatent(num_feat=num_feat)
-        self.max_t = getattr(args, "max_t", 50)
-        self.use_sto = getattr(args, "use_sto", True)
+        self.max_t = getattr(self.args, "max_t", 50)
+        self.use_sto = getattr(self.args, "use_sto", True)
 
         # -------------------------
         # Registration and alignment
@@ -191,7 +191,7 @@ class OA_BreaCR(BaseRiskModel):
             y_true, y_mask = self.build_survival_targets(
                 risk_label,
                 years_lfu,
-                num_years=T,
+                num_years=self.args.num_output_neurons,
                 device=device
             )
             return (logits, y_true, y_mask)
