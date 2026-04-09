@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import sys
+from models.common_parts import BaseRiskModel
+
 
 # ── Register onconet aliases before any import from factory ──────────
 from . import onconet as _onconet
@@ -12,11 +14,10 @@ for _key in list(sys.modules.keys()):
             sys.modules[_key]
         )
 
-from .onconet.models.factory import get_model_by_name, load_model, RegisterModel
+from .onconet.models.factory import get_model_by_name, load_model
 
 
-@RegisterModel("mirai_full")
-class Mirai(nn.Module):
+class Mirai(BaseRiskModel):
     """
     Full Mirai model combining image encoder + transformer for longitudinal risk prediction.
     """

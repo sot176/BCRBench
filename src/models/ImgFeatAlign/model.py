@@ -5,9 +5,10 @@ import torch.nn.functional as F
 from config.config import cfg
 from models.common_parts import extract_mirai_backbone, SpatialTransformerBlock
 from .model_utils import RiskModelWithAttention
+from models.common_parts import BaseRiskModel
 
 
-class ImgFeatAlign(nn.Module):
+class ImgFeatAlign(BaseRiskModel):
     """
     Feature-level alignment using deformation fields for longitudinal risk prediction.
     """

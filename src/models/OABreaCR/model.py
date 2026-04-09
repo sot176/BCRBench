@@ -5,9 +5,10 @@ from typing import Dict
 
 from models.common_parts import ContinuousPosEncoding, SpatialTransformerBlock
 from .model_utils import SimpleAttentionPool, POELatent, Feedforward, BaselineModel, prob_to_score
+from models.common_parts import BaseRiskModel
 
 
-class OA_BreaCR(nn.Module):
+class OA_BreaCR(BaseRiskModel):
     """
     Longitudinal breast cancer risk prediction model with optional probabilistic latent embeddings.
     """

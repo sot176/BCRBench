@@ -9,6 +9,7 @@ from .lat import LongitudinalAsymmetryTracker
 from models.common_parts import CumulativeProbabilityLayer
 from config.config import cfg
 from models.Mirai import onconet as _onconet
+from models.common_parts import BaseRiskModel
 
 sys.modules.setdefault("onconet", _onconet)
 for _key in list(sys.modules.keys()):
@@ -39,7 +40,7 @@ class IdentityPool(nn.Module):
         return False
 
 
-class VMRAMaR(nn.Module):
+class VMRAMaR(BaseRiskModel):
     """
     Stable reimplementation of VMRNN-Asymmetry Mammogram Risk model.
 

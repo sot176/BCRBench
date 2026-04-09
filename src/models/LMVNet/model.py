@@ -3,9 +3,10 @@ import torch.nn as nn
 from .model_utils import CrossAttentionBlock, LongitudinalFeatureProcessor
 from models.common_parts import CumulativeProbabilityLayer
 from typing import Dict, Any
+from models.common_parts import BaseRiskModel
 
 
-class LMVNet(nn.Module):
+class LMVNet(BaseRiskModel):
     """
     Longitudinal Multi-View Network (LMVNet) for risk prediction.
 
