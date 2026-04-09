@@ -67,7 +67,6 @@ def parse_cli_args():
 
     parser.add_argument("--augmentations", action="store_true")
     parser.add_argument("--use_scheduler", action="store_true")
-    parser.add_argument("--finetune_all", action="store_true")
     parser.add_argument("--resume_from", type=str)
     parser.add_argument("--wandb_id", type=str)
     parser.add_argument("--seed", type=int, default=2023)

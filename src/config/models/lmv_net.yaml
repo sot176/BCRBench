@@ -6,7 +6,7 @@ name: LMV-Net
 max_followup: 5
 num_attn_blocks: 1
 feature_dim: 1536
-finetune_all: false
+finetune_all: true
 
 heads: 4
 dropout: 0.3
