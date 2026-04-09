@@ -4,14 +4,12 @@ name: ImgFeatAlign
 # Transformer / Attention params
 # ----------------------------
 max_followup: 5
-num_attn_blocks: 1
-feature_dim: 1536
+feature_dim: 512
 finetune_all: false
 
-heads: 4
-dropout: 0.3
-drop_path: 0.2
-ffn_expansion_factor: 2
+num_heads: 8
+dropout: 0.1
+ffn_expansion_factor: 4
 
 # ----------------------------
 # Positional Encoding

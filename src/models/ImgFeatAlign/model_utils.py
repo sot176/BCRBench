@@ -10,7 +10,7 @@ from models.common_parts import ContinuousPosEncoding, CumulativeProbabilityLaye
 # -------------------------
 
 class TemporalAttentionLayer(nn.Module):
-    def __init__(self, dim, num_heads, dropout=0.1):
+    def __init__(self, dim, num_heads, dropout=0.1, ffn_expansion_factor=4):
         super().__init__()
 
         self.attn = nn.MultiheadAttention(
@@ -24,9 +24,9 @@ class TemporalAttentionLayer(nn.Module):
         self.norm2 = nn.LayerNorm(dim)
 
         self.ff = nn.Sequential(
-            nn.Linear(dim, dim * 4),
+            nn.Linear(dim, dim * ffn_expansion_factor),
             nn.ReLU(),
-            nn.Linear(dim * 4, dim),
+            nn.Linear(dim * ffn_expansion_factor, dim),
         )
 
     def forward(self, x):
@@ -46,20 +46,18 @@ class TemporalAttentionLayer(nn.Module):
 # -------------------------
 
 class RiskModelWithAttention(nn.Module):
-    def __init__(self, feature_dim=512, num_years=5, num_heads=8):
+    def __init__(self, args):
         super().__init__()
 
-        self.feature_dim = feature_dim
+        self.positional_encoding = ContinuousPosEncoding(dim=args.pos_encoding_dim)
+        self.attention_layer = TemporalAttentionLayer(dim=args.feature_dim, num_heads=args.num_heads, dropout=args.dropout, ffn_expansion_factor=args.ffn_expansion_factor)
 
-        self.positional_encoding = ContinuousPosEncoding(dim=feature_dim)
-        self.attention_layer = TemporalAttentionLayer(dim=feature_dim, num_heads=num_heads)
-
-        self.feature_projection = nn.Linear(feature_dim, feature_dim)
+        self.feature_projection = nn.Linear(args.feature_dim, args.feature_dim)
 
         # Prediction heads
-        self.head_fused = CumulativeProbabilityLayer(feature_dim, num_years)
-        self.head_cur = CumulativeProbabilityLayer(feature_dim, num_years)
-        self.head_pri = CumulativeProbabilityLayer(feature_dim, num_years)
+        self.head_fused = CumulativeProbabilityLayer(num_features=args.feature_dim, max_followup=args.max_followup)
+        self.head_cur = CumulativeProbabilityLayer(num_features=args.feature_dim, max_followup=args.max_followup)
+        self.head_pri = CumulativeProbabilityLayer(num_features=args.feature_dim, max_followup=args.max_followup)
 
     # -------------------------
     # Helpers

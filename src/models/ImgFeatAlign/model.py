@@ -25,7 +25,7 @@ class ImgFeatAlign(nn.Module):
         # -------------------------
         # Modules
         # -------------------------
-        self.risk_model = RiskModelWithAttention()
+        self.risk_model = RiskModelWithAttention(args)
         self.spatial_transform = SpatialTransformerBlock(mode="bilinear")
 
         # Registration network (frozen)
