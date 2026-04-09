@@ -158,33 +158,103 @@ class OA_BreaCR(BaseRiskModel):
     def compute_reg_loss(x: torch.Tensor, target_x_source: torch.Tensor) -> torch.Tensor:
         """MSE loss for registration alignment."""
         return torch.mean((x - target_x_source) ** 2) * 1e-2
+    
+    def build_survival_targets(risk_label, years_lfu, num_years, device):
+        B = risk_label.shape[0]
 
+        y_seq = torch.zeros((B, num_years), device=device)
+        y_mask = torch.ones((B, num_years), device=device)
+
+        followup = num_years - 1
+        risk_label = risk_label.clamp(max=followup)
+
+        for i in range(B):
+            if risk_label[i] < followup:
+                y_seq[i, risk_label[i]] = 1
+                y_mask[i, risk_label[i]+1:] = 0
+            elif years_lfu[i] < followup:
+                y_mask[i, years_lfu[i]+1:] = 0
+
+        return y_seq, y_mask
 
     # -------------------------
     # Risk head
     # -------------------------
     def get_risk_heads(self, outputs: Dict, batch: Dict) -> Dict:
-        """
-        Builds targets and masks for all heads.
-        Used by both loss computation and evaluation.
-        """
-        y_true, y_mask = self.compute_risk_target_and_mask(
-            outputs["final"],
-            batch["years_to_cancer"],
-            batch["years_to_last_followup"],
-        )
-        y_true_pri, y_mask_pri = self.compute_risk_target_and_mask(
-            outputs["final"],
-            batch["years_to_cancer_prior"],
-            batch["years_to_last_followup_prior"],
-        )
+        device = outputs["final"].device
+        T = self.max_t if hasattr(self, "max_t") else outputs["final"].shape[1]
+
+        def make_head(logits, risk_label, years_lfu):
+            if logits is None:
+                return (None, None, None)
+
+            y_true, y_mask = self.build_survival_targets(
+                risk_label,
+                years_lfu,
+                num_years=T,
+                device=device
+            )
+            return (logits, y_true, y_mask)
+
         return {
-            "final":      (outputs.get("final"),      y_true,     y_mask),
-            "current":    (outputs.get("current"),    y_true,     y_mask),
-            "prior":      (outputs.get("prior"),      y_true_pri, y_mask_pri),
-            "difference": (outputs.get("difference"), y_true,     y_mask),
+            "final": make_head(
+                outputs.get("final"),
+                batch["years_to_cancer"],
+                batch["years_to_last_followup"]
+            ),
+            "current": make_head(
+                outputs.get("current"),
+                batch["years_to_cancer"],
+                batch["years_to_last_followup"]
+            ),
+            "prior": make_head(
+                outputs.get("prior"),
+                batch["years_to_cancer_prior"],
+                batch["years_to_last_followup_prior"]
+            ),
+            "difference": make_head(
+                outputs.get("difference"),
+                batch["years_to_cancer"],
+                batch["years_to_last_followup"]
+            ),
         }
     
+    def get_auxiliary_heads(self, outputs, batch):
+        return {
+            "final": {
+                "risk": outputs.get("final"),
+                "risk_label": batch["years_to_cancer"],
+                "years_lfu": batch["years_to_last_followup"],
+                "emb": outputs.get("emb_final"),
+                "log_var": outputs.get("log_var_final"),
+                "weight": 1.0,
+            },
+            "current": {
+                "risk": outputs.get("current"),
+                "risk_label": batch["years_to_cancer"],
+                "years_lfu": batch["years_to_last_followup"],
+                "emb": outputs.get("emb_current"),
+                "log_var": outputs.get("log_var_current"),
+                "weight": 0.2,
+            },
+            "prior": {
+                "risk": outputs.get("prior"),
+                "risk_label": batch["years_to_cancer_prior"],
+                "years_lfu": batch["years_to_last_followup_prior"],
+                "emb": outputs.get("emb_prior"),
+                "log_var": outputs.get("log_var_prior"),
+                "weight": 0.2,
+            },
+            "difference": {
+                "risk": outputs.get("difference"),
+                "risk_label": batch["years_to_cancer"],
+                "years_lfu": batch["years_to_last_followup"],
+                "emb": outputs.get("emb_difference"),
+                "log_var": outputs.get("log_var_difference"),
+                "weight": 0.2,
+            },
+        }
+
     def get_primary_risk_head(outputs: Dict[str, torch.Tensor], max_followup: int = 5) -> torch.Tensor:
         """Return softmax-normalized cumulative risk score."""
         risk = outputs["final"]
@@ -194,25 +264,4 @@ class OA_BreaCR(BaseRiskModel):
         score = prob_to_score(prob.detach().cpu().numpy(), max_followup=max_followup)
         return torch.tensor(score, device=prob.device, dtype=torch.float)
     
-    @staticmethod
-    def compute_risk_target_and_mask(pred, years_to_cancer,
-                                     years_last_followup):
-        if pred.dim() == 3:
-            pred = pred.mean(dim=0)
-        B, num_pred_years = pred.shape
-        followup = num_pred_years - 1
-        device   = years_to_cancer.device
-
-        risk_label          = years_to_cancer.cpu().detach().numpy().copy()
-        years_last_followup = years_last_followup.cpu().detach().numpy().copy()
-        risk_label[risk_label > followup] = followup
-
-        y_true = torch.zeros(B, num_pred_years, device=device)
-        y_mask = torch.ones(B, num_pred_years, device=device)
-
-        for i in range(B):
-            y_true[i, int(risk_label[i])] = 1
-            if risk_label[i] == followup and years_last_followup[i] < followup:
-                y_mask[i, int(years_last_followup[i]) + 1:] = 0
-
-        return y_true, y_mask
+   
