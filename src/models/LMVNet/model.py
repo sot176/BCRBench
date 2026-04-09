@@ -24,32 +24,32 @@ class LMVNet(BaseRiskModel):
         # Longitudinal feature processor
         self.longitudinal_feat_processor = LongitudinalFeatureProcessor(
             mammo_reg_net=mammo_reg_net,
-            args=args
+            args=self.args
         )
 
         # Cross-attention blocks
         self.cross_attn_blocks = nn.ModuleList([
             CrossAttentionBlock(
-                in_channels=args.feature_dim,
-                reduced_channels=args.feature_dim,
-                heads=args.num_heads,
-                dropout=args.dropout,
-                drop_path=args.drop_path,
-                ffn_expansion_factor=args.ffn_expansion_factor
+                in_channels=self.args.feature_dim,
+                reduced_channels=self.args.feature_dim,
+                heads=self.args.num_heads,
+                dropout=self.args.dropout,
+                drop_path=self.args.drop_path,
+                ffn_expansion_factor=self.args.ffn_expansion_factor
             )
-            for _ in range(args.num_attn_blocks)
+            for _ in range(self.args.num_attn_blocks)
         ])
 
         # Adaptive pooling for each view
         self.global_avg_pool = nn.AdaptiveAvgPool2d((1, 1))
 
         # Fusion layer for multi-view concatenated features
-        self.view_fc = nn.Linear(args.feature_dim * 2, args.feature_dim)
+        self.view_fc = nn.Linear(self.args.feature_dim * 2, self.args.feature_dim)
 
         # Cumulative probability layers for risk prediction
         self.cumulative_risk = CumulativeProbabilityLayer(
-            num_features=args.feature_dim,
-            max_followup=args.max_followup
+            num_features=self.args.feature_dim,
+            max_followup=self.args.max_followup
         )
 
     # -------------------------

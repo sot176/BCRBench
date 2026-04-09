@@ -27,10 +27,10 @@ class Mirai(BaseRiskModel):
         # -------------------------
         # Image Encoder
         # -------------------------
-        self.image_encoder = self._init_image_encoder(args)
+        self.image_encoder = self._init_image_encoder(self.args)
 
         # Freeze encoder if requested
-        if getattr(args, "freeze_image_encoder", True):
+        if getattr(self.args, "freeze_image_encoder", True):
             self._freeze_encoder(self.image_encoder)
 
         self.image_repr_dim = self.image_encoder._model.args.img_only_dim
@@ -38,11 +38,11 @@ class Mirai(BaseRiskModel):
         # -------------------------
         # Transformer
         # -------------------------
-        args.precomputed_hidden_dim = self.image_repr_dim
-        self.transformer = self._init_transformer(args)
+        self.args.precomputed_hidden_dim = self.image_repr_dim
+        self.transformer = self._init_transformer(self.args)
 
         # Update transformer output dim
-        args.img_only_dim = self.transformer.args.transformer_hidden_dim
+        self.args.img_only_dim = self.transformer.args.transformer_hidden_dim
 
     # -------------------------
     # Helper methods

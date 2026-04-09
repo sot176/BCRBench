@@ -21,12 +21,12 @@ class ImgFeatAlign(BaseRiskModel):
         # -------------------------
         self.encoder = extract_mirai_backbone(cfg["paths"]["mirai_path"])
 
-        self._set_encoder_trainable(args.finetune_all)
+        self._set_encoder_trainable(self.args.finetune_all)
 
         # -------------------------
         # Modules
         # -------------------------
-        self.risk_model = RiskModelWithAttention(args)
+        self.risk_model = RiskModelWithAttention(self.args)
         self.spatial_transform = SpatialTransformerBlock(mode="bilinear")
 
         # Registration network (frozen)

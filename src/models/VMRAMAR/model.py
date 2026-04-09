@@ -55,10 +55,10 @@ class VMRAMaR(BaseRiskModel):
         # -------------------------
         # Image Encoder
         # -------------------------
-        self.image_encoder = self._init_image_encoder(args)
+        self.image_encoder = self._init_image_encoder(self.args)
 
         # Freeze encoder if requested
-        if getattr(args, "freeze_image_encoder", True):
+        if getattr(self.args, "freeze_image_encoder", True):
             self._freeze_encoder(self.image_encoder)
 
         # Replace pooling / fc layers with identity to extract features
@@ -70,30 +70,30 @@ class VMRAMaR(BaseRiskModel):
         self.image_repr_dim = self.image_encoder._model.args.img_only_dim
 
         # ── 2. View Aggregation (CC / MLO) ───────────────────────────
-        self.view_fc = nn.Linear(self.image_repr_dim, args.embed_dim)
+        self.view_fc = nn.Linear(self.image_repr_dim, self.args.embed_dim)
         self.view_attn = nn.MultiheadAttention(
-            args.embed_dim, num_heads=4, batch_first=True
+            self.args.embed_dim, num_heads=4, batch_first=True
         )
 
         # ── 3. Temporal Projection + VMRNN ───────────────────────────
         self.vmrnn_out_proj = nn.Sequential(
-            nn.Linear(args.embed_dim, args.embed_dim),
-            nn.LayerNorm(args.embed_dim),
+            nn.Linear(self.args.embed_dim, self.args.embed_dim),
+            nn.LayerNorm(self.args.embed_dim),
         )
         self.vmrnn = VMRNN(
-            embed_dim=args.embed_dim,
-            depths_downsample=args.depths_downsample,
-            depths_upsample=args.depths_upsample,
+            embed_dim=self.args.embed_dim,
+            depths_downsample=self.args.depths_downsample,
+            depths_upsample=self.args.depths_upsample,
             feature_resolution=(1, 1),
         )
 
         # ── 4. Asymmetry Branch ──────────────────────────────────────
-        self.use_asymmetry = getattr(args, "use_asymmetry", False)
+        self.use_asymmetry = getattr(self.args, "use_asymmetry", False)
         if self.use_asymmetry:
-            self.sad = SpatialAsymmetryDetector(args)
-            self.lat = LongitudinalAsymmetryTracker(args)
-            latent_h = getattr(args, "latent_h", 5)
-            latent_w = getattr(args, "latent_w", 5)
+            self.sad = SpatialAsymmetryDetector(self.args)
+            self.lat = LongitudinalAsymmetryTracker(self.args)
+            latent_h = getattr(self.args, "latent_h", 5)
+            latent_w = getattr(self.args, "latent_w", 5)
             self.asym_proj = nn.Sequential(
                 nn.Linear(latent_h * latent_w, 512),
                 nn.ReLU(),
@@ -101,7 +101,7 @@ class VMRAMaR(BaseRiskModel):
             )
 
         # ── 5. Final Fusion + AHL ────────────────────────────────────
-        final_dim = args.embed_dim + (512 if self.use_asymmetry else 0)
+        final_dim = self.args.embed_dim + (512 if self.use_asymmetry else 0)
         self.fusion_norm = nn.LayerNorm(final_dim)
         self.ahl = CumulativeProbabilityLayer(final_dim, max_followup=5)
 
