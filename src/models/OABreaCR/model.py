@@ -166,7 +166,6 @@ class OA_BreaCR(BaseRiskModel):
         y_mask = torch.ones((B, num_years), device=device)
 
         followup = num_years - 1
-        risk_label = risk_label.clamp(max=followup)
 
         for i in range(B):
             if risk_label[i] < followup:
