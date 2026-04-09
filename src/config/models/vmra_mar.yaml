@@ -1,7 +1,84 @@
-defaults:
-  - mirai
 
 name: VMRA-MaR
+
+
+# ----------------------------
+# Snapshots / Pretrained
+# ----------------------------
+img_encoder_snapshot: "/mirai_pretrained_backbone/snapshots/mgh_mammo_MIRAI_Base_May20_2019.p"
+transformer_snapshot:  
+snapshot:  
+freeze_image_encoder: false
+use_precomputed_hiddens: false
+state_dict_path: null
+
+# ----------------------------
+# Transformer architecture
+# ----------------------------
+transformer_hidden_dim: 512
+num_layers: 3
+num_heads: 4
+dropout: 0.1
+
+# ----------------------------
+# Image / input settings
+# ----------------------------
+num_chan: 3
+multi_image: true
+num_images: 4
+
+# ----------------------------
+# ResNet backbone
+# ----------------------------
+model_name: mirai_full
+block_layout:
+  - "BasicBlock,2"
+  - "BasicBlock,2"
+  - "BasicBlock,2"
+  - "BasicBlock,2"
+block_widening_factor: 1
+num_groups: 1
+pool_name: GlobalMaxPool
+deep_risk_factor_pool: false
+replace_snapshot_pool: true
+pretrained_on_imagenet: false
+pretrained_imagenet_model_name: resnet18
+make_fc: false
+replace_bn_with_gn: false
+
+# ----------------------------
+# Risk factors
+# ----------------------------
+use_risk_factors: false
+pred_risk_factors: false
+pred_both_sides: false
+predict_birads: false
+pred_missing_mammos: false
+also_pred_given_mammos: false
+
+# ----------------------------
+# Regularization / annotations
+# ----------------------------
+use_region_annotation: false
+
+# ----------------------------
+# Survival analysis
+# ----------------------------
+survival_analysis_setup: true
+max_followup: 5
+
+# ----------------------------
+# Misc / runtime settings
+# ----------------------------
+num_classes: 2
+cuda: false
+num_gpus: 1
+num_shards: 1
+data_parallel: false
+model_parallel: false
+wrap_model: false
+
+
 
 # ----------------------------
 # VMRNN architecture
