@@ -42,7 +42,7 @@ class Mirai(nn.Module):
         self.transformer = self._init_transformer(args)
 
         # Update transformer output dim
-        args.img_only_dim = self.transformer.args.transfomer_hidden_dim
+        args.img_only_dim = self.transformer.args.transformer_hidden_dim
 
     # -------------------------
     # Helper methods
