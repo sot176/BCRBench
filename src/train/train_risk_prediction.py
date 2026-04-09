@@ -31,8 +31,6 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
         args.model,
         args=args,
         path_saved_reg_model=path_saved_reg_model,
-        max_followup=5,
-        finetune_all=args.finetune_all,
     )
 
     total_params = sum(p.numel() for p in model_risk.parameters())
