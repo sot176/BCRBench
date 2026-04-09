@@ -29,11 +29,7 @@ num_images: 4
 # ResNet backbone
 # ----------------------------
 model_name: mirai_full
-block_layout:
-  - ["BasicBlock", 2]
-  - ["BasicBlock", 2]
-  - ["BasicBlock", 2]
-  - ["BasicBlock", 2]
+block_layout: "BasicBlock,2 BasicBlock,2 BasicBlock,2 BasicBlock,2"
 block_widening_factor: 1
 num_groups: 1
 pool_name: GlobalMaxPool
