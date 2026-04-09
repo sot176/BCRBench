@@ -37,21 +37,17 @@ def parse_test_args():
     # ---------------- Model-specific YAML ----------------
     try:
         yaml_path = f"config/models/{temp_args.model.lower().replace('-', '_')}.yaml"
+        print("yaml path", yaml_path)
         with open(yaml_path, "r") as f:
             model_config = yaml.safe_load(f)
 
         # Dynamically add YAML args to the parser
         for k, v in model_config.items():
-            # Determine argument type from the YAML value
-            arg_type = type(v) if not isinstance(v, bool) else None
             if isinstance(v, bool):
-                # For booleans, create store_true/store_false flags
-                if v:
-                    parser.add_argument(f"--{k}", action="store_true")
-                else:
-                    parser.add_argument(f"--{k}", action="store_false")
+                parser.add_argument(f"--{k}", action="store_true")
+                parser.set_defaults(**{k: v})
             else:
-                parser.add_argument(f"--{k}", type=arg_type, default=v)
+                parser.add_argument(f"--{k}", type=type(v), default=v)
     except FileNotFoundError:
         print(f"[WARNING] YAML config for {temp_args.model} not found. Using CLI/default values.")
 

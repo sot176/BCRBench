@@ -30,7 +30,7 @@ class Mirai(nn.Module):
         self.image_encoder = self._init_image_encoder(args)
 
         # Freeze encoder if requested
-        if getattr(args, "freeze_image_encoder", False):
+        if getattr(args, "freeze_image_encoder", True):
             self._freeze_encoder(self.image_encoder)
 
         self.image_repr_dim = self.image_encoder._model.args.img_only_dim

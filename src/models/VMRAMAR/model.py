@@ -51,19 +51,14 @@ class VMRAMaR(nn.Module):
         super().__init__()
         self.args = args
 
-        # ── 1. Image Encoder ─────────────────────────────────────────
-        if args.img_encoder_snapshot is not None:
-            self.image_encoder = load_model(
-                args.img_encoder_snapshot, args, do_wrap_model=False
-            )
-            if getattr(args, "replace_snapshot_pool", True):
-                non_trained_encoder = get_model_by_name("custom_resnet", False, args)
-                self.image_encoder._model.pool = non_trained_encoder._model.pool
-                self.image_encoder._model.fc = non_trained_encoder._model.fc
-                self.image_encoder._model.prob_of_failure_layer = non_trained_encoder._model.prob_of_failure_layer
-                self.image_encoder._model.args = non_trained_encoder._model.args
-        else:
-            self.image_encoder = get_model_by_name("custom_resnet", False, args)
+        # -------------------------
+        # Image Encoder
+        # -------------------------
+        self.image_encoder = self._init_image_encoder(args)
+
+        # Freeze encoder if requested
+        if getattr(args, "freeze_image_encoder", True):
+            self._freeze_encoder(self.image_encoder)
 
         # Replace pooling / fc layers with identity to extract features
         self.image_encoder._model.pool = IdentityPool()
@@ -108,6 +103,29 @@ class VMRAMaR(nn.Module):
         final_dim = args.embed_dim + (512 if self.use_asymmetry else 0)
         self.fusion_norm = nn.LayerNorm(final_dim)
         self.ahl = CumulativeProbabilityLayer(final_dim, max_followup=5)
+
+    def _init_image_encoder(self, args):
+        """Initialize the image encoder, optionally loading a snapshot."""
+        if getattr(args, "img_encoder_snapshot", None):
+            encoder = load_model(args.img_encoder_snapshot, args, do_wrap_model=False)
+            if getattr(args, "replace_snapshot_pool", True):
+                new_encoder = get_model_by_name("custom_resnet", False, args)
+                # Replace pool, fc, prob_of_failure_layer, and args
+                encoder._model.pool = new_encoder._model.pool
+                encoder._model.fc = new_encoder._model.fc
+                encoder._model.prob_of_failure_layer = new_encoder._model.prob_of_failure_layer
+                encoder._model.args = new_encoder._model.args
+        else:
+            encoder = get_model_by_name("custom_resnet", False, args)
+        return encoder
+
+    @staticmethod
+    def _freeze_encoder(encoder):
+        """Freeze all parameters of the encoder."""
+        for param in encoder.parameters():
+            param.requires_grad = False
+        encoder.eval()
+        print("[INFO] Image encoder frozen.")
 
     def forward(self, batch: dict) -> dict:
         """
