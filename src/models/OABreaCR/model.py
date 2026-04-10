@@ -158,60 +158,29 @@ class OA_BreaCR(BaseRiskModel):
     def compute_reg_loss(x: torch.Tensor, target_x_source: torch.Tensor) -> torch.Tensor:
         """MSE loss for registration alignment."""
         return torch.mean((x - target_x_source) ** 2) * 1e-2
-    
-    def build_survival_targets(risk_label, years_lfu, num_years, device):
-        B = risk_label.shape[0]
-
-        y_seq = torch.zeros((B, num_years), device=device)
-        y_mask = torch.ones((B, num_years), device=device)
-
-        followup = num_years - 1
-
-        for i in range(B):
-            if risk_label[i] < followup:
-                y_seq[i, risk_label[i]] = 1
-                y_mask[i, risk_label[i]+1:] = 0
-            elif years_lfu[i] < followup:
-                y_mask[i, years_lfu[i]+1:] = 0
-
-        return y_seq, y_mask
 
     # -------------------------
     # Risk head
     # -------------------------
     def get_risk_heads(self, outputs: Dict, batch: Dict) -> Dict:
-        device = outputs["final"].device
-        T = self.max_t if hasattr(self, "max_t") else outputs["final"].shape[1]
-
-        def make_head(logits, risk_label, years_lfu):
-            if logits is None:
-                return (None, None, None)
-
-            y_true, y_mask = self.build_survival_targets(
-                risk_label,
-                years_lfu,
-                num_years=self.args.num_output_neurons,
-                device=device
-            )
-            return (logits, y_true, y_mask)
-
+         
         return {
-            "final": make_head(
+            "final":(
                 outputs.get("final"),
                 batch["years_to_cancer"],
                 batch["years_to_last_followup"]
             ),
-            "current": make_head(
+            "current": (
                 outputs.get("current"),
                 batch["years_to_cancer"],
                 batch["years_to_last_followup"]
             ),
-            "prior": make_head(
+            "prior": (
                 outputs.get("prior"),
                 batch["years_to_cancer_prior"],
                 batch["years_to_last_followup_prior"]
             ),
-            "difference": make_head(
+            "difference": (
                 outputs.get("difference"),
                 batch["years_to_cancer"],
                 batch["years_to_last_followup"]

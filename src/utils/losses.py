@@ -62,11 +62,11 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
             # -------------------------
             risk_heads = model_risk.get_risk_heads(outputs, batch)
 
-            for head_name, (logits, target, mask) in risk_heads.items():
+            for head_name, (logits, risk_label, years_lfu) in risk_heads.items():
                 if logits is None:
                     continue
 
-                total_loss += criterion_BCE(logits, target, mask)
+                total_loss += criterion_BCE(logits, risk_label, years_lfu)
 
             # -------------------------
             # MV + POE
@@ -133,33 +133,52 @@ def get_risk_loss_BCE(pred, y_true, y_mask):
     return loss / mask_sum
 
 
-
+ 
 class risk_BCE_loss(nn.Module):
-    """
-    Defines for computing the risk prediction loss for time-to-event data.
+    def __init__(self, num_years, weight_loss=2):
+            super().__init__()
+            self.num_years = num_years
+            self.weight_loss = weight_loss
 
-    This class calculates a custom loss function based on binary
-    cross-entropy. It utilizes masking to handle censored data during follow-up periods and allows
-    for weighted contributions to the loss computation to reflect varying levels of significance
-    across events and time periods. The class is parameterized for flexibility in accounting for
-    different datasets and settings.
-    """
-    def __init__(self, weight_loss=2):
-        super().__init__()
-        self.weight_loss = weight_loss
+    def build_survival_targets(self, risk_label, years_lfu, device):
+        B = risk_label.shape[0]
 
-    def forward(self, pred, y_true, y_mask):
+        y_seq = torch.zeros((B, self.num_years), device=device)
+        y_mask = torch.ones((B, self.num_years), device=device)
+
+        followup = self.num_years - 1
+
+        for i in range(B):
+            if risk_label[i] < followup:
+                y_seq[i, risk_label[i]] = 1
+                y_mask[i, risk_label[i] + 1:] = 0
+            elif years_lfu[i] < followup:
+                y_mask[i, years_lfu[i] + 1:] = 0
+
+        return y_seq, y_mask
+
+    def forward(self, pred, risk_label, years_lfu):
+        device = pred.device
+
+        # Build targets inside loss
+        y_true, y_mask = self.build_survival_targets(
+            risk_label, years_lfu, device
+        )
+
+        # Convert logits → probabilities
         pred = F.softmax(pred, dim=1)
 
         loss = F.binary_cross_entropy(
-            pred, y_true.float(),
+            pred,
+            y_true.float(),
             weight=y_mask.float(),
             reduction='sum'
-        ) / torch.sum(y_mask.float()) * self.weight_loss
+        )
 
+        loss = loss / torch.sum(y_mask.float())
+        loss = loss * self.weight_loss
 
-        return loss 
-
+        return loss
 #########################################################################
 # ------------------ Mean Variance loss ------------------
 #########################################################################
