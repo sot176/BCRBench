@@ -305,8 +305,8 @@ class ProbOrdiLoss(nn.Module):
     def __init__(self, distance='Bhattacharyya', alpha_coeff=0, beta_coeff=0, margin=0, main_loss_type='cls',
                  criterion='l1', start_label=0):
         super(ProbOrdiLoss, self).__init__()
-        self.alpha_coeff = float(self.alpha_coeff)
-        self.beta_coeff = float(self.beta_coeff)
+        self.alpha_coeff = float(alpha_coeff)
+        self.beta_coeff = float(beta_coeff)
         self.margin = margin
         self.start_label = start_label
 
