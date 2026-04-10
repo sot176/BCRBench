@@ -4,8 +4,23 @@ theme:
   name: material
 
 nav:
-  - Home: index.md
+  - Overview: overview.md
   - Getting Started: getting-started.md
   - Models:
-      - Overview: models/index.md
-      - OABreaCR: models/oabreacr.md
+      - Overview: models/overview.md
+      - OA-BreaCR: models/oabreacr.md
+      - ImgFeatAlign: models/imgfeatalign.md
+      - LMV-Net: models/lmvnet.md
+      - Mirai: models/mirai.md
+      - VMRA-MaR: models/vmramar.md
+      - Adding new models: models/adding_new_models.md
+  - Datasets:
+      - Overview: datasets/overview.md
+      - Preprocessing: datasets/preprocessing.md
+      - CSV-File Creation: datasets/csv_file_creation.md
+  - Training:
+      - Overview: training/overview.md
+      - Training a Model: training/training_a_model.md
+  - Evaluation:
+      - Overview: evaluation/overview.md
+      - Evaluating a Model: evaluation/evaluating_a_model.md
