@@ -9,7 +9,7 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
     if args.model == "OA-BreaCR":
 
         # Use their exact BCE loss
-        criterion_BCE = risk_BCE_loss(
+        criterion_BCE = risk_BCE_loss(num_years=args.num_output_neurons,
             weight_loss=2
         )
 
