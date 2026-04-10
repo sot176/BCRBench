@@ -66,7 +66,19 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                 if logits is None:
                     continue
 
-                total_loss += criterion_BCE(logits, risk_label, years_lfu)
+                is_sto = logits.dim() == 3
+
+                if is_sto:
+                    sample_size, _, out_dim = logits.shape
+                    logits_flat = logits.view(-1, out_dim)
+                    label_flat  = risk_label.repeat(sample_size)
+                    years_flat  = years_lfu.repeat(sample_size)
+                else:
+                    logits_flat = logits
+                    label_flat  = risk_label
+                    years_flat  = years_lfu
+
+                total_loss += criterion_BCE(logits_flat, label_flat, years_flat)
 
             # -------------------------
             # MV + POE
