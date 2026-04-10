@@ -1,0 +1,11 @@
+site_name: Breast Cancer Risk Benchmark
+
+theme:
+  name: material
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Models:
+      - Overview: models/index.md
+      - OABreaCR: models/oabreacr.md
