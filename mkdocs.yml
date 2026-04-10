@@ -1,7 +1,7 @@
 site_name: Breast Cancer Risk Benchmark
 
 theme:
-  name: material
+  name: readthedocs
 
 nav:
   - Overview: overview.md
