@@ -30,8 +30,7 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                 years_flat = years_last_followup
 
             loss = criterion_BCE(
-                risk_flat, label_flat, years_flat,
-                weights=getattr(args, "time_to_events_weights", None)
+                risk_flat, label_flat, years_flat
             )
 
             # MV
