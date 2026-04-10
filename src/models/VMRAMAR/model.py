@@ -188,8 +188,8 @@ class VMRAMaR(BaseRiskModel):
 
     # ── Risk helpers ─────────────────────────────
 
-    def get_risk_heads(self, outputs: dict, batch: dict) -> dict:
+    def get_risk_heads(self, outputs, batch):
         return {"logit_output": (outputs["logit"], batch["target"], batch["y_mask"])}
 
-    def get_primary_risk_head(self, outputs: dict) -> torch.Tensor:
+    def get_primary_risk_head(self, outputs):
         return torch.sigmoid(outputs["logit"])

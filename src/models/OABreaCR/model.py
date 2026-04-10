@@ -199,7 +199,7 @@ class OA_BreaCR(BaseRiskModel):
             },
         }
 
-    def get_primary_risk_head(outputs: Dict[str, torch.Tensor], max_followup: int = 5) -> torch.Tensor:
+    def get_primary_risk_head(self, outputs, max_followup = 5):
         """Return softmax-normalized cumulative risk score."""
         risk = outputs["final"]
         if risk.dim() == 3:  # stochastic dimension

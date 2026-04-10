@@ -106,7 +106,7 @@ class LMVNet(BaseRiskModel):
     # -------------------------
     # Risk head helpers
     # -------------------------
-    def get_risk_heads(self, outputs: Dict[str, torch.Tensor], batch: Dict[str, torch.Tensor]) -> Dict[str, Any]:
+    def get_risk_heads(self, outputs, batch):
         """
         Returns a dictionary of risk heads for loss computation.
 
@@ -125,7 +125,7 @@ class LMVNet(BaseRiskModel):
             "mlo": (outputs["risk_mlo"], target, mask),
         }
 
-    def get_primary_risk_head(self, outputs: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def get_primary_risk_head(self, outputs):
         """
         Returns the primary risk prediction (sigmoid of multi-view risk).
 
