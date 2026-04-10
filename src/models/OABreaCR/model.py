@@ -162,32 +162,8 @@ class OA_BreaCR(BaseRiskModel):
     # -------------------------
     # Risk head
     # -------------------------
-    def get_risk_heads(self, outputs: Dict, batch: Dict) -> Dict:
-         
-        return {
-            "final":(
-                outputs.get("final"),
-                batch["years_to_cancer"],
-                batch["years_to_last_followup"]
-            ),
-            "current": (
-                outputs.get("current"),
-                batch["years_to_cancer"],
-                batch["years_to_last_followup"]
-            ),
-            "prior": (
-                outputs.get("prior"),
-                batch["years_to_cancer_prior"],
-                batch["years_to_last_followup_prior"]
-            ),
-            "difference": (
-                outputs.get("difference"),
-                batch["years_to_cancer"],
-                batch["years_to_last_followup"]
-            ),
-        }
     
-    def get_auxiliary_heads(self, outputs, batch):
+    def get_risk_heads(self, outputs, batch):
         return {
             "final": {
                 "risk": outputs.get("final"),

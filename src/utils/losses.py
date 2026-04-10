@@ -29,7 +29,10 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
                 label_flat = risk_label
                 years_flat = years_last_followup
 
-            loss = torch.tensor(0.0, device=risk.device)
+            loss = criterion_BCE(
+                risk_flat, label_flat, years_flat,
+                weights=getattr(args, "time_to_events_weights", None)
+            )
 
             # MV
             if criterion_MV is not None:
@@ -57,35 +60,10 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
             if outputs.get("loss") is not None:
                 total_loss += outputs["loss"]
 
-            # -------------------------
-            # BCE (via risk_heads)
-            # -------------------------
+      
             risk_heads = model_risk.get_risk_heads(outputs, batch)
 
-            for head_name, (logits, risk_label, years_lfu) in risk_heads.items():
-                if logits is None:
-                    continue
-
-                is_sto = logits.dim() == 3
-
-                if is_sto:
-                    sample_size, _, out_dim = logits.shape
-                    logits_flat = logits.view(-1, out_dim)
-                    label_flat  = risk_label.repeat(sample_size)
-                    years_flat  = years_lfu.repeat(sample_size)
-                else:
-                    logits_flat = logits
-                    label_flat  = risk_label
-                    years_flat  = years_lfu
-
-                total_loss += criterion_BCE(logits_flat, label_flat, years_flat)
-
-            # -------------------------
-            # MV + POE
-            # -------------------------
-            aux_heads = model_risk.get_auxiliary_heads(outputs, batch)
-
-            for head_name, head in aux_heads.items():
+            for head_name, head in risk_heads.items():
                 risk = head["risk"]
                 if risk is None:
                     continue
