@@ -1,7 +1,9 @@
 import inspect
-from models.MammoRegNet import MammoRegNet
 import torch
+from typing import Optional
+
 from models.common_parts import BaseRiskModel
+from models.MammoRegNet import MammoRegNet
 
 
 def _build_model(model_class, args=None, **kwargs):
@@ -26,8 +28,6 @@ def build_mammo_reg_net(path_saved_reg_model):
     model_reg.eval()
 
     return model_reg
-from typing import Optional
-import torch.nn as nn
 
 
 def get_model(model_name: str, args=None,
