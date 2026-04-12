@@ -39,7 +39,7 @@ This project aims to:
 
 ## 📚 Implemented Models
 
-- **LMV-Net** (multi-view longitudinal, proposed)  
+- **LMV-Net**  
 - **Mirai**  
 - **VMRA-MaR**  
 - **OA-BReaCR**  
