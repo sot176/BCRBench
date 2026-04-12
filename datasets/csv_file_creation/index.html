@@ -208,19 +208,33 @@
 <hr />
 <h2 id="dataset-curation-and-label-generation">🧬 Dataset Curation and Label Generation</h2>
 <h3 id="embed">EMBED</h3>
-<p><strong>Positive cases:</strong>
-- BI-RADS = 6  (biopsy-proven cancer)</p>
+<p><strong>Positive cases:</strong></p>
 <ul>
-<li>Pathological severity = 0 or 1  (invasive or non-invasive cancer)</li>
+<li>
+<p>BI-RADS = 6  (biopsy-proven cancer)</p>
+</li>
+<li>
+<p>Pathological severity = 0 or 1  (invasive or non-invasive cancer)</p>
+</li>
 </ul>
-<p><strong>Negative cases:</strong>
-- BI-RADS = 1 or 2   (negative or benign)</p>
+<p><strong>Negative cases:</strong></p>
 <ul>
-<li>BI-RADS 0 later reclassified as 1 or 2  </li>
+<li>
+<p>BI-RADS = 1 or 2   (negative or benign)</p>
+</li>
+<li>
+<p>BI-RADS 0 later reclassified as 1 or 2  </p>
+</li>
 </ul>
-<p><strong>Column references in the original CSV-files:</strong>
-- BI-RADS → <code>asses</code><br />
-- Diagnosis date → <code>procdate_anon</code>  </p>
+<p><strong>Column references in the original CSV-files:</strong></p>
+<ul>
+<li>
+<p>BI-RADS → <code>asses</code>  </p>
+</li>
+<li>
+<p>Diagnosis date → <code>procdate_anon</code>  </p>
+</li>
+</ul>
 <hr />
 <h3 id="example-embed">Example (EMBED)</h3>
 <table>
@@ -261,15 +275,21 @@
 </table>
 <hr />
 <h3 id="csaw-cc">CSAW-CC</h3>
-<p><strong>Positive cases:</strong>
-- <code>rad_timing = 1</code> → screen-detected cancer  </p>
+<p><strong>Positive cases:</strong></p>
 <ul>
-<li><code>rad_timing = 2</code> → interval cancer  </li>
+<li>
+<p><code>rad_timing = 1</code> → screen-detected cancer  </p>
+</li>
+<li>
+<p><code>rad_timing = 2</code> → interval cancer  </p>
+</li>
 </ul>
-<p><strong>Negative cases:</strong>
-- No recorded <code>rad_timing</code></p>
-<p><strong>Note:</strong><br />
-Biopsy dates are not available. <code>rad_timing</code> is used as a proxy for cancer timing.</p>
+<p><strong>Negative cases:</strong></p>
+<ul>
+<li>No recorded <code>rad_timing</code></li>
+</ul>
+<p><strong>Note:</strong>  </p>
+<p>Biopsy dates are not available. <code>rad_timing</code> is used as a proxy for cancer timing.</p>
 <hr />
 <h3 id="cancer-year-assignment-csaw-cc">Cancer Year Assignment (CSAW-CC)</h3>
 <ul>
@@ -455,12 +475,12 @@ Biopsy dates are not available. <code>rad_timing</code> is used as a proxy for c
 <tr>
 <th>patient_id</th>
 <th>exam_id</th>
-<th>laterality</th>
+<th>ImageLaterality</th>
 <th>view</th>
-<th>diagnosis_year</th>
-<th>study_year</th>
-<th>time_to_cancer</th>
-<th>followup</th>
+<th>diagnosed_date_year</th>
+<th>study_date_year</th>
+<th>Time_to_Cancer_Years</th>
+<th>years_last_followup</th>
 <th>density</th>
 <th>cancer_type</th>
 <th>race</th>
@@ -473,12 +493,12 @@ Biopsy dates are not available. <code>rad_timing</code> is used as a proxy for c
 <td>L</td>
 <td>CC</td>
 <td>—</td>
-<td>2015</td>
+<td>2012</td>
 <td>—</td>
 <td>3</td>
 <td>1</td>
 <td>—</td>
-<td>White</td>
+<td>Caucasian or White</td>
 </tr>
 <tr>
 <td>10093833</td>
@@ -486,12 +506,12 @@ Biopsy dates are not available. <code>rad_timing</code> is used as a proxy for c
 <td>L</td>
 <td>MLO</td>
 <td>—</td>
-<td>2015</td>
+<td>2012</td>
 <td>—</td>
 <td>3</td>
 <td>1</td>
 <td>—</td>
-<td>White</td>
+<td>Caucasian or White</td>
 </tr>
 <tr>
 <td>10093833</td>
@@ -499,12 +519,12 @@ Biopsy dates are not available. <code>rad_timing</code> is used as a proxy for c
 <td>R</td>
 <td>CC</td>
 <td>—</td>
-<td>2015</td>
+<td>2012</td>
 <td>—</td>
 <td>3</td>
 <td>1</td>
 <td>—</td>
-<td>White</td>
+<td>Caucasian or White</td>
 </tr>
 <tr>
 <td>10093833</td>
@@ -512,28 +532,92 @@ Biopsy dates are not available. <code>rad_timing</code> is used as a proxy for c
 <td>R</td>
 <td>MLO</td>
 <td>—</td>
-<td>2015</td>
+<td>2012</td>
 <td>—</td>
 <td>3</td>
 <td>1</td>
 <td>—</td>
-<td>White</td>
+<td>Caucasian or White</td>
+</tr>
+<tr>
+<td>10093833</td>
+<td>41737690</td>
+<td>L</td>
+<td>CC</td>
+<td>—</td>
+<td>2015</td>
+<td>—</td>
+<td>0</td>
+<td>1</td>
+<td>—</td>
+<td>Caucasian or White</td>
+</tr>
+<tr>
+<td>10093833</td>
+<td>41737690</td>
+<td>L</td>
+<td>MLO</td>
+<td>—</td>
+<td>2015</td>
+<td>—</td>
+<td>0</td>
+<td>1</td>
+<td>—</td>
+<td>Caucasian or White</td>
+</tr>
+<tr>
+<td>10093833</td>
+<td>41737690</td>
+<td>R</td>
+<td>CC</td>
+<td>—</td>
+<td>2015</td>
+<td>—</td>
+<td>0</td>
+<td>1</td>
+<td>—</td>
+<td>Caucasian or White</td>
+</tr>
+<tr>
+<td>10093833</td>
+<td>41737690</td>
+<td>R</td>
+<td>MLO</td>
+<td>—</td>
+<td>2015</td>
+<td>—</td>
+<td>0</td>
+<td>1</td>
+<td>—</td>
+<td>Caucasian or White</td>
+</tr>
+<tr>
+<td>---</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
 </tr>
 </tbody>
 </table>
-<hr />
 <h3 id="cancer-patient">Cancer Patient</h3>
 <table>
 <thead>
 <tr>
 <th>patient_id</th>
 <th>exam_id</th>
-<th>laterality</th>
+<th>ImageLaterality</th>
 <th>view</th>
-<th>diagnosis_year</th>
-<th>study_year</th>
-<th>time_to_cancer</th>
-<th>followup</th>
+<th>diagnosed_date_year</th>
+<th>study_date_year</th>
+<th>Time_to_Cancer_Years</th>
+<th>years_last_followup</th>
 <th>density</th>
 <th>cancer_type</th>
 <th>race</th>
@@ -551,7 +635,7 @@ Biopsy dates are not available. <code>rad_timing</code> is used as a proxy for c
 <td>4</td>
 <td>3</td>
 <td>1</td>
-<td>White</td>
+<td>Caucasian or White</td>
 </tr>
 <tr>
 <td>11513410</td>
@@ -564,7 +648,7 @@ Biopsy dates are not available. <code>rad_timing</code> is used as a proxy for c
 <td>4</td>
 <td>3</td>
 <td>1</td>
-<td>White</td>
+<td>Caucasian or White</td>
 </tr>
 <tr>
 <td>11513410</td>
@@ -577,7 +661,7 @@ Biopsy dates are not available. <code>rad_timing</code> is used as a proxy for c
 <td>4</td>
 <td>3</td>
 <td>1</td>
-<td>White</td>
+<td>Caucasian or White</td>
 </tr>
 <tr>
 <td>11513410</td>
@@ -590,7 +674,59 @@ Biopsy dates are not available. <code>rad_timing</code> is used as a proxy for c
 <td>4</td>
 <td>3</td>
 <td>1</td>
-<td>White</td>
+<td>Caucasian or White</td>
+</tr>
+<tr>
+<td>11513410</td>
+<td>17070991</td>
+<td>L</td>
+<td>CC</td>
+<td>2020</td>
+<td>2017</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>1</td>
+<td>Caucasian or White</td>
+</tr>
+<tr>
+<td>11513410</td>
+<td>17070991</td>
+<td>L</td>
+<td>MLO</td>
+<td>2020</td>
+<td>2017</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>1</td>
+<td>Caucasian or White</td>
+</tr>
+<tr>
+<td>11513410</td>
+<td>17070991</td>
+<td>R</td>
+<td>CC</td>
+<td>2020</td>
+<td>2017</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>1</td>
+<td>Caucasian or White</td>
+</tr>
+<tr>
+<td>11513410</td>
+<td>17070991</td>
+<td>R</td>
+<td>MLO</td>
+<td>2020</td>
+<td>2017</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>1</td>
+<td>Caucasian or White</td>
 </tr>
 </tbody>
 </table>
