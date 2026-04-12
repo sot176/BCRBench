@@ -16,10 +16,9 @@ We aim to encourage further research by providing a single, unified repository w
 2. ⚙️ [Models Implemented](#models-implemented)  
 3. 📚 [Comparison of Models](#comparison-of-models)  
 4. 🗂️ [Datasets](#datasets)
-5. 📄 [CSV File Format](#csv-file-format)  
-6. ▶️ [Usage](#usage)  
-7. 📄 [Citation](#citation) 
-8. 📝 [License](#license) 
+5. ▶️ [Usage](#usage)  
+6. 📄 [Citation](#citation) 
+7. 📝 [License](#license) 
 
 ---
 
