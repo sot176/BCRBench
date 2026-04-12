@@ -79,11 +79,11 @@ Biopsy dates are not available. `rad_timing` is used as a proxy for cancer timin
 
 - Data grouped by patient ID  
 - The latest exam year per patient is selected  
-- Screen-detected → same year  
+- Screen-detected → same year as exam year
 - Interval cancer → exam year + 1  
 
 **Special case:**
-- If latest exam year = 2016 → cancer year = 2016  
+ If latest exam year = 2016 → cancer year = 2016  
 
 ---
 
