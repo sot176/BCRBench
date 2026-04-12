@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide explains how to set up the repository, prepare your environment, and run training and evaluation for breast cancer risk prediction models.
+This guide walks you through setting up the repository and running training and evaluation for breast cancer risk prediction models.
 
 ---
 
@@ -23,18 +23,18 @@ Clone the repository and set up a Python environment:
 All experiments are controlled through scripts located in the `scripts/` directory.
 
 > ⚠️ **Important:**  
-> Before running any script, update the paths inside the scripts to:
 
+> Before running any script, update the paths inside the scripts to:
 > - point to your dataset location  
 > - specify output directories for logs and results  
 
+For dataset formatting and preprocessing, see the **Datasets** section.
+
 ---
 
-## 🧠 Training Models
+## 🧠 Training
 
-Each model has a dedicated training script.
-
-Run a model using:
+Each model can be trained using its corresponding script:
 
     scripts/train_mirai.sh
     scripts/train_vmra_mar.sh
@@ -42,18 +42,11 @@ Run a model using:
     scripts/train_imgfeatalign.sh
     scripts/train_lmv_net.sh
 
-These scripts handle:
-
-- data loading  
-- model initialization  
-- training procedure  
-- checkpoint saving  
-
 ---
 
 ## 📊 Evaluation
 
-Each model also provides a corresponding evaluation script:
+Evaluate trained models using:
 
     scripts/test_mirai.sh
     scripts/test_vmra_mar.sh
@@ -61,44 +54,23 @@ Each model also provides a corresponding evaluation script:
     scripts/test_imgfeatalign.sh
     scripts/test_lmv_net.sh
 
-Evaluation includes:
-- performance metrics (e.g., AUC)  
- 
+Evaluation scripts compute performance metrics such as AUC.
+
 ---
 
-## 🧪 Typical Workflow
+## 🧪 Workflow
 
-A standard workflow for running experiments:
+Typical usage:
 
-1. Prepare dataset in the required CSV format  (See **Datasets** Section of the documentation)
-2. Configure dataset paths in the scripts  
+1. Prepare dataset (see **Datasets**)  
+2. Update paths in scripts  
 3. Train a model  
-4. Evaluate the trained model  
-5. Compare results across models  
-
----
-
-## 📚 Available Models
-
-The framework includes implementations of:
-
-- **LMV-Net**  
-- **ImgFeatAlign** 
-- **VMRA-MaR**
-- **OA-BreaCR**  
-- **Mirai**  
-  
- 
-
-See the **Models** section for details on each architecture.
+4. Run evaluation  
 
 ---
 
 ## ❗ Notes
 
-- Ensure consistent preprocessing across datasets  
-- Verify CSV formatting before training  
-- GPU acceleration is recommended for training  
-
----
- 
+- Ensure dataset formatting is correct before training  
+- Use consistent preprocessing across experiments  
+- GPU acceleration is recommended  
