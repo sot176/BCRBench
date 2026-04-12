@@ -27,17 +27,21 @@ To use the models and dataset classes in this repository, datasets must be provi
 ### EMBED
 
 **Positive cases:**
+
 - BI-RADS = 6  (biopsy-proven cancer)
 
 - Pathological severity = 0 or 1  (invasive or non-invasive cancer)
 
 **Negative cases:**
+
 - BI-RADS = 1 or 2   (negative or benign)
 
 - BI-RADS 0 later reclassified as 1 or 2  
 
 **Column references in the original CSV-files:**
+
 - BI-RADS → `asses`  
+
 - Diagnosis date → `procdate_anon`  
 
 ---
@@ -56,14 +60,17 @@ To use the models and dataset classes in this repository, datasets must be provi
 ### CSAW-CC
 
 **Positive cases:**
+
 - `rad_timing = 1` → screen-detected cancer  
 
 - `rad_timing = 2` → interval cancer  
 
 **Negative cases:**
+
 - No recorded `rad_timing`
 
 **Note:**  
+
 Biopsy dates are not available. `rad_timing` is used as a proxy for cancer timing.
 
 ---
@@ -132,20 +139,29 @@ The column names listed below correspond to the original dataset CSV files.
 
 ### Cancer-Free Patient
 
-| patient_id | exam_id | laterality | view | diagnosis_year | study_year | time_to_cancer | followup | density | cancer_type | race |
-|-----------|--------|------------|------|----------------|------------|----------------|----------|--------|-------------|------|
-| 10093833 | 64887706 | L | CC | — | 2015 | — | 3 | 1 | — | White |
-| 10093833 | 64887706 | L | MLO | — | 2015 | — | 3 | 1 | — | White |
-| 10093833 | 64887706 | R | CC | — | 2015 | — | 3 | 1 | — | White |
-| 10093833 | 64887706 | R | MLO | — | 2015 | — | 3 | 1 | — | White |
+### Cancer-Free Patient Example
 
+| patient_id | exam_id | ImageLaterality | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | cancer_type | race |
+|-----------|--------|----------------|------|---------------------|----------------|----------------------|---------------------|--------|-------------|------|
+| 10093833 | 64887706 | L | CC  | — | 2012 | — | 3 | 1 | — | Caucasian or White |
+| 10093833 | 64887706 | L | MLO | — | 2012 | — | 3 | 1 | — | Caucasian or White |
+| 10093833 | 64887706 | R | CC  | — | 2012 | — | 3 | 1 | — | Caucasian or White |
+| 10093833 | 64887706 | R | MLO | — | 2012 | — | 3 | 1 | — | Caucasian or White |
+| 10093833 | 41737690 | L | CC  | — | 2015 | — | 0 | 1 | — | Caucasian or White |
+| 10093833 | 41737690 | L | MLO | — | 2015 | — | 0 | 1 | — | Caucasian or White |
+| 10093833 | 41737690 | R | CC  | — | 2015 | — | 0 | 1 | — | Caucasian or White |
+| 10093833 | 41737690 | R | MLO | — | 2015 | — | 0 | 1 | — | Caucasian or White |
 ---
 
 ### Cancer Patient
 
-| patient_id | exam_id | laterality | view | diagnosis_year | study_year | time_to_cancer | followup | density | cancer_type | race |
-|-----------|--------|------------|------|----------------|------------|----------------|----------|--------|-------------|------|
-| 11513410 | 11470876 | L | CC | 2020 | 2016 | 4 | 4 | 3 | 1 | White |
-| 11513410 | 11470876 | L | MLO | 2020 | 2016 | 4 | 4 | 3 | 1 | White |
-| 11513410 | 11470876 | R | CC | 2020 | 2016 | 4 | 4 | 3 | 1 | White |
-| 11513410 | 11470876 | R | MLO | 2020 | 2016 | 4 | 4 | 3 | 1 | White |
+| patient_id | exam_id | ImageLaterality | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | cancer_type | race |
+|-----------|--------|----------------|------|---------------------|----------------|----------------------|---------------------|--------|-------------|------|
+| 11513410 | 11470876 | L | CC  | 2020 | 2016 | 4 | 4 | 3 | 1 | Caucasian or White |
+| 11513410 | 11470876 | L | MLO | 2020 | 2016 | 4 | 4 | 3 | 1 | Caucasian or White |
+| 11513410 | 11470876 | R | CC  | 2020 | 2016 | 4 | 4 | 3 | 1 | Caucasian or White |
+| 11513410 | 11470876 | R | MLO | 2020 | 2016 | 4 | 4 | 3 | 1 | Caucasian or White |
+| 11513410 | 17070991 | L | CC  | 2020 | 2017 | 3 | 3 | 3 | 1 | Caucasian or White |
+| 11513410 | 17070991 | L | MLO | 2020 | 2017 | 3 | 3 | 3 | 1 | Caucasian or White |
+| 11513410 | 17070991 | R | CC  | 2020 | 2017 | 3 | 3 | 3 | 1 | Caucasian or White |
+| 11513410 | 17070991 | R | MLO | 2020 | 2017 | 3 | 3 | 3 | 1 | Caucasian or White |
