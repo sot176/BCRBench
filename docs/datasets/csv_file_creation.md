@@ -128,13 +128,9 @@ The column names listed below correspond to the original dataset CSV files.
 | CSAW-CC | `libra_percentdensity` | 0–100 | Continuous percentage |
 
 ---
-
 ## 📊 Examples
 
 ### Cancer-Free Patient
-
-<details>
-<summary>Show example</summary>
 
 | patient_id | exam_id | laterality | view | diagnosis_year | study_year | time_to_cancer | followup | density | cancer_type | race |
 |-----------|--------|------------|------|----------------|------------|----------------|----------|--------|-------------|------|
@@ -143,14 +139,9 @@ The column names listed below correspond to the original dataset CSV files.
 | 10093833 | 64887706 | R | CC | — | 2015 | — | 3 | 1 | — | White |
 | 10093833 | 64887706 | R | MLO | — | 2015 | — | 3 | 1 | — | White |
 
-</details>
-
 ---
 
 ### Cancer Patient
-
-<details>
-<summary>Show example</summary>
 
 | patient_id | exam_id | laterality | view | diagnosis_year | study_year | time_to_cancer | followup | density | cancer_type | race |
 |-----------|--------|------------|------|----------------|------------|----------------|----------|--------|-------------|------|
@@ -158,5 +149,3 @@ The column names listed below correspond to the original dataset CSV files.
 | 11513410 | 11470876 | L | MLO | 2020 | 2016 | 4 | 4 | 3 | 1 | White |
 | 11513410 | 11470876 | R | CC | 2020 | 2016 | 4 | 4 | 3 | 1 | White |
 | 11513410 | 11470876 | R | MLO | 2020 | 2016 | 4 | 4 | 3 | 1 | White |
-
-</details>
