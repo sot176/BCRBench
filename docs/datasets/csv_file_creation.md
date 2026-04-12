@@ -28,10 +28,12 @@ To use the models and dataset classes in this repository, datasets must be provi
 
 **Positive cases:**
 - BI-RADS = 6  (biopsy-proven cancer)
+
 - Pathological severity = 0 or 1  (invasive or non-invasive cancer)
 
 **Negative cases:**
 - BI-RADS = 1 or 2   (negative or benign)
+
 - BI-RADS 0 later reclassified as 1 or 2  
 
 **Column references in the original CSV-files:**
@@ -55,6 +57,7 @@ To use the models and dataset classes in this repository, datasets must be provi
 
 **Positive cases:**
 - `rad_timing = 1` → screen-detected cancer  
+
 - `rad_timing = 2` → interval cancer  
 
 **Negative cases:**
