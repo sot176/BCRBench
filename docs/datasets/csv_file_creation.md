@@ -28,21 +28,23 @@ To use the models and dataset classes in this repository, datasets must be provi
 
 **Positive cases:**
 
-- BI-RADS = 6  (biopsy-proven cancer)
+- BI-RADS = 6  (biopsy-proven cancer) (`asses` column in the original csv file)
 
-- Pathological severity = 0 or 1  (invasive or non-invasive cancer)
+- Pathological severity = 0 or 1  (invasive or non-invasive cancer) (`path_severity`column in the original csv file)
 
 **Negative cases:**
 
-- BI-RADS = 1 or 2   (negative or benign)
+- BI-RADS = 1 or 2   (negative or benign) (`asses` column in the original csv file)
 
-- BI-RADS 0 later reclassified as 1 or 2  
+- BI-RADS 0 later reclassified as 1 or 2   (`asses` column in the original csv file)
 
-**Column references in the original CSV-files:**
+#### Cancer Year Assignment (EMBED)
 
-- BI-RADS → `asses`  
+- Defined as the pathology result date (biopsy confirmation)
+- Corresponds to the column `procdate_anon` in the original CSV file
 
-- Diagnosis date → `procdate_anon`  
+
+ 
 
 ---
 
