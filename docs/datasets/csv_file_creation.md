@@ -139,7 +139,6 @@ The column names listed below correspond to the original dataset CSV files.
 
 ### Cancer-Free Patient
 
-### Cancer-Free Patient Example
 
 | patient_id | exam_id | ImageLaterality | view | diagnosed_date_year | study_date_year | Time_to_Cancer_Years | years_last_followup | density | cancer_type | race |
 |-----------|--------|----------------|------|---------------------|----------------|----------------------|---------------------|--------|-------------|------|
