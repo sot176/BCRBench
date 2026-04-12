@@ -71,6 +71,18 @@
               <p class="caption"><span class="caption-text">Datasets</span></p>
               <ul class="current">
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Overview</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#dataset-characteristics">📊 Dataset Characteristics</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#usage-in-this-framework">🔧 Usage in This Framework</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#further-documentation">📚 Further Documentation</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#access-and-licensing">⚠️ Access and Licensing</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#summary">🚀 Summary</a>
+    </li>
+    </ul>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../preprocessing/">Preprocessing</a>
                   </li>
@@ -115,7 +127,64 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                
+                <h1 id="datasets-overview">Datasets Overview</h1>
+<p>This repository currently supports two large, publicly available mammography datasets for breast cancer risk prediction:</p>
+<ul>
+<li>
+<p><strong>Emory Breast Imaging Dataset (EMBED)</strong><br />
+  https://aws.amazon.com/marketplace/pp/prodview-unw4li5rkivs2#overview</p>
+</li>
+<li>
+<p><strong>Cohort of Screen-Aged Women Case Control (CSAW-CC)</strong><br />
+  https://snd.se/en/catalogue/dataset/2021-204-1</p>
+</li>
+</ul>
+<p>These datasets provide complementary information and enable benchmarking of models across different populations and data characteristics.</p>
+<hr />
+<h2 id="dataset-characteristics">📊 Dataset Characteristics</h2>
+<p>Both datasets include:</p>
+<ul>
+<li>Multi-view mammography images (e.g., CC and MLO views)  </li>
+<li>Longitudinal screening exams per patient  </li>
+<li>Clinical metadata and annotations  </li>
+<li>Information for deriving breast cancer risk labels  </li>
+</ul>
+<p>However, they differ in:
+- Label definitions and availability<br />
+- Data formats and preprocessing requirements  </p>
+<hr />
+<h2 id="usage-in-this-framework">🔧 Usage in This Framework</h2>
+<p>Within this repository, both datasets are:</p>
+<ul>
+<li>Standardized into a unified CSV format  </li>
+<li>Processed to generate time-to-cancer labels  </li>
+<li>Used for training and evaluating risk prediction models  </li>
+</ul>
+<hr />
+<h2 id="further-documentation">📚 Further Documentation</h2>
+<p>For detailed instructions on how to use these datasets, please refer to:</p>
+<ul>
+<li><strong>Preprocessing</strong> → Data cleaning, filtering, and preparation  </li>
+<li><strong>CSV File Format</strong> → Required structure for model input  </li>
+</ul>
+<p>These sections provide step-by-step guidance for preparing datasets for use within the benchmark.</p>
+<hr />
+<h2 id="access-and-licensing">⚠️ Access and Licensing</h2>
+<p>Both datasets are publicly available but may require:</p>
+<ul>
+<li>Registration or data use agreements  </li>
+<li>Compliance with dataset-specific licensing terms  </li>
+</ul>
+<p>Please consult the official dataset pages for access requirements.</p>
+<hr />
+<h2 id="summary">🚀 Summary</h2>
+<p>This framework enables consistent benchmarking across EMBED and CSAW-CC by:</p>
+<ul>
+<li>Harmonizing data formats  </li>
+<li>Standardizing label generation  </li>
+<li>Supporting multi-view and longitudinal analysis  </li>
+</ul>
+<p>This allows fair and reproducible comparison of breast cancer risk prediction models.</p>
               
             </div>
           </div><footer>

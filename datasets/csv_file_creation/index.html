@@ -81,14 +81,20 @@
     <li class="toctree-l2"><a class="reference internal" href="#dataset-curation-and-label-generation">🧬 Dataset Curation and Label Generation</a>
         <ul>
     <li class="toctree-l3"><a class="reference internal" href="#embed">EMBED</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#cancer-year-assignment-embed">Cancer Year Assignment (EMBED)</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#example-embed">Example (EMBED)</a>
+    <li class="toctree-l4"><a class="reference internal" href="#example-embed">Example (EMBED)</a>
+    </li>
+        </ul>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#csaw-cc">CSAW-CC</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#cancer-year-assignment-csaw-cc">Cancer Year Assignment (CSAW-CC)</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#cancer-year-assignment-csaw-cc">Cancer Year Assignment (CSAW-CC)</a>
+    <li class="toctree-l4"><a class="reference internal" href="#example-csaw-cc">Example (CSAW-CC)</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#example-csaw-cc">Example (CSAW-CC)</a>
+        </ul>
     </li>
         </ul>
     </li>
@@ -211,32 +217,28 @@
 <p><strong>Positive cases:</strong></p>
 <ul>
 <li>
-<p>BI-RADS = 6  (biopsy-proven cancer)</p>
+<p>BI-RADS = 6  (biopsy-proven cancer) (<code>asses</code> column in the original csv file)</p>
 </li>
 <li>
-<p>Pathological severity = 0 or 1  (invasive or non-invasive cancer)</p>
+<p>Pathological severity = 0 or 1  (invasive or non-invasive cancer) (<code>path_severity</code>column in the original csv file)</p>
 </li>
 </ul>
 <p><strong>Negative cases:</strong></p>
 <ul>
 <li>
-<p>BI-RADS = 1 or 2   (negative or benign)</p>
+<p>BI-RADS = 1 or 2   (negative or benign) (<code>asses</code> column in the original csv file)</p>
 </li>
 <li>
-<p>BI-RADS 0 later reclassified as 1 or 2  </p>
+<p>BI-RADS 0 later reclassified as 1 or 2   (<code>asses</code> column in the original csv file)</p>
 </li>
 </ul>
-<p><strong>Column references in the original CSV-files:</strong></p>
+<h4 id="cancer-year-assignment-embed">Cancer Year Assignment (EMBED)</h4>
 <ul>
-<li>
-<p>BI-RADS → <code>asses</code>  </p>
-</li>
-<li>
-<p>Diagnosis date → <code>procdate_anon</code>  </p>
-</li>
+<li>Defined as the pathology result date (biopsy confirmation)</li>
+<li>Corresponds to the column <code>procdate_anon</code> in the original CSV file</li>
 </ul>
 <hr />
-<h3 id="example-embed">Example (EMBED)</h3>
+<h4 id="example-embed">Example (EMBED)</h4>
 <table>
 <thead>
 <tr>
@@ -291,17 +293,17 @@
 <p><strong>Note:</strong>  </p>
 <p>Biopsy dates are not available. <code>rad_timing</code> is used as a proxy for cancer timing.</p>
 <hr />
-<h3 id="cancer-year-assignment-csaw-cc">Cancer Year Assignment (CSAW-CC)</h3>
+<h4 id="cancer-year-assignment-csaw-cc">Cancer Year Assignment (CSAW-CC)</h4>
 <ul>
 <li>Data grouped by patient ID  </li>
 <li>The latest exam year per patient is selected  </li>
-<li>Screen-detected → same year  </li>
+<li>Screen-detected → same year as exam year</li>
 <li>Interval cancer → exam year + 1  </li>
 </ul>
 <p><strong>Special case:</strong>
-- If latest exam year = 2016 → cancer year = 2016  </p>
+ If latest exam year = 2016 → cancer year = 2016  </p>
 <hr />
-<h3 id="example-csaw-cc">Example (CSAW-CC)</h3>
+<h4 id="example-csaw-cc">Example (CSAW-CC)</h4>
 <table>
 <thead>
 <tr>
