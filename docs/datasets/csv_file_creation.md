@@ -46,7 +46,7 @@ To use the models and dataset classes in this repository, datasets must be provi
 
 ---
 
-### Example (EMBED)
+#### Example (EMBED)
 
 | exam_year | BI-RADS | diagnosis_year | time_to_cancer |
 |----------|--------|----------------|----------------|
@@ -75,7 +75,7 @@ Biopsy dates are not available. `rad_timing` is used as a proxy for cancer timin
 
 ---
 
-### Cancer Year Assignment (CSAW-CC)
+#### Cancer Year Assignment (CSAW-CC)
 
 - Data grouped by patient ID  
 - The latest exam year per patient is selected  
@@ -87,7 +87,7 @@ Biopsy dates are not available. `rad_timing` is used as a proxy for cancer timin
 
 ---
 
-### Example (CSAW-CC)
+#### Example (CSAW-CC)
 
 | exam_year | rad_timing | cancer_year | time_to_cancer |
 |----------|------------|-------------|----------------|
