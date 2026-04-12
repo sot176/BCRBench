@@ -75,6 +75,38 @@
                   <li class="toctree-l1"><a class="reference internal" href="../preprocessing/">Preprocessing</a>
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">CSV-File Creation</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#required-columns">📌 Required Columns</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#dataset-curation-and-label-generation">🧬 Dataset Curation and Label Generation</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#embed">EMBED</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#example-embed">Example (EMBED)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#csaw-cc">CSAW-CC</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#cancer-year-assignment-csaw-cc">Cancer Year Assignment (CSAW-CC)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#example-csaw-cc">Example (CSAW-CC)</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#time-to-cancer-definition">⏱ Time-to-Cancer Definition</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#cancer-type-encoding">🧾 Cancer Type Encoding</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#breast-density">🧾 Breast Density</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#examples">📊 Examples</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#cancer-free-patient">Cancer-Free Patient</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#cancer-patient">Cancer Patient</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Training</span></p>
@@ -115,7 +147,328 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                
+                <h1 id="csv-file-format">CSV File Format</h1>
+<p>To use the models and dataset classes in this repository, datasets must be provided as CSV files with a predefined structure.</p>
+<hr />
+<h2 id="required-columns">📌 Required Columns</h2>
+<table>
+<thead>
+<tr>
+<th>Column Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>patient_id</code></td>
+<td>Unique identifier for each patient</td>
+</tr>
+<tr>
+<td><code>exam_id</code></td>
+<td>Unique identifier for each exam (one per timepoint)</td>
+</tr>
+<tr>
+<td><code>ImageLaterality</code></td>
+<td><code>L</code> (left) or <code>R</code> (right breast)</td>
+</tr>
+<tr>
+<td><code>view</code></td>
+<td>Mammography view (e.g., CC, MLO)</td>
+</tr>
+<tr>
+<td><code>diagnosed_date_year</code></td>
+<td>Year of diagnosis (empty if cancer-free)</td>
+</tr>
+<tr>
+<td><code>study_date_year</code></td>
+<td>Year the mammogram was acquired</td>
+</tr>
+<tr>
+<td><code>Time_to_Cancer_Years</code></td>
+<td>Years until diagnosis (empty if cancer-free)</td>
+</tr>
+<tr>
+<td><code>years_last_followup</code></td>
+<td>Years until last follow-up</td>
+</tr>
+<tr>
+<td><code>density</code></td>
+<td>Breast density (dataset-specific format)</td>
+</tr>
+<tr>
+<td><code>cancer_type</code></td>
+<td>Cancer type (dataset-specific encoding)</td>
+</tr>
+<tr>
+<td><code>race</code></td>
+<td>Optional demographic information</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="dataset-curation-and-label-generation">🧬 Dataset Curation and Label Generation</h2>
+<h3 id="embed">EMBED</h3>
+<p><strong>Positive cases:</strong>
+- BI-RADS = 6  (biopsy-proven cancer)
+- Pathological severity = 0 or 1  (invasive or non-invasive cancer)</p>
+<p><strong>Negative cases:</strong>
+- BI-RADS = 1 or 2   (negative or benign)
+- BI-RADS 0 later reclassified as 1 or 2  </p>
+<p><strong>Column references in the original CSV-files:</strong>
+- BI-RADS → <code>asses</code><br />
+- Diagnosis date → <code>procdate_anon</code>  </p>
+<hr />
+<h3 id="example-embed">Example (EMBED)</h3>
+<table>
+<thead>
+<tr>
+<th>exam_year</th>
+<th>BI-RADS</th>
+<th>diagnosis_year</th>
+<th>time_to_cancer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2016</td>
+<td>1</td>
+<td>—</td>
+<td>3</td>
+</tr>
+<tr>
+<td>2017</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+</tr>
+<tr>
+<td>2018</td>
+<td>1</td>
+<td>—</td>
+<td>1</td>
+</tr>
+<tr>
+<td>2019</td>
+<td>6</td>
+<td>2019</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="csaw-cc">CSAW-CC</h3>
+<p><strong>Positive cases:</strong>
+- <code>rad_timing = 1</code> → screen-detected cancer<br />
+- <code>rad_timing = 2</code> → interval cancer  </p>
+<p><strong>Negative cases:</strong>
+- No recorded <code>rad_timing</code></p>
+<p><strong>Note:</strong><br />
+Biopsy dates are not available. <code>rad_timing</code> is used as a proxy for cancer timing.</p>
+<hr />
+<h3 id="cancer-year-assignment-csaw-cc">Cancer Year Assignment (CSAW-CC)</h3>
+<ul>
+<li>Data grouped by patient ID  </li>
+<li>The latest exam year per patient is selected  </li>
+<li>Screen-detected → same year  </li>
+<li>Interval cancer → exam year + 1  </li>
+</ul>
+<p><strong>Special case:</strong>
+- If latest exam year = 2016 → cancer year = 2016  </p>
+<hr />
+<h3 id="example-csaw-cc">Example (CSAW-CC)</h3>
+<table>
+<thead>
+<tr>
+<th>exam_year</th>
+<th>rad_timing</th>
+<th>cancer_year</th>
+<th>time_to_cancer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2013</td>
+<td>—</td>
+<td>—</td>
+<td>4</td>
+</tr>
+<tr>
+<td>2014</td>
+<td>—</td>
+<td>—</td>
+<td>3</td>
+</tr>
+<tr>
+<td>2015</td>
+<td>—</td>
+<td>—</td>
+<td>2</td>
+</tr>
+<tr>
+<td>2016</td>
+<td>2</td>
+<td>2017</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="time-to-cancer-definition">⏱ Time-to-Cancer Definition</h2>
+<p>Time-to-Cancer represents the interval between a screening exam and the corresponding breast cancer diagnosis.</p>
+<hr />
+<h2 id="cancer-type-encoding">🧾 Cancer Type Encoding</h2>
+<p>The column names listed below correspond to the original dataset CSV files.</p>
+<table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th>Column</th>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>EMBED</td>
+<td><code>path_severity</code></td>
+<td>0</td>
+<td>Invasive cancer</td>
+</tr>
+<tr>
+<td>EMBED</td>
+<td><code>path_severity</code></td>
+<td>1</td>
+<td>Non-invasive cancer</td>
+</tr>
+<tr>
+<td>EMBED</td>
+<td><code>path_severity</code></td>
+<td>2</td>
+<td>High-risk lesion</td>
+</tr>
+<tr>
+<td>EMBED</td>
+<td><code>path_severity</code></td>
+<td>3</td>
+<td>Borderline lesion</td>
+</tr>
+<tr>
+<td>EMBED</td>
+<td><code>path_severity</code></td>
+<td>4</td>
+<td>Benign findings</td>
+</tr>
+<tr>
+<td>EMBED</td>
+<td><code>path_severity</code></td>
+<td>5</td>
+<td>Negative</td>
+</tr>
+<tr>
+<td>EMBED</td>
+<td><code>path_severity</code></td>
+<td>6</td>
+<td>Non-breast cancer</td>
+</tr>
+<tr>
+<td>CSAW-CC</td>
+<td><code>x_type</code></td>
+<td>1</td>
+<td>In situ (non-invasive)</td>
+</tr>
+<tr>
+<td>CSAW-CC</td>
+<td><code>x_type</code></td>
+<td>2</td>
+<td>Invasive ≤ 15 mm</td>
+</tr>
+<tr>
+<td>CSAW-CC</td>
+<td><code>x_type</code></td>
+<td>3</td>
+<td>Invasive &gt; 15 mm</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="breast-density">🧾 Breast Density</h2>
+<p>The column names listed below correspond to the original dataset CSV files.</p>
+<table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th>Column</th>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>EMBED</td>
+<td><code>tissueden</code></td>
+<td>1</td>
+<td>Almost entirely fat (BI-RADS A)</td>
+</tr>
+<tr>
+<td>EMBED</td>
+<td><code>tissueden</code></td>
+<td>2</td>
+<td>Scattered density (BI-RADS B)</td>
+</tr>
+<tr>
+<td>EMBED</td>
+<td><code>tissueden</code></td>
+<td>3</td>
+<td>Heterogeneously dense (BI-RADS C)</td>
+</tr>
+<tr>
+<td>EMBED</td>
+<td><code>tissueden</code></td>
+<td>4</td>
+<td>Extremely dense (BI-RADS D)</td>
+</tr>
+<tr>
+<td>EMBED</td>
+<td><code>tissueden</code></td>
+<td>5</td>
+<td>Normal male</td>
+</tr>
+<tr>
+<td>CSAW-CC</td>
+<td><code>libra_percentdensity</code></td>
+<td>0–100</td>
+<td>Continuous percentage</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="examples">📊 Examples</h2>
+<h3 id="cancer-free-patient">Cancer-Free Patient</h3>
+<details>
+<summary>Show example</summary>
+
+| patient_id | exam_id | laterality | view | diagnosis_year | study_year | time_to_cancer | followup | density | cancer_type | race |
+|-----------|--------|------------|------|----------------|------------|----------------|----------|--------|-------------|------|
+| 10093833 | 64887706 | L | CC | — | 2015 | — | 3 | 1 | — | White |
+| 10093833 | 64887706 | L | MLO | — | 2015 | — | 3 | 1 | — | White |
+| 10093833 | 64887706 | R | CC | — | 2015 | — | 3 | 1 | — | White |
+| 10093833 | 64887706 | R | MLO | — | 2015 | — | 3 | 1 | — | White |
+
+</details>
+
+<hr />
+<h3 id="cancer-patient">Cancer Patient</h3>
+<details>
+<summary>Show example</summary>
+
+| patient_id | exam_id | laterality | view | diagnosis_year | study_year | time_to_cancer | followup | density | cancer_type | race |
+|-----------|--------|------------|------|----------------|------------|----------------|----------|--------|-------------|------|
+| 11513410 | 11470876 | L | CC | 2020 | 2016 | 4 | 4 | 3 | 1 | White |
+| 11513410 | 11470876 | L | MLO | 2020 | 2016 | 4 | 4 | 3 | 1 | White |
+| 11513410 | 11470876 | R | CC | 2020 | 2016 | 4 | 4 | 3 | 1 | White |
+| 11513410 | 11470876 | R | MLO | 2020 | 2016 | 4 | 4 | 3 | 1 | White |
+
+</details>
               
             </div>
           </div><footer>
