@@ -24,6 +24,7 @@ All experiments are controlled through scripts located in the `scripts/` directo
 
 > ⚠️ **Important:**  
 > Before running any script, update the paths inside the scripts to:
+
 > - point to your dataset location  
 > - specify output directories for logs and results  
 
@@ -42,6 +43,7 @@ Run a model using:
     scripts/train_lmv_net.sh
 
 These scripts handle:
+
 - data loading  
 - model initialization  
 - training procedure  
