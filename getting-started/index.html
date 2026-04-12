@@ -54,18 +54,25 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#configuration">📁 Configuration</a>
     </li>
-    <li class="toctree-l2"><a class="reference internal" href="#training-models">🧠 Training Models</a>
+    <li class="toctree-l2"><a class="reference internal" href="#training">🧠 Training</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#evaluation">📊 Evaluation</a>
     </li>
-    <li class="toctree-l2"><a class="reference internal" href="#typical-workflow">🧪 Typical Workflow</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#available-models">📚 Available Models</a>
+    <li class="toctree-l2"><a class="reference internal" href="#workflow">🧪 Workflow</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#notes">❗ Notes</a>
     </li>
     </ul>
                 </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Datasets</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../datasets/overview/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../datasets/preprocessing/">Preprocessing</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../datasets/csv_file_creation/">CSV-File Creation</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Models</span></p>
               <ul>
@@ -82,15 +89,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../models/vmramar/">VMRA-MaR</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../models/adding_new_models/">Adding new models</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Datasets</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../datasets/overview/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../datasets/preprocessing/">Preprocessing</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../datasets/csv_file_creation/">CSV-File Creation</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Training</span></p>
@@ -131,7 +129,7 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="getting-started">Getting Started</h1>
-<p>This guide explains how to set up the repository, prepare your environment, and run training and evaluation for breast cancer risk prediction models.</p>
+<p>This guide walks you through setting up the repository and running training and evaluation for breast cancer risk prediction models.</p>
 <hr />
 <h2 id="installation">⚙️ Installation</h2>
 <p>Clone the repository and set up a Python environment:</p>
@@ -147,76 +145,53 @@ pip install -r requirements.txt
 <h2 id="configuration">📁 Configuration</h2>
 <p>All experiments are controlled through scripts located in the <code>scripts/</code> directory.</p>
 <blockquote>
-<p>⚠️ <strong>Important:</strong><br />
-Before running any script, update the paths inside the scripts to:</p>
-<ul>
-<li>point to your dataset location  </li>
-<li>specify output directories for logs and results  </li>
-</ul>
+<p>⚠️ <strong>Important:</strong>  </p>
+<p>Before running any script, update the paths inside the scripts to:
+- point to your dataset location<br />
+- specify output directories for logs and results  </p>
 </blockquote>
+<p>For dataset formatting and preprocessing, see the <strong>Datasets</strong> section.</p>
 <hr />
-<h2 id="training-models">🧠 Training Models</h2>
-<p>Each model has a dedicated training script.</p>
-<p>Run a model using:</p>
+<h2 id="training">🧠 Training</h2>
+<p>Each model can be trained using its corresponding script:</p>
 <pre><code>scripts/train_mirai.sh
 scripts/train_vmra_mar.sh
 scripts/train_oa_breacr.sh
 scripts/train_imgfeatalign.sh
 scripts/train_lmv_net.sh
 </code></pre>
-<p>These scripts handle:</p>
-<ul>
-<li>data loading  </li>
-<li>model initialization  </li>
-<li>training procedure  </li>
-<li>checkpoint saving  </li>
-</ul>
 <hr />
 <h2 id="evaluation">📊 Evaluation</h2>
-<p>Each model also provides a corresponding evaluation script:</p>
+<p>Evaluate trained models using:</p>
 <pre><code>scripts/test_mirai.sh
 scripts/test_vmra_mar.sh
 scripts/test_oa_breacr.sh
 scripts/test_imgfeatalign.sh
 scripts/test_lmv_net.sh
 </code></pre>
-<p>Evaluation includes:
-- performance metrics (e.g., AUC)  </p>
+<p>Evaluation scripts compute performance metrics such as AUC.</p>
 <hr />
-<h2 id="typical-workflow">🧪 Typical Workflow</h2>
-<p>A standard workflow for running experiments:</p>
+<h2 id="workflow">🧪 Workflow</h2>
+<p>Typical usage:</p>
 <ol>
-<li>Prepare dataset in the required CSV format  (See <strong>Datasets</strong> Section of the documentation)</li>
-<li>Configure dataset paths in the scripts  </li>
+<li>Prepare dataset (see <strong>Datasets</strong>)  </li>
+<li>Update paths in scripts  </li>
 <li>Train a model  </li>
-<li>Evaluate the trained model  </li>
-<li>Compare results across models  </li>
+<li>Run evaluation  </li>
 </ol>
-<hr />
-<h2 id="available-models">📚 Available Models</h2>
-<p>The framework includes implementations of:</p>
-<ul>
-<li><strong>LMV-Net</strong>  </li>
-<li><strong>ImgFeatAlign</strong> </li>
-<li><strong>VMRA-MaR</strong></li>
-<li><strong>OA-BreaCR</strong>  </li>
-<li><strong>Mirai</strong>  </li>
-</ul>
-<p>See the <strong>Models</strong> section for details on each architecture.</p>
 <hr />
 <h2 id="notes">❗ Notes</h2>
 <ul>
-<li>Ensure consistent preprocessing across datasets  </li>
-<li>Verify CSV formatting before training  </li>
-<li>GPU acceleration is recommended for training  </li>
+<li>Ensure dataset formatting is correct before training  </li>
+<li>Use consistent preprocessing across experiments  </li>
+<li>GPU acceleration is recommended  </li>
 </ul>
-<hr />
               
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
         <a href="../overview/" class="btn btn-neutral float-left" title="Overview"><span class="icon icon-circle-arrow-left"></span> Previous</a>
-        <a href="../models/overview/" class="btn btn-neutral float-right" title="Overview">Next <span class="icon icon-circle-arrow-right"></span></a>
+        <a href="../datasets/overview/" class="btn btn-neutral float-right" title="Overview">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
   <hr/>
@@ -242,7 +217,7 @@ scripts/test_lmv_net.sh
       <span><a href="../overview/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
-      <span><a href="../models/overview/" style="color: #fcfcfc">Next &raquo;</a></span>
+      <span><a href="../datasets/overview/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>

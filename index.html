@@ -42,6 +42,22 @@
               <ul class="current">
                 <li class="toctree-l1 current"><a class="reference internal current" href="#">Home</a>
     <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#overview">🔬 Overview</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#motivation">🎯 Motivation</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#key-features">⚙️ Key Features</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#implemented-models">📚 Implemented Models</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#getting-started">🚀 Getting Started</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#documentation">📊 Documentation</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#contributing">🤝 Contributing</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#license">📄 License</a>
+    </li>
     </ul>
                 </li>
               </ul>
@@ -52,6 +68,15 @@
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="getting-started/">Getting Started</a>
                 </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Datasets</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="datasets/overview/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="datasets/preprocessing/">Preprocessing</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="datasets/csv_file_creation/">CSV-File Creation</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Models</span></p>
               <ul>
@@ -68,15 +93,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="models/vmramar/">VMRA-MaR</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="models/adding_new_models/">Adding new models</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Datasets</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="datasets/overview/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="datasets/preprocessing/">Preprocessing</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="datasets/csv_file_creation/">CSV-File Creation</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Training</span></p>
@@ -117,7 +133,65 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="breast-cancer-risk-benchmark">Breast Cancer Risk Benchmark</h1>
-<p>This repository contains models and experiments for breast cancer risk prediction.</p>
+<p>A unified framework for training, evaluating, and benchmarking deep learning models for breast cancer risk prediction from mammography.</p>
+<hr />
+<h2 id="overview">🔬 Overview</h2>
+<p>This repository provides implementations of state-of-the-art image-based breast cancer risk prediction models within a single, unified pipeline.</p>
+<p>It supports:</p>
+<ul>
+<li>Multi-view mammography (e.g., CC, MLO)</li>
+<li>Longitudinal analysis across multiple screening timepoints</li>
+<li>Standardized training and evaluation across models</li>
+</ul>
+<hr />
+<h2 id="motivation">🎯 Motivation</h2>
+<p>Breast cancer risk prediction models are often implemented in isolation, making it difficult to compare methods or reproduce results.</p>
+<p>This project aims to:</p>
+<ul>
+<li>Provide a <strong>centralized benchmark</strong> for existing models  </li>
+<li>Enable <strong>fair and reproducible comparison</strong>  </li>
+<li>Facilitate <strong>extension with new models</strong>  </li>
+</ul>
+<hr />
+<h2 id="key-features">⚙️ Key Features</h2>
+<ul>
+<li>Unified training and evaluation pipeline  </li>
+<li>Support for multiple datasets (e.g., EMBED, CSAW-CC)  </li>
+<li>Consistent data format and preprocessing  </li>
+<li>Modular design for adding new models  </li>
+</ul>
+<hr />
+<h2 id="implemented-models">📚 Implemented Models</h2>
+<ul>
+<li><strong>LMV-Net</strong>  </li>
+<li><strong>Mirai</strong>  </li>
+<li><strong>VMRA-MaR</strong>  </li>
+<li><strong>OA-BReaCR</strong>  </li>
+<li><strong>ImgFeatAlign</strong>  </li>
+</ul>
+<p>👉 See the <strong>Models</strong> section for detailed descriptions.</p>
+<hr />
+<h2 id="getting-started">🚀 Getting Started</h2>
+<p>Follow the <strong>Getting Started</strong> guide to:</p>
+<ol>
+<li>Set up the environment  </li>
+<li>Prepare datasets  </li>
+<li>Train and evaluate models  </li>
+</ol>
+<hr />
+<h2 id="documentation">📊 Documentation</h2>
+<ul>
+<li>Datasets → Data format and preprocessing  </li>
+<li>Models → Architecture and design  </li>
+<li>Training → Running experiments  </li>
+<li>Evaluation → Metrics and benchmarking  </li>
+</ul>
+<hr />
+<h2 id="contributing">🤝 Contributing</h2>
+<p>We welcome contributions of new models, datasets, and evaluation methods to further expand this benchmark.</p>
+<hr />
+<h2 id="license">📄 License</h2>
+<p>See repository for licensing details.</p>
               
             </div>
           </div><footer>
@@ -166,5 +240,5 @@
 
 <!--
 MkDocs version : 1.6.1
-Build Date UTC : 2026-04-12 17:02:45.291743+00:00
+Build Date UTC : 2026-04-12 17:27:36.541640+00:00
 -->

@@ -45,11 +45,46 @@
               </ul>
               <ul class="current">
                 <li class="toctree-l1 current"><a class="reference internal current" href="#">Overview</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#scope">🔬 Scope</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#objectives">🎯 Objectives</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#supported-tasks">📊 Supported Tasks</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#implemented-models">🧠 Implemented Models</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#model-comparison">🔍 Model Comparison</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#input-representation">Input Representation</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#temporal-modeling">Temporal Modeling</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#aggregation-strategy">Aggregation Strategy</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#framework-design">🏗️ Framework Design</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#extensibility">🚀 Extensibility</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#next-steps">📚 Next Steps</a>
+    </li>
+    </ul>
                 </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../getting-started/">Getting Started</a>
                 </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Datasets</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../datasets/overview/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../datasets/preprocessing/">Preprocessing</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../datasets/csv_file_creation/">CSV-File Creation</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Models</span></p>
               <ul>
@@ -66,15 +101,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../models/vmramar/">VMRA-MaR</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../models/adding_new_models/">Adding new models</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Datasets</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../datasets/overview/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../datasets/preprocessing/">Preprocessing</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../datasets/csv_file_creation/">CSV-File Creation</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Training</span></p>
@@ -114,7 +140,145 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                
+                <h1 id="overview">Overview</h1>
+<p>This repository provides a unified framework for implementing and benchmarking state-of-the-art breast cancer risk prediction models.</p>
+<hr />
+<h2 id="scope">🔬 Scope</h2>
+<p>The framework focuses on <strong>image-based risk prediction</strong> from mammography and supports:</p>
+<ul>
+<li>Single-view and multi-view inputs  </li>
+<li>Single-timepoint and longitudinal data  </li>
+<li>Breast-wise and patient-wise modeling  </li>
+</ul>
+<hr />
+<h2 id="objectives">🎯 Objectives</h2>
+<p>The main goals of this repository are:</p>
+<ul>
+<li>To <strong>standardize model implementations</strong>  </li>
+<li>To enable <strong>fair comparison across methods</strong>  </li>
+<li>To provide a <strong>reproducible research framework</strong>  </li>
+<li>To accelerate progress in breast cancer risk prediction  </li>
+</ul>
+<hr />
+<h2 id="supported-tasks">📊 Supported Tasks</h2>
+<p>The framework enables:</p>
+<ul>
+<li>Training models end-to-end  </li>
+<li>Evaluating risk prediction performance  </li>
+<li>Comparing models under consistent settings  </li>
+</ul>
+<hr />
+<h2 id="implemented-models">🧠 Implemented Models</h2>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Venue</th>
+<th>Input</th>
+<th>Key Idea</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LMV-Net</strong></td>
+<td>MICCAI 2026 (submitted)</td>
+<td>Multi-view, longitudinal</td>
+<td>Joint modeling of multi-view and temporal information</td>
+</tr>
+<tr>
+<td><strong>ImgFeatAlign</strong></td>
+<td>MICCAI 2025</td>
+<td>Single-view, longitudinal</td>
+<td>Feature-space alignment using deformation</td>
+</tr>
+<tr>
+<td><strong>VMRA-MaR</strong></td>
+<td>MICCAI 2025</td>
+<td>Multi-view, longitudinal</td>
+<td>Extends Mirai with temporal asymmetry modeling</td>
+</tr>
+<tr>
+<td><strong>OA-BReaCR</strong></td>
+<td>MICCAI 2024</td>
+<td>Single-view, longitudinal</td>
+<td>Learns temporal changes via deformation fields</td>
+</tr>
+<tr>
+<td><strong>Mirai</strong></td>
+<td>Sci. Transl. Med. 2021</td>
+<td>Multi-view, single-timepoint</td>
+<td>Joint modeling of four standard mammography views</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="model-comparison">🔍 Model Comparison</h2>
+<h3 id="input-representation">Input Representation</h3>
+<ul>
+<li><strong>Single-view models:</strong>  </li>
+<li>OA-BReaCR  </li>
+<li>
+<p>ImgFeatAlign  </p>
+</li>
+<li>
+<p><strong>Multi-view models:</strong>  </p>
+</li>
+<li>Mirai  </li>
+<li>VMRA-MaR  </li>
+<li>LMV-Net  </li>
+</ul>
+<hr />
+<h3 id="temporal-modeling">Temporal Modeling</h3>
+<ul>
+<li><strong>Single-timepoint:</strong>  </li>
+<li>
+<p>Mirai  </p>
+</li>
+<li>
+<p><strong>Longitudinal (multi-timepoint):</strong>  </p>
+</li>
+<li>VMRA-MaR  </li>
+<li>OA-BReaCR  </li>
+<li>ImgFeatAlign  </li>
+<li>LMV-Net  </li>
+</ul>
+<hr />
+<h3 id="aggregation-strategy">Aggregation Strategy</h3>
+<ul>
+<li><strong>Patient-wise (all views jointly):</strong>  </li>
+<li>Mirai  </li>
+<li>
+<p>VMRA-MaR  </p>
+</li>
+<li>
+<p><strong>Breast-wise modeling:</strong>  </p>
+</li>
+<li>LMV-Net  </li>
+</ul>
+<hr />
+<h2 id="framework-design">🏗️ Framework Design</h2>
+<p>All models in this repository:</p>
+<ul>
+<li>Share a <strong>common data interface</strong>  </li>
+<li>Use a <strong>unified training pipeline</strong>  </li>
+<li>Support <strong>consistent evaluation metrics</strong>  </li>
+</ul>
+<p>This ensures fair comparison and simplifies experimentation.</p>
+<hr />
+<h2 id="extensibility">🚀 Extensibility</h2>
+<p>The framework is designed to be easily extended:</p>
+<ul>
+<li>Add new models with minimal changes  </li>
+<li>Integrate additional datasets  </li>
+<li>Modify training and evaluation pipelines  </li>
+</ul>
+<hr />
+<h2 id="next-steps">📚 Next Steps</h2>
+<ul>
+<li>Explore the <strong>Datasets</strong> section for data preparation  </li>
+<li>Review individual <strong>Model</strong> pages for architecture details  </li>
+<li>Use the <strong>Training</strong> and <strong>Evaluation</strong> guides to run experiments  </li>
+</ul>
               
             </div>
           </div><footer>
