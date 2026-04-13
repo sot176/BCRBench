@@ -22,6 +22,7 @@ Both datasets include:
 - Information for deriving breast cancer risk labels  
 
 However, they differ in:
+
 - Label definitions and availability  
 - Data formats and preprocessing requirements  
 
