@@ -28,6 +28,7 @@ All images were preprocessed following the same protocol:
 ## 4. Summary
 
 This preprocessing pipeline ensures:
+
 - Consistent image resolution and intensity scaling  
 - Removal of irrelevant background and annotation artifacts  
 - Proper separation of patient data across splits  
