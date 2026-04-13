@@ -56,6 +56,16 @@
                   <li class="toctree-l1"><a class="reference internal" href="../overview/">Overview</a>
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Preprocessing</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#1-data-format-conversion">1. Data Format Conversion</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#2-image-preprocessing-pipeline">2. Image Preprocessing Pipeline</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#3-dataset-split">3. Dataset Split</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#4-summary">4. Summary</a>
+    </li>
+    </ul>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../csv_file_creation/">CSV-File Creation</a>
                   </li>
@@ -115,7 +125,40 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                
+                <h1 id="mammography-image-preprocessing">Mammography Image Preprocessing</h1>
+<p>The following describes the preprocessing pipeline applied to all mammography images prior to model training and evaluation.</p>
+<h2 id="1-data-format-conversion">1. Data Format Conversion</h2>
+<ul>
+<li>All mammograms were originally stored in <strong>DICOM format</strong></li>
+<li>Converted to <strong>16-bit grayscale PNG images</strong></li>
+<li>This conversion preserves high-intensity resolution while enabling efficient processing in deep learning pipelines</li>
+</ul>
+<h2 id="2-image-preprocessing-pipeline">2. Image Preprocessing Pipeline</h2>
+<p>All images were preprocessed following the same protocol:</p>
+<ul>
+<li><strong>Background removal</strong> to eliminate irrelevant black borders and artifacts  </li>
+<li><strong>Breast region segmentation</strong> to isolate the region of interest and remove non-breast content, including <strong>annotations and text commonly present in mammograms</strong>  </li>
+<li><strong>Resizing</strong> to a fixed resolution of <strong>1664 × 2048 pixels</strong>  </li>
+<li><strong>Intensity normalization</strong> to standardize pixel value distributions across scans  </li>
+</ul>
+<h2 id="3-dataset-split">3. Dataset Split</h2>
+<ul>
+<li>Data split was performed at the <strong>patient level</strong> to avoid data leakage  </li>
+<li>Splits were defined as:<ul>
+<li><strong>Training:</strong> 50%  </li>
+<li><strong>Validation:</strong> 20%  </li>
+<li><strong>Test:</strong> 30%  </li>
+</ul>
+</li>
+</ul>
+<h2 id="4-summary">4. Summary</h2>
+<p>This preprocessing pipeline ensures:</p>
+<ul>
+<li>Consistent image resolution and intensity scaling  </li>
+<li>Removal of irrelevant background and annotation artifacts  </li>
+<li>Proper separation of patient data across splits  </li>
+<li>Compatibility with deep learning-based mammography analysis models  </li>
+</ul>
               
             </div>
           </div><footer>
