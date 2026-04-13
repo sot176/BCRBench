@@ -82,6 +82,7 @@ results/
 logs/
 checkpoints/
 saved_models/
+site/
 *.log
 *.pth
 *.pt
