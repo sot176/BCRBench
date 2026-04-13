@@ -1,6 +1,6 @@
 # Mammography Image Preprocessing
 
-This document describes the preprocessing pipeline applied to all mammography images prior to model training and evaluation.
+The following describes the preprocessing pipeline applied to all mammography images prior to model training and evaluation.
 
 ## 1. Data Format Conversion
 
@@ -21,9 +21,9 @@ All images were preprocessed following the same protocol:
 
 - Data split was performed at the **patient level** to avoid data leakage  
 - Splits were defined as:
-  - **Training:** 50%  
-  - **Validation:** 20%  
-  - **Test:** 30%  
+    - **Training:** 50%  
+    - **Validation:** 20%  
+    - **Test:** 30%  
 
 ## 4. Summary
 
