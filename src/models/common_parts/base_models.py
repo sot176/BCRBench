@@ -18,18 +18,18 @@ class BaseRiskModel(nn.Module, ABC):
         self.args = args   
 
     @abstractmethod
-    def forward(self, batch: Dict) -> Dict:
+    def forward(self, batch):
         """Run forward pass. Returns dict of outputs."""
         pass
 
     @abstractmethod
-    def get_risk_heads(self, outputs: Dict, batch: Dict) -> Dict[str, Tuple]:
+    def get_risk_heads(self, outputs, batch):
         """
         Returns dict of {head_name: (logits, target, mask)} for loss computation.
         """
         pass
 
     @abstractmethod
-    def get_primary_risk_head(self, outputs: Dict) -> torch.Tensor:
+    def get_primary_risk_head(self, outputs):
         """Returns the main risk prediction tensor for evaluation metrics (AUC, C_index)."""
         pass
