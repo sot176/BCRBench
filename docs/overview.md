@@ -54,7 +54,7 @@ The framework enables:
 - **Single-view models:**  
   - OA-BReaCR  
   - ImgFeatAlign  
-
+<br>
 - **Multi-view models:**  
   - Mirai  
   - VMRA-MaR  
