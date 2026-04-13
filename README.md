@@ -14,11 +14,10 @@ We aim to encourage further research by providing a single, unified repository w
 ## Table of Contents
 1. 📘 [Overview](#overview)  
 2. ⚙️ [Models Implemented](#models-implemented)  
-3. 📚 [Comparison of Models](#comparison-of-models)  
-4. 🗂️ [Datasets](#datasets)
-5. ▶️ [Usage](#usage)  
-6. 📄 [Citation](#citation) 
-7. 📝 [License](#license) 
+3. 🗂️ [Datasets](#datasets)
+4. ▶️ [Usage](#usage)  
+5. 📄 [Citation](#citation) 
+6. 📝 [License](#license) 
 
 ---
 
