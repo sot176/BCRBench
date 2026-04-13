@@ -6,7 +6,7 @@ from typing import Tuple, Dict
 import numpy as np
 
 
-def prob_to_score(prob: np.ndarray, max_followup: int = 5) -> np.ndarray:
+def prob_to_score(prob, max_followup= 5):
     """Convert probability outputs to cumulative scores over follow-up periods."""
     score = np.zeros_like(prob)[:, :max_followup]
     for i in range(max_followup):
@@ -19,19 +19,19 @@ def prob_to_score(prob: np.ndarray, max_followup: int = 5) -> np.ndarray:
 # -------------------------
 class ConvBlock(nn.Module):
     """Conv2d + BatchNorm + ReLU block."""
-    def __init__(self, in_channels: int, out_channels: int, kernel_size: int = 3, padding: int = 1):
+    def __init__(self, in_channels, out_channels, kernel_size = 3, padding = 1):
         super().__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=padding, bias=False)
         self.bn = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU(inplace=True)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x):
         return self.relu(self.bn(self.conv(x)))
 
 
 class Feedforward(nn.Module):
     """Two stacked ConvBlocks."""
-    def __init__(self, in_channels: int, out_channels: int):
+    def __init__(self, in_channels, out_channels):
         super().__init__()
         self.block1 = ConvBlock(in_channels, out_channels)
         self.block2 = ConvBlock(out_channels, out_channels)
@@ -50,13 +50,13 @@ class POELatent(nn.Module):
     Probabilistic latent embedding with optional stochastic sampling.
     Adapted from: https://github.com/Li-Wanhua/POEs
     """
-    def __init__(self, num_feat: int = 2048, dropout: float = 0.1):
+    def __init__(self, num_feat = 2048, dropout = 0.1):
         super().__init__()
         self.embed = nn.Linear(num_feat, num_feat)
         self.log_var = nn.Linear(num_feat, num_feat)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x: torch.Tensor, max_t: int = 50, use_sto: bool = True) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, x, max_t = 50, use_sto = True):
         """
         Args:
             x: Input tensor [B, num_feat]
@@ -90,7 +90,7 @@ class BaselineModel(nn.Module):
     Generic CNN backbone extractor (ResNet, VGG, DenseNet, ConvNext, EfficientNet).
     Removes final pooling/classifier layers for feature extraction.
     """
-    def __init__(self, arch: str = 'resnet18', pretrained: bool = True):
+    def __init__(self, arch = 'resnet18', pretrained = True):
         super().__init__()
         print(f"=> creating model '{arch}'")
         model = models.__dict__[arch](weights=models.get_model_weights(arch).DEFAULT if pretrained else None)
@@ -115,10 +115,10 @@ class BaselineModel(nn.Module):
             modules.append(m)
         self.model = nn.Sequential(*modules)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x):
         return self.model(x)
 
-    def get_num_feat(self) -> int:
+    def get_num_feat(self):
         return self.num_feat
 
 

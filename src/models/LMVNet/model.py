@@ -55,7 +55,7 @@ class LMVNet(BaseRiskModel):
     # -------------------------
     # Forward
     # -------------------------
-    def forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, batch):
         """
         Forward pass of LMVNet.
 
