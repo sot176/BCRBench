@@ -48,15 +48,7 @@ Each model is implemented with a consistent API and unified training/evaluation 
 
 ---
 
-## Comparison of Models
- 
-- Single-view vs Multi-view: OA-BReaCR, ImgFeatAlign (single-view); LMV-Net (multi-view)
 
-- Single-timepoint vs Multi-timepoint: Mirai (single); VMRA-MAR, OA-BReaCR, ImgFeatAlign, LMV-Net (multi)
-
-- Patient-wise vs Breast-wise aggregation: Mirai, VMRA-MAR (patient-wise, all 4 images of a patient); LMV-Net (breast-wise, per breast)
-
----
 
 ## Datasets
 This repository integrates two large, publicly available mammography datasets:
