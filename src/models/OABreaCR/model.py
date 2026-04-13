@@ -67,7 +67,7 @@ class OA_BreaCR(BaseRiskModel):
     # -------------------------
     # Forward
     # -------------------------
-    def forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, batch):
         target_x = batch["current_image"]
         prior_x = batch["previous_image"]
         time_gap = batch["time_gap"]
@@ -155,7 +155,7 @@ class OA_BreaCR(BaseRiskModel):
     # Loss helpers
     # -------------------------
     @staticmethod
-    def compute_reg_loss(x: torch.Tensor, target_x_source: torch.Tensor) -> torch.Tensor:
+    def compute_reg_loss(x, target_x_source):
         """MSE loss for registration alignment."""
         return torch.mean((x - target_x_source) ** 2) * 1e-2
 
