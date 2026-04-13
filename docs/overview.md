@@ -51,11 +51,13 @@ The framework enables:
 
 ### Input Representation
 
-- **Single-view models:**  
+**Single-view models:**  
   - OA-BReaCR  
   - ImgFeatAlign  
+
 <br>
-- **Multi-view models:**  
+
+**Multi-view models:**  
   - Mirai  
   - VMRA-MaR  
   - LMV-Net  
@@ -64,10 +66,12 @@ The framework enables:
 
 ### Temporal Modeling
 
-- **Single-timepoint:**  
+**Single-timepoint:**  
   - Mirai  
 
-- **Longitudinal (multi-timepoint):**  
+<br>
+
+**Longitudinal (multi-timepoint):**  
   - VMRA-MaR  
   - OA-BReaCR  
   - ImgFeatAlign  
@@ -77,11 +81,13 @@ The framework enables:
 
 ### Aggregation Strategy
 
-- **Patient-wise (all views jointly):**  
+**Patient-wise (all views jointly):**  
   - Mirai  
   - VMRA-MaR  
 
-- **Breast-wise modeling:**  
+<br>
+
+**Breast-wise modeling:**  
   - LMV-Net  
 
 ---
