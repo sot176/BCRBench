@@ -66,29 +66,28 @@ The framework enables:
 
 ### Temporal Modeling
 
-**Single-timepoint:**  
-  - Mirai  
+- **Single-timepoint:**  
+      
 
 <br>
 
-**Longitudinal (multi-timepoint):**  
-  - VMRA-MaR  
-  - OA-BReaCR  
-  - ImgFeatAlign  
-  - LMV-Net  
+- **Longitudinal (multi-timepoint):**  
+    - VMRA-MaR  
+    - OA-BReaCR  
+    - ImgFeatAlign  
+    - LMV-Net  
 
 ---
 
 ### Aggregation Strategy
 
-**Patient-wise (all views jointly):**  
-  - Mirai  
-  - VMRA-MaR  
-
+- **Patient-wise (all views jointly):**  
+    - Mirai  
+    - VMRA-MaR  
 <br>
 
-**Breast-wise modeling:**  
-  - LMV-Net  
+- **Breast-wise modeling:**  
+    - LMV-Net  
 
 ---
 
