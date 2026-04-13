@@ -1,28 +1,43 @@
 import argparse
-from html import parser
 import os
 import random
-import torch
 import logging
 import time
-import kornia.augmentation as K_A
-from kornia.constants import Resample
 from datetime import datetime
-import kornia.augmentation.container as K_C
+from typing import Optional, Any
 import warnings
-from torch.serialization import SourceChangeWarning
-warnings.filterwarnings("ignore", category=SourceChangeWarning)
-import argparse
-from datetime import datetime
+
+import torch
 import yaml
+import kornia.augmentation as K_A
+import kornia.augmentation.container as K_C
+from kornia.constants import Resample
+from torch.serialization import SourceChangeWarning
 from accelerate import Accelerator
 from accelerate.utils import DistributedDataParallelKwargs
+
+warnings.filterwarnings("ignore", category=SourceChangeWarning)
 
 from train import train_val
 from datasets import get_dataset_and_loader
 
-# function to log the details
-def setup_logging(path_logger, is_main_process):
+
+logger: Optional[logging.Logger] = None
+
+def setup_logging(path_logger: str, is_main_process: bool) -> Optional[logging.Logger]:
+    """
+    Configure logging for distributed training.
+
+    Sets up file and console logging handlers only on the main process to avoid duplicate logs
+    in distributed training scenarios.
+
+    Args:
+        path_logger: Path to save log file.
+        is_main_process: Whether this is the main process in distributed training.
+
+    Returns:
+        Logger instance configured with file and console handlers if is_main_process=True, else None.
+    """
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
 
@@ -44,8 +59,20 @@ def setup_logging(path_logger, is_main_process):
     return logger
 
  
-def parse_cli_args():
+def parse_cli_args() -> argparse.Namespace:
+    """
+    Parse command-line arguments and load model-specific configuration from YAML.
 
+    Performs two-stage parsing: first parses CLI args to determine the model, then loads
+    model-specific hyperparameters from a YAML config file and adds them dynamically.
+
+    Returns:
+        Namespace object containing all parsed arguments including dynamic model-specific parameters.
+        Also sets results_dir attribute with timestamped output directory path.
+
+    Raises:
+        FileNotFoundError: If required CSV file or model YAML config is not found.
+    """
     parser = argparse.ArgumentParser()
 
     # ---------------- General CLI args ----------------
@@ -91,7 +118,8 @@ def parse_cli_args():
             else:
                 parser.add_argument(f"--{k}", type=type(v), default=v)
     except FileNotFoundError:
-        print(f"[WARNING] YAML config for {temp_args.model} not found. Using CLI/default values.")
+        logger: logging.Logger = logging.getLogger()
+        logger.warning(f"YAML config for {temp_args.model} not found. Using CLI/default values.")
 
     # ---------------- Final parse ----------------
     args = parser.parse_args()
@@ -104,7 +132,13 @@ def parse_cli_args():
 
     return args
      
-def main():
+def main() -> None:
+    """
+    Main entry point for training script.
+
+    Initializes distributed training setup, random seeds, and data loaders, then launches
+    the training loop with checkpointing and evaluation on all epochs.
+    """
     args = parse_cli_args()
     
     ddp_kwargs = DistributedDataParallelKwargs(
@@ -112,8 +146,11 @@ def main():
     )
 
     accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
+    
     if accelerator.is_main_process:
-        print("Arguments", args)
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO)
+        logger.info(f"Arguments: {args}")
     if args.seed is not None:
         random.seed(args.seed)
         torch.manual_seed(args.seed)
@@ -133,7 +170,7 @@ def main():
             K_A.RandomGamma(gamma=(0.8, 1.2), gain=(0.9, 1.05), p=0.5),
         )
         if accelerator.is_main_process:
-            print("Train augmentations :", train_transform)
+            logger.info(f"Train augmentations: {train_transform}")
     else:
         train_transform = None
 
@@ -174,13 +211,15 @@ def main():
     if accelerator.is_main_process:
         os.makedirs(args.results_dir, exist_ok=True)
 
-    # call the logging
-    logger = setup_logging(path_logger, accelerator.is_main_process)
+    # Setup logging with file and console handlers
+    if accelerator.is_main_process:
+        logger = setup_logging(path_logger, accelerator.is_main_process)
 
     start_time = time.time()
 
     if accelerator.is_main_process:
         logger.info("Training started...")
+    
     train_val(args,
                       train_loader,
                       validation_loader,
@@ -190,7 +229,7 @@ def main():
                       )
 
     end_time = time.time()
-    if accelerator.is_main_process:
+    if accelerator.is_main_process and logger:
         logger.info(f"Training completed in {(end_time - start_time) / 60:.2f} minutes")
         logger.info(f"Saving model to: {path_out_model}")
 

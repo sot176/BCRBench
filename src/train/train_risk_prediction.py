@@ -1,20 +1,52 @@
 import os
+import logging
+from typing import Tuple, Dict, Any, Optional
+
 import torch
 import wandb
 from accelerate import Accelerator
- 
+from torch.utils.data import DataLoader
+
 from utils import create_logger
 from models.model_factory import get_model
 from .train_utils import train_one_epoch, evaluate, get_param_groups, linear_warmup, load_checkpoint, \
     save_checkpoint
 from config.config import cfg
+from utils import loss_factory, MeanVarianceLoss, ProbOrdiLoss
 
-from utils import (loss_factory, MeanVarianceLoss, ProbOrdiLoss
-)
 
-def train_val(args, train_loader, valid_loader, path_loggger, path_model, accelerator: Accelerator):
+def train_val(
+    args: Any,
+    train_loader: DataLoader,
+    valid_loader: DataLoader,
+    path_logger: str,
+    path_model: str,
+    accelerator: Accelerator,
+) -> None:
+    """
+    Main training loop with validation, checkpointing, and early stopping.
+
+    Handles distributed training with mixed precision, learning rate scheduling, checkpoint management,
+    and integration with Weights & Biases (WandB) for experiment tracking.
+
+    Args:
+        args: Training configuration arguments containing model, dataset, learning rate, epochs,
+              scheduler settings, and other training hyperparameters.
+        train_loader: PyTorch DataLoader for training split.
+        valid_loader: PyTorch DataLoader for validation split.
+        path_logger: Path to save training log file.
+        path_model: Path to save final trained model weights.
+        accelerator: Hugging Face Accelerator instance for distributed training and mixed precision.
+
+    Returns:
+        None. Saves checkpoints and final model to disk, logs metrics to WandB.
+
+    Raises:
+        FileNotFoundError: If checkpoint or model paths are invalid.
+        RuntimeError: If model loading or training fails.
+    """
     # Initialize logger
-    logger = create_logger(path_loggger) if accelerator.is_main_process else None
+    logger: Optional[logging.Logger] = create_logger(path_logger) if accelerator.is_main_process else None
     if accelerator.is_main_process:
         logger.info(f"Number Training Epochs: {args.num_epochs}")
 
@@ -23,7 +55,8 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
                             if args.dataset == "CSAW"
                             else cfg["paths"]["embed_path_saved_reg_model"]
                             )
-    if accelerator.is_main_process: print("Path reg model:", path_saved_reg_model)
+    if accelerator.is_main_process:
+        logger.info(f"Path reg model: {path_saved_reg_model}")
     
     # --- Model, Optimizer, and Scheduler Setup ---
     # load the risk prediction model (e.g. OA-BreaCR, Mirai, ImgFeatAlign, LMV-Net, VMRA-MaR, etc.)
@@ -37,10 +70,10 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
     trainable_params = sum(p.numel() for p in model_risk.parameters() if p.requires_grad)
 
     if accelerator.is_main_process:
-        print("Risk prediction model", model_risk)
-        print(f"Total parameters:     {total_params:,}")
-        print(f"Trainable parameters: {trainable_params:,}")
-        print(f"Total params (M):            {total_params / 1e6:.2f} M")
+        logger.info(f"Risk prediction model:\n{model_risk}")
+        logger.info(f"Total parameters:     {total_params:,}")
+        logger.info(f"Trainable parameters: {trainable_params:,}")
+        logger.info(f"Total params (M):     {total_params / 1e6:.2f} M")
 
     # Set up optimizer with parameter groups for differential learning rates (lower LR for pretrained encoder, higher LR for new modules)
     param_groups = get_param_groups(args, model_risk, base_lr=args.learning_rate)
@@ -59,7 +92,6 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
 
         if accelerator.is_main_process:
             logger.info(f"Scheduler configured: {type(scheduler).__name__}")
-            print(f"Scheduler configured: {type(scheduler).__name__}")
 
     # --- Prepare with Accelerator ---
     model_risk, optimizer, train_loader, valid_loader, scheduler, warmup_scheduler  = accelerator.prepare(
@@ -95,7 +127,7 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
         patience_counter = 0 
 
         if accelerator.is_main_process:
-            print(f"[INFO] Resumed from {args.resume_from} at epoch {start_epoch}")
+            logger.info(f"Resumed from {args.resume_from} at epoch {start_epoch}")
 
     # WandB (resume-safe)
     if accelerator.is_main_process:
@@ -147,12 +179,10 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
             for year, auc in auc_results_train.items():
                 logger.info(f"Train Year {year + 1}: AUC = {auc:.6f}")
                 wandb.log({f"Train Year {year + 1} AUC": auc, "epoch": epoch})
-                print(f"Train Year {year + 1}: AUC = {auc:.6f}")
 
             for year, auc in auc_results.items():
                 logger.info(f"Val Year {year + 1}: AUC = {auc:.6f}")
                 wandb.log({f"Val Year {year + 1} AUC": auc, "epoch": epoch})
-                print(f"Val Year {year + 1}: AUC = {auc:.6f}")
 
             # Scheduler step
             if scheduler and global_step >= warmup_steps:
@@ -190,7 +220,7 @@ def train_val(args, train_loader, valid_loader, path_loggger, path_model, accele
 
     # --- Final Model Saving and WandB Artifact Logging ---
     if accelerator.is_main_process:
-        print("[INFO] Saving final model ...")
+        logger.info("Saving final model ...")
         unwrapped_model = accelerator.unwrap_model(model_risk)
         accelerator.save(unwrapped_model.state_dict(), path_model)
 
