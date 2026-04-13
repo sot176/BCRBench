@@ -31,11 +31,11 @@ class LongitudinalFeatureProcessor(nn.Module):
             self.encoder.train()
 
     @staticmethod
-    def _to_3ch(x: torch.Tensor) -> torch.Tensor:
+    def _to_3ch(x):
         """Convert grayscale (B,1,H,W) → 3-channel (B,3,H,W)."""
         return x.expand(-1, 3, -1, -1)
 
-    def _process_view(self, img_cur: torch.Tensor, img_pri: torch.Tensor, time_gap: torch.Tensor) -> torch.Tensor:
+    def _process_view(self, img_cur, img_pri, time_gap):
         """Process one view (CC or MLO) and return longitudinal features."""
         # Convert to 3-channel
         f_cur = self.encoder(self._to_3ch(img_cur))
@@ -59,7 +59,7 @@ class LongitudinalFeatureProcessor(nn.Module):
         return f_long
 
     @staticmethod
-    def _resize_flow(flow: torch.Tensor, target_shape, src_shape) -> torch.Tensor:
+    def _resize_flow(flow, target_shape, src_shape):
         """Resizes and rescales deformation field to match feature map resolution."""
         B, C, Hf, Wf = target_shape
         _, _, Hi, Wi = src_shape
@@ -69,7 +69,7 @@ class LongitudinalFeatureProcessor(nn.Module):
         flow_resized[:, 1] *= Hf / Hi
         return flow_resized
 
-    def forward(self, img_cur_cc, img_pri_cc, img_cur_mlo, img_pri_mlo, time_gap) -> Dict[str, torch.Tensor]:
+    def forward(self, img_cur_cc, img_pri_cc, img_cur_mlo, img_pri_mlo, time_gap):
         f_cc_long = self._process_view(img_cur_cc, img_pri_cc, time_gap)
         f_mlo_long = self._process_view(img_cur_mlo, img_pri_mlo, time_gap)
         return {"f_cc_long": f_cc_long, "f_mlo_long": f_mlo_long}
@@ -139,7 +139,7 @@ class CrossAttentionBlock(nn.Module):
         self.proj_drop = nn.Dropout(dropout)
         self.drop_path = DropPath(drop_path) if drop_path > 0 else nn.Identity()
 
-    def forward(self, f_cc: torch.Tensor, f_mlo: torch.Tensor):
+    def forward(self, f_cc, f_mlo):
         B, C, H, W = f_cc.shape
         N = H * W
 
