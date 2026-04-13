@@ -43,7 +43,7 @@ class LongitudinalAsymmetryTracker(nn.Module):
         # Learned output normalization
         self.out_norm = nn.LayerNorm(self.feature_dim)
 
-    def compute_displacement(self, coords1: torch.Tensor, coords2: torch.Tensor) -> torch.Tensor:
+    def compute_displacement(self, coords1, coords2):
         """
         Compute normalized L2 displacement between coordinate sets.
         """
@@ -54,10 +54,10 @@ class LongitudinalAsymmetryTracker(nn.Module):
 
     def forward(
         self,
-        asymmetry_features: torch.Tensor,
-        asymmetry_coords: torch.Tensor,
-        asymmetry_maps: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
+        asymmetry_features,
+        asymmetry_coords,
+        asymmetry_maps = None
+    ):
         """
         Forward pass to compute fused longitudinal asymmetry features.
         """

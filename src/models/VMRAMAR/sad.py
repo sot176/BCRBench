@@ -1,18 +1,18 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Optional, Dict, Any, Tuple
+from typing import Dict
 
 
 def hybrid_asymmetry(
-    left: torch.Tensor,
-    right: torch.Tensor,
-    latent_h: int = 5,
-    latent_w: int = 5,
-    flexible: bool = False,
-    topk: Optional[int] = None,
-    bias_params: Optional[torch.Tensor] = None
-) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    left,
+    right,
+    latent_h = 5,
+    latent_w = 5,
+    flexible = False,
+    topk = None,
+    bias_params = None
+):
     """
     Compute hybrid asymmetry between left and right feature maps.
 
@@ -90,7 +90,7 @@ class SpatialAsymmetryDetector(nn.Module):
         if self.use_bn:
             self.bn = nn.BatchNorm2d(self.feature_dim)
 
-    def forward(self, left_features: torch.Tensor, right_features: torch.Tensor) -> Dict[str, torch.Tensor]:
+    def forward(self, left_features, right_features):
         B, T, C, H, W = left_features.shape
         asym_values, asym_coords, asym_maps = [], [], []
 

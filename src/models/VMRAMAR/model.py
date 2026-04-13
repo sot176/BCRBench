@@ -7,9 +7,9 @@ from .vmrnn import VMRNN
 from .sad import SpatialAsymmetryDetector
 from .lat import LongitudinalAsymmetryTracker
 from models.common_parts import CumulativeProbabilityLayer
-from config.config import cfg
 from models.Mirai import onconet as _onconet
 from models.common_parts import BaseRiskModel
+from models.Mirai.onconet.models.factory import get_model_by_name, load_model
 
 sys.modules.setdefault("onconet", _onconet)
 for _key in list(sys.modules.keys()):
@@ -27,16 +27,13 @@ def _disable_inplace_relu(module: nn.Module):
             m.inplace = False
 
 
-from models.Mirai.onconet.models.factory import get_model_by_name, load_model
-
-
 class IdentityPool(nn.Module):
     """Dummy pool layer for snapshot encoders."""
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x):
         return None, x  # logit=None, hidden=feature_map
 
-    def replaces_fc(self) -> bool:
+    def replaces_fc(self):
         return False
 
 
@@ -128,7 +125,7 @@ class VMRAMaR(BaseRiskModel):
         encoder.eval()
         print("[INFO] Image encoder frozen.")
 
-    def forward(self, batch: dict) -> dict:
+    def forward(self, batch):
         """
         Forward pass.
 

@@ -5,14 +5,14 @@ from typing import Optional, Tuple, Dict, Any
 def hybrid_asymmetry(
     left: torch.Tensor,
     right: torch.Tensor,
-    latent_h: int = 5,
-    latent_w: int = 5,
-    verbose: bool = False,
-    flexible: bool = False,
-    topk: Optional[int] = None,
-    bias_params: Optional[torch.Tensor] = None,
+    latent_h = 5,
+    latent_w = 5,
+    verbose = False,
+    flexible = False,
+    topk = None,
+    bias_params = None,
     **kwargs
-) -> Tuple[torch.Tensor, Dict[str, Any]]:
+):
     """
     Compute a hybrid asymmetry metric between two feature maps.
 
