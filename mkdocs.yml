@@ -8,11 +8,11 @@ nav:
   - Overview: overview.md
   - Getting Started: getting-started.md
   - Datasets:
-    - Overview: datasets/overview.md
+    - Overview: datasets/index.md
     - Preprocessing: datasets/preprocessing.md
     - CSV-File Creation: datasets/csv_file_creation.md
   - Models:
-      - Overview: models/overview.md
+      - Overview: models/index.md
       - OA-BreaCR: models/oabreacr.md
       - ImgFeatAlign: models/imgfeatalign.md
       - LMV-Net: models/lmvnet.md
@@ -20,8 +20,8 @@ nav:
       - VMRA-MaR: models/vmramar.md
       - Adding new models: models/adding_new_models.md
   - Training:
-      - Overview: training/overview.md
+      - Overview: training/index.md
       - Training a Model: training/training_a_model.md
   - Evaluation:
-      - Overview: evaluation/overview.md
+      - Overview: evaluation/index.md
       - Evaluating a Model: evaluation/evaluating_a_model.md

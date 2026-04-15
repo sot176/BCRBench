@@ -1,57 +1,31 @@
 # Breast Cancer Risk Benchmark
 
-A unified framework for training, evaluating, and benchmarking deep learning models for breast cancer risk prediction from mammography.
+A unified framework for training and benchmarking deep learning models for breast cancer risk prediction from mammography.
 
 ---
 
-## 🔬 Overview
+## 🔬 Key Features
 
-This repository provides implementations of state-of-the-art image-based breast cancer risk prediction models within a single, unified pipeline.
-
-It supports:
-
-- Multi-view mammography (e.g., CC, MLO)
-- Longitudinal analysis across multiple screening timepoints
-- Standardized training and evaluation across models
+- Multi-view mammography support (e.g., CC, MLO)
+- Longitudinal modeling across multiple screening timepoints
+- Standardized training and evaluation pipeline
+- Modular design for easy integration of new models
 
 ---
 
-## 🎯 Motivation
+## 📚 Documentation
 
-Breast cancer risk prediction models are often implemented in isolation, making it difficult to compare methods or reproduce results.
-
-This project aims to:
-
-- Provide a **centralized benchmark** for existing models  
-- Enable **fair and reproducible comparison**  
-- Facilitate **extension with new models**  
-
+- [Overview](overview.md) – Scope, objectives, and model comparison
+- [Getting Started](getting_started.md) – Setup and running experiments
+- [Datasets](datasets/) – Data formats and preprocessing
+- [Models](models/) – Architecture details and implementations
+- [Training](training/) – Training procedures and configuration
+- [Evaluation](evaluation/) – Metrics and benchmarking
 ---
 
-## ⚙️ Key Features
+## 🚀 Quick Start
 
-- Unified training and evaluation pipeline  
-- Support for multiple datasets (e.g., EMBED, CSAW-CC)  
-- Consistent data format and preprocessing  
-- Modular design for adding new models  
-
----
-
-## 📚 Implemented Models
-
-- **LMV-Net**  
-- **Mirai**  
-- **VMRA-MaR**  
-- **OA-BReaCR**  
-- **ImgFeatAlign**  
-
-👉 See the **Models** section for detailed descriptions.
-
----
-
-## 🚀 Getting Started
-
-Follow the **Getting Started** guide to:
+Follow the Getting Started guide to:
 
 1. Set up the environment  
 2. Prepare datasets  
@@ -59,18 +33,9 @@ Follow the **Getting Started** guide to:
 
 ---
 
-## 📊 Documentation
-
-- Datasets → Data format and preprocessing  
-- Models → Architecture and design  
-- Training → Running experiments  
-- Evaluation → Metrics and benchmarking  
-
----
-
 ## 🤝 Contributing
 
-We welcome contributions of new models, datasets, and evaluation methods to further expand this benchmark.
+We welcome contributions of new models, datasets, and evaluation methods to extend this benchmark.
 
 ---
 
