@@ -55,9 +55,9 @@ The model consists of four main components:
 ### 4. Risk Prediction Heads
 - Shared cumulative probability layer  
 - Outputs:
-  - Multi-view risk prediction  
-  - CC-only risk prediction  
-  - MLO-only risk prediction  
+    - Multi-view risk prediction  
+    - CC-only risk prediction  
+    - MLO-only risk prediction  
 
 ---
 
