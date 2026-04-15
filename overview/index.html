@@ -52,17 +52,7 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#supported-tasks">📊 Supported Tasks</a>
     </li>
-    <li class="toctree-l2"><a class="reference internal" href="#implemented-models">🧠 Implemented Models</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#model-comparison">🔍 Model Comparison</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#input-representation">Input Representation</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#temporal-modeling">Temporal Modeling</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#aggregation-strategy">Aggregation Strategy</a>
-    </li>
-        </ul>
+    <li class="toctree-l2"><a class="reference internal" href="#model-overview">🧠 Model Overview</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#framework-design">🏗️ Framework Design</a>
     </li>
@@ -79,7 +69,7 @@
               </ul>
               <p class="caption"><span class="caption-text">Datasets</span></p>
               <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../datasets/overview/">Overview</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../datasets/">Overview</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../datasets/preprocessing/">Preprocessing</a>
                   </li>
@@ -88,7 +78,7 @@
               </ul>
               <p class="caption"><span class="caption-text">Models</span></p>
               <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../models/overview/">Overview</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../models/">Overview</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../models/oabreacr/">OA-BreaCR</a>
                   </li>
@@ -105,14 +95,14 @@
               </ul>
               <p class="caption"><span class="caption-text">Training</span></p>
               <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../training/overview/">Overview</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../training/">Overview</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../training/training_a_model/">Training a Model</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Evaluation</span></p>
               <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../evaluation/overview/">Overview</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../evaluation/">Overview</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../evaluation/evaluating_a_model/">Evaluating a Model</a>
                   </li>
@@ -141,10 +131,10 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="overview">Overview</h1>
-<p>This repository provides a unified framework for implementing and benchmarking state-of-the-art breast cancer risk prediction models.</p>
+<p>This page provides a technical overview of the Breast Cancer Risk Benchmark, including its scope, objectives, and supported modeling paradigms.</p>
 <hr />
 <h2 id="scope">🔬 Scope</h2>
-<p>The framework focuses on <strong>image-based risk prediction</strong> from mammography and supports:</p>
+<p>The framework focuses on image-based breast cancer risk prediction from mammography and supports:</p>
 <ul>
 <li>Single-view and multi-view inputs  </li>
 <li>Single-timepoint and longitudinal data  </li>
@@ -152,23 +142,24 @@
 </ul>
 <hr />
 <h2 id="objectives">🎯 Objectives</h2>
-<p>The main goals of this repository are:</p>
+<p>The main goals of this benchmark are:</p>
 <ul>
-<li>To <strong>standardize model implementations</strong>  </li>
-<li>To enable <strong>fair comparison across methods</strong>  </li>
-<li>To provide a <strong>reproducible research framework</strong>  </li>
-<li>To accelerate progress in breast cancer risk prediction  </li>
+<li>Standardizing model implementations across methods  </li>
+<li>Enabling fair and reproducible comparisons  </li>
+<li>Providing a unified research framework  </li>
+<li>Accelerating progress in breast cancer risk prediction  </li>
 </ul>
 <hr />
 <h2 id="supported-tasks">📊 Supported Tasks</h2>
-<p>The framework enables:</p>
+<p>The framework supports:</p>
 <ul>
-<li>Training models end-to-end  </li>
-<li>Evaluating risk prediction performance  </li>
-<li>Comparing models under consistent settings  </li>
+<li>End-to-end model training  </li>
+<li>Risk prediction evaluation  </li>
+<li>Consistent benchmarking across architectures  </li>
 </ul>
 <hr />
-<h2 id="implemented-models">🧠 Implemented Models</h2>
+<h2 id="model-overview">🧠 Model Overview</h2>
+<p>The benchmark includes the following models:</p>
 <table>
 <thead>
 <tr>
@@ -212,84 +203,28 @@
 </tbody>
 </table>
 <hr />
-<h2 id="model-comparison">🔍 Model Comparison</h2>
-<h3 id="input-representation">Input Representation</h3>
-<ul>
-<li>
-<p><strong>Single-view models:</strong>  </p>
-<ul>
-<li>OA-BReaCR  </li>
-<li>ImgFeatAlign  </li>
-</ul>
-</li>
-<li>
-<p><strong>Multi-view models:</strong>  </p>
-<ul>
-<li>Mirai  </li>
-<li>VMRA-MaR  </li>
-<li>LMV-Net  </li>
-</ul>
-</li>
-</ul>
-<hr />
-<h3 id="temporal-modeling">Temporal Modeling</h3>
-<ul>
-<li>
-<p><strong>Single-timepoint:</strong>  </p>
-<ul>
-<li>Mirai</li>
-</ul>
-</li>
-<li>
-<p><strong>Longitudinal (multi-timepoint):</strong>  </p>
-<ul>
-<li>VMRA-MaR  </li>
-<li>OA-BReaCR  </li>
-<li>ImgFeatAlign  </li>
-<li>LMV-Net  </li>
-</ul>
-</li>
-</ul>
-<hr />
-<h3 id="aggregation-strategy">Aggregation Strategy</h3>
-<ul>
-<li>
-<p><strong>Patient-wise (all views jointly):</strong>  </p>
-<ul>
-<li>Mirai  </li>
-<li>VMRA-MaR  </li>
-</ul>
-</li>
-<li>
-<p><strong>Breast-wise modeling:</strong>  </p>
-<ul>
-<li>LMV-Net  </li>
-</ul>
-</li>
-</ul>
-<hr />
 <h2 id="framework-design">🏗️ Framework Design</h2>
-<p>All models in this repository:</p>
+<p>All models in this benchmark share:</p>
 <ul>
-<li>Share a <strong>common data interface</strong>  </li>
-<li>Use a <strong>unified training pipeline</strong>  </li>
-<li>Support <strong>consistent evaluation metrics</strong>  </li>
+<li>A unified data interface  </li>
+<li>A standardized training pipeline  </li>
+<li>Consistent evaluation metrics  </li>
 </ul>
-<p>This ensures fair comparison and simplifies experimentation.</p>
+<p>This ensures fair and reproducible comparison across methods.</p>
 <hr />
 <h2 id="extensibility">🚀 Extensibility</h2>
 <p>The framework is designed to be easily extended:</p>
 <ul>
 <li>Add new models with minimal changes  </li>
-<li>Integrate additional datasets  </li>
-<li>Modify training and evaluation pipelines  </li>
+<li>Integrate new datasets  </li>
+<li>Extend training and evaluation pipelines  </li>
 </ul>
 <hr />
 <h2 id="next-steps">📚 Next Steps</h2>
 <ul>
-<li>Explore the <strong>Datasets</strong> section for data preparation  </li>
-<li>Review individual <strong>Model</strong> pages for architecture details  </li>
-<li>Use the <strong>Training</strong> and <strong>Evaluation</strong> guides to run experiments  </li>
+<li>See <strong>Datasets</strong> for data preparation details  </li>
+<li>See <strong>Models</strong> for architecture-level documentation  </li>
+<li>See <strong>Getting Started</strong> to run experiments</li>
 </ul>
               
             </div>
