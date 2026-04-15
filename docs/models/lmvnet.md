@@ -21,8 +21,12 @@ This design allows the model to capture both **temporal changes** and **cross-vi
 ---
 
 ## 🏗️ Architecture
+ 
+ <p align="center">
+   <img src="/figs/LMV.png" alt="Image 1" width="700"/>
+ </p>
+ 
 
-![LMV-Net Architecture](../assets/lmv_net_architecture.png)
 
 The model consists of four main components:
 
