@@ -16,7 +16,7 @@ A unified framework for training and benchmarking deep learning models for breas
 ## 📚 Documentation
 
 - [Overview](overview.md) – Scope, objectives, and model comparison
-- [Getting Started](getting_started.md) – Setup and running experiments
+- [Getting Started](getting-started.md) – Setup and running experiments
 - [Datasets](datasets/) – Data formats and preprocessing
 - [Models](models/) – Architecture details and implementations
 - [Training](training/) – Training procedures and configuration
