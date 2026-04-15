@@ -13,7 +13,7 @@
 
 ---
 
-## 🔍 Model Comparison  ← THIS is where your section belongs
+## 🔍 Model Comparison  
 
 ### Input Representation
 
