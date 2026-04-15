@@ -271,8 +271,8 @@ class CrossAttentionBlock(nn.Module):
         in_channels: int,
         reduced_channels: int,
         heads: int = 4,
-        dropout: float = 0.1,
-        drop_path: float = 0.1,
+        dropout: float = 0.3,
+        drop_path: float = 0.2,
         ffn_expansion_factor: int = 4,
     ) -> None:
         """
