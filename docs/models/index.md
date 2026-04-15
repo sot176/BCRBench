@@ -9,6 +9,8 @@
 | **VMRA-MaR** | MICCAI 2025 | Multi-view, longitudinal | Extends Mirai with spatial and longitudinal asymmetry modeling |
 | **OA-BReaCR** | MICCAI 2024 | Single-view, longitudinal | Learns temporal changes via feature deformation fields |
 | **Mirai** | Sci. Transl. Med. 2021 | Multi-view, single-timepoint | Baseline risk prediction from a single screening visit |
+
+
 ---
 
 ## 🔍 Model Comparison  ← THIS is where your section belongs
@@ -16,34 +18,37 @@
 ### Input Representation
 
 - **Single-view models:**
-  - OA-BReaCR
-  - ImgFeatAlign
+    - OA-BReaCR
+    - ImgFeatAlign
+
 
 - **Multi-view models:**
-  - Mirai
-  - VMRA-MaR
-  - LMV-Net
+    - Mirai
+    - VMRA-MaR
+    - LMV-Net
 
 ---
 
 ### Temporal Modeling
 
 - **Single-timepoint:**
-  - Mirai
+    - Mirai
+
 
 - **Longitudinal (multi-timepoint):**
-  - VMRA-MaR
-  - OA-BReaCR
-  - ImgFeatAlign
-  - LMV-Net
+    - VMRA-MaR
+    - OA-BReaCR
+    - ImgFeatAlign
+    - LMV-Net
 
 ---
 
 ### Aggregation Strategy
 
 - **Patient-wise (all views jointly):**
-  - Mirai
-  - VMRA-MaR
+    - Mirai
+    - VMRA-MaR
+
 
 - **Breast-wise modeling:**
-  - LMV-Net
+    - LMV-Net
