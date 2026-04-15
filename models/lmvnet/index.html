@@ -78,11 +78,9 @@
         <ul>
     <li class="toctree-l3"><a class="reference internal" href="#1-longitudinal-feature-processing">1. Longitudinal Feature Processing</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#2-cross-attention-fusion">2. Cross-Attention Fusion</a>
+    <li class="toctree-l3"><a class="reference internal" href="#2-dual-stream-attention">2. Dual Stream-Attention</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#3-multi-view-pooling-and-fusion">3. Multi-View Pooling and Fusion</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#4-risk-prediction-heads">4. Risk Prediction Heads</a>
+    <li class="toctree-l3"><a class="reference internal" href="#3-multi-view-fusion-and-risk-prediction">3. Multi-View Fusion and Risk Prediction</a>
     </li>
         </ul>
     </li>
@@ -166,31 +164,27 @@
   <img src="../figs/LMV.png" alt="LMV-Net Architecture" width="700"/>
 </p>
 
-<p>The model consists of four main components:</p>
+<p>The model consists of three main components:</p>
 <h3 id="1-longitudinal-feature-processing">1. Longitudinal Feature Processing</h3>
 <ul>
-<li>Uses a registration network (MammoRegNet)  </li>
-<li>Warps prior features to align with current features</li>
-<li>Generates difference feature maps by subtracting the aligned prior featuers from the current features  </li>
-<li>Produces longitudinally aligned feature maps for CC and MLO views  </li>
+<li>Uses a shared encoder to extract feature maps from each view across both time points  </li>
+<li>Applies a registration network (e.g., MammoRegNet) to align prior feature maps with current feature maps  </li>
+<li>Computes difference features by subtracting aligned prior features from current features  </li>
+<li>Concatenates current, aligned prior, and difference features to form a unified longitudinal feature representation for each view  prior, and difference feature to obtain a longitudinal feature vector for each view</li>
 </ul>
 <hr />
-<h3 id="2-cross-attention-fusion">2. Cross-Attention Fusion</h3>
+<h3 id="2-dual-stream-attention">2. Dual Stream-Attention</h3>
 <ul>
-<li>A stack of cross-attention blocks  </li>
+<li>Performs self-attention and corss-attention within each view </li>
 <li>Iteratively exchanges information between CC and MLO features  </li>
 <li>Enhances view consistency and complementary feature learning  </li>
 </ul>
 <hr />
-<h3 id="3-multi-view-pooling-and-fusion">3. Multi-View Pooling and Fusion</h3>
+<h3 id="3-multi-view-fusion-and-risk-prediction">3. Multi-View Fusion and  Risk Prediction</h3>
 <ul>
 <li>Global average pooling applied to each view  </li>
 <li>Feature vectors concatenated and passed through a linear layer  </li>
 <li>Produces a fused multi-view representation  </li>
-</ul>
-<hr />
-<h3 id="4-risk-prediction-heads">4. Risk Prediction Heads</h3>
-<ul>
 <li>Shared cumulative probability layer  </li>
 <li>Outputs:<ul>
 <li>Multi-view risk prediction  </li>
