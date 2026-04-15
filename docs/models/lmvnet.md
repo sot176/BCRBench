@@ -38,7 +38,7 @@ The model consists of three main components:
 
 ---
 
-### 2. Dual Stream-Attention
+### 2. Multi-View Dual Stream-Attention
 - Performs self-attention and corss-attention within each view 
 - Iteratively exchanges information between CC and MLO features  
 - Enhances view consistency and complementary feature learning  
@@ -104,7 +104,7 @@ LMV-Net is implemented as a subclass of `BaseRiskModel` and:
 ## ⚙️ Key Components
 
 - **LongitudinalFeatureProcessor**: Handles temporal feature alignment using registration  
-- **CrossAttentionBlock**: Performs cross-view feature fusion using self-attention and cross-attention  
+- **Multi-View Dual Stream-Attention Block**: Performs cross-view feature fusion using self-attention and cross-attention  
 - **CumulativeProbabilityLayer**: Outputs risk over time horizons  
 
 ---
