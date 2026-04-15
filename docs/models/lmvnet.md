@@ -21,10 +21,10 @@ This design allows the model to capture both **temporal changes** and **cross-vi
 ---
 
 ## 🏗️ Architecture
- 
- <p align="center">
-   <img src="./figs/LMV.png" alt="Image 1" width="700"/>
- </p>
+
+<p align="center">
+  <img src="../figs/LMV.png" alt="LMV-Net Architecture" width="700"/>
+</p>
  
 
 
@@ -79,12 +79,19 @@ The model expects a batch dictionary with:
 
 ### Output
 
-The model returns:
+The `forward` method returns a dictionary containing:
 
 - `risk_multi`: Multi-view fused risk logits `[B, num_years]`  
 - `risk_cc`: CC-only risk logits `[B, num_years]`  
 - `risk_mlo`: MLO-only risk logits `[B, num_years]`  
 
+These outputs are consumed by two helper methods:
+
+- **`get_risk_heads(outputs, batch)`**  
+  Uses the outputs from `forward` to construct `(logits, target, mask)` tuples for each head (`multi`, `cc`, `mlo`), enabling multi-task loss computation.
+
+- **`get_primary_risk_head(outputs)`**  
+  Uses the outputs from `forward` to return the final prediction for evaluation, defined as `sigmoid(risk_multi)`.
 ---
 
 ## 🧩 Integration in This Framework
