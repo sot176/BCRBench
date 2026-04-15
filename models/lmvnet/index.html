@@ -78,7 +78,7 @@
         <ul>
     <li class="toctree-l3"><a class="reference internal" href="#1-longitudinal-feature-processing">1. Longitudinal Feature Processing</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#2-dual-stream-attention">2. Dual Stream-Attention</a>
+    <li class="toctree-l3"><a class="reference internal" href="#2-multi-view-dual-stream-attention">2. Multi-View Dual Stream-Attention</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#3-multi-view-fusion-and-risk-prediction">3. Multi-View Fusion and Risk Prediction</a>
     </li>
@@ -173,7 +173,7 @@
 <li>Concatenates current, aligned prior, and difference features to form a unified longitudinal feature representation for each view  prior, and difference feature to obtain a longitudinal feature vector for each view</li>
 </ul>
 <hr />
-<h3 id="2-dual-stream-attention">2. Dual Stream-Attention</h3>
+<h3 id="2-multi-view-dual-stream-attention">2. Multi-View Dual Stream-Attention</h3>
 <ul>
 <li>Performs self-attention and corss-attention within each view </li>
 <li>Iteratively exchanges information between CC and MLO features  </li>
@@ -238,7 +238,7 @@
 <h2 id="key-components">⚙️ Key Components</h2>
 <ul>
 <li><strong>LongitudinalFeatureProcessor</strong>: Handles temporal feature alignment using registration  </li>
-<li><strong>CrossAttentionBlock</strong>: Performs cross-view feature fusion using self-attention and cross-attention  </li>
+<li><strong>Multi-View Dual Stream-Attention Block</strong>: Performs cross-view feature fusion using self-attention and cross-attention  </li>
 <li><strong>CumulativeProbabilityLayer</strong>: Outputs risk over time horizons  </li>
 </ul>
 <hr />
