@@ -117,5 +117,5 @@ LMV-Net is implemented as a subclass of `BaseRiskModel` and:
 
 - Risk is modeled as **cumulative probability over time**  
 - Multiple heads allow:
-  - View-specific supervision  
-  - Improved training stability  
+    - View-specific supervision  
+    - Improved training stability  
