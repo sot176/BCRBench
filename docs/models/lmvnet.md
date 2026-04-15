@@ -28,31 +28,27 @@ This design allows the model to capture both **temporal changes** and **cross-vi
  
 
 
-The model consists of four main components:
+The model consists of three main components:
 
 ### 1. Longitudinal Feature Processing
-- Uses a registration network (MammoRegNet)  
-- Warps prior features to align with current features
-- Generates difference feature maps by subtracting the aligned prior featuers from the current features  
-- Produces longitudinally aligned feature maps for CC and MLO views  
+- Uses a shared encoder to extract feature maps from each view across both time points  
+- Applies a registration network (e.g., MammoRegNet) to align prior feature maps with current feature maps  
+- Computes difference features by subtracting aligned prior features from current features  
+- Concatenates current, aligned prior, and difference features to form a unified longitudinal feature representation for each view  prior, and difference feature to obtain a longitudinal feature vector for each view
 
 ---
 
-### 2. Cross-Attention Fusion
-- A stack of cross-attention blocks  
+### 2. Dual Stream-Attention
+- Performs self-attention and corss-attention within each view 
 - Iteratively exchanges information between CC and MLO features  
 - Enhances view consistency and complementary feature learning  
 
 ---
 
-### 3. Multi-View Pooling and Fusion
+### 3. Multi-View Fusion and  Risk Prediction
 - Global average pooling applied to each view  
 - Feature vectors concatenated and passed through a linear layer  
 - Produces a fused multi-view representation  
-
----
-
-### 4. Risk Prediction Heads
 - Shared cumulative probability layer  
 - Outputs:
     - Multi-view risk prediction  
