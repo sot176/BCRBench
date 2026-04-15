@@ -69,6 +69,38 @@
                   <li class="toctree-l1"><a class="reference internal" href="../imgfeatalign/">ImgFeatAlign</a>
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">LMV-Net</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#overview">📌 Overview</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#key-idea">🧠 Key Idea</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#architecture">🏗️ Architecture</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#1-longitudinal-feature-processing">1. Longitudinal Feature Processing</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#2-cross-attention-fusion">2. Cross-Attention Fusion</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#3-multi-view-pooling-and-fusion">3. Multi-View Pooling and Fusion</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#4-risk-prediction-heads">4. Risk Prediction Heads</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#input-output">🔄 Input / Output</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#input">Input</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#output">Output</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#integration-in-this-framework">🧩 Integration in This Framework</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#key-components">⚙️ Key Components</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#risk-prediction">📉 Risk Prediction</a>
+    </li>
+    </ul>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../mirai/">Mirai</a>
                   </li>
@@ -115,7 +147,112 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                
+                <h1 id="lmv-net">LMV-Net</h1>
+<h2 id="overview">📌 Overview</h2>
+<p>LMV-Net (Longitudinal Multi-View Network) is a deep learning model for breast cancer risk prediction from mammography. It jointly models <strong>multi-view imaging (CC, MLO)</strong> and <strong>longitudinal information (current and prior exams)</strong> to produce risk estimates over multiple future time horizons.</p>
+<p>The model integrates temporal alignment, cross-view feature fusion, and multi-head risk prediction within a unified framework.</p>
+<hr />
+<h2 id="key-idea">🧠 Key Idea</h2>
+<p>LMV-Net is built around three core ideas:</p>
+<ul>
+<li><strong>Longitudinal alignment:</strong> Previous mammography feature maps are spatially aligned to current mammogrpahy feature maps using a registration network (MammoRegNet) to enable meaningful temporal comparison  </li>
+<li><strong>Cross-view fusion:</strong> CC and MLO views are iteratively fused using self-attention and cross-attention mechanism  </li>
+<li><strong>Multi-level prediction:</strong> Risk is predicted at both view-specific and fused multi-view levels  </li>
+</ul>
+<p>This design allows the model to capture both <strong>temporal changes</strong> and <strong>cross-view consistency</strong>.</p>
+<hr />
+<h2 id="architecture">🏗️ Architecture</h2>
+<p align="center">
+  <img src="../figs/LMV.png" alt="LMV-Net Architecture" width="700"/>
+</p>
+
+<p>The model consists of four main components:</p>
+<h3 id="1-longitudinal-feature-processing">1. Longitudinal Feature Processing</h3>
+<ul>
+<li>Uses a registration network (MammoRegNet)  </li>
+<li>Warps prior features to align with current features</li>
+<li>Generates difference feature maps by subtracting the aligned prior featuers from the current features  </li>
+<li>Produces longitudinally aligned feature maps for CC and MLO views  </li>
+</ul>
+<hr />
+<h3 id="2-cross-attention-fusion">2. Cross-Attention Fusion</h3>
+<ul>
+<li>A stack of cross-attention blocks  </li>
+<li>Iteratively exchanges information between CC and MLO features  </li>
+<li>Enhances view consistency and complementary feature learning  </li>
+</ul>
+<hr />
+<h3 id="3-multi-view-pooling-and-fusion">3. Multi-View Pooling and Fusion</h3>
+<ul>
+<li>Global average pooling applied to each view  </li>
+<li>Feature vectors concatenated and passed through a linear layer  </li>
+<li>Produces a fused multi-view representation  </li>
+</ul>
+<hr />
+<h3 id="4-risk-prediction-heads">4. Risk Prediction Heads</h3>
+<ul>
+<li>Shared cumulative probability layer  </li>
+<li>Outputs:</li>
+<li>Multi-view risk prediction  </li>
+<li>CC-only risk prediction  </li>
+<li>MLO-only risk prediction  </li>
+</ul>
+<hr />
+<h2 id="input-output">🔄 Input / Output</h2>
+<h3 id="input">Input</h3>
+<p>The model expects a batch dictionary with:</p>
+<ul>
+<li><code>current_image_cc</code>: Current CC view <code>[B, 1, H, W]</code>  </li>
+<li><code>previous_image_cc</code>: Prior CC view <code>[B, 1, H, W]</code>  </li>
+<li><code>current_image_mlo</code>: Current MLO view <code>[B, 1, H, W]</code>  </li>
+<li><code>previous_image_mlo</code>: Prior MLO view <code>[B, 1, H, W]</code>  </li>
+<li><code>time_gap</code>: Time between exams <code>[B, 1]</code>  </li>
+<li><code>target</code>: Risk labels <code>[B, num_years]</code>  </li>
+<li><code>y_mask</code>: Valid label mask <code>[B, num_years]</code>  </li>
+</ul>
+<hr />
+<h3 id="output">Output</h3>
+<p>The <code>forward</code> method returns a dictionary containing:</p>
+<ul>
+<li><code>risk_multi</code>: Multi-view fused risk logits <code>[B, num_years]</code>  </li>
+<li><code>risk_cc</code>: CC-only risk logits <code>[B, num_years]</code>  </li>
+<li><code>risk_mlo</code>: MLO-only risk logits <code>[B, num_years]</code>  </li>
+</ul>
+<p>These outputs are consumed by two helper methods:</p>
+<ul>
+<li>
+<p><strong><code>get_risk_heads(outputs, batch)</code></strong><br />
+  Uses the outputs from <code>forward</code> to construct <code>(logits, target, mask)</code> tuples for each head (<code>multi</code>, <code>cc</code>, <code>mlo</code>), enabling multi-task loss computation.</p>
+</li>
+<li>
+<p><strong><code>get_primary_risk_head(outputs)</code></strong><br />
+  Uses the outputs from <code>forward</code> to return the final prediction for evaluation, defined as <code>sigmoid(risk_multi)</code>.</p>
+</li>
+</ul>
+<hr />
+<h2 id="integration-in-this-framework">🧩 Integration in This Framework</h2>
+<p>LMV-Net is implemented as a subclass of <code>BaseRiskModel</code> and:</p>
+<ul>
+<li>Uses the shared data interface  </li>
+<li>Supports multi-view and longitudinal inputs  </li>
+<li>Produces multiple risk heads for multi-task training  </li>
+<li>Uses a unified evaluation pipeline via the primary risk head  </li>
+</ul>
+<hr />
+<h2 id="key-components">⚙️ Key Components</h2>
+<ul>
+<li><strong>LongitudinalFeatureProcessor</strong>: Handles temporal feature alignment using registration  </li>
+<li><strong>CrossAttentionBlock</strong>: Performs cross-view feature fusion using self-attention and cross-attention  </li>
+<li><strong>CumulativeProbabilityLayer</strong>: Outputs risk over time horizons  </li>
+</ul>
+<hr />
+<h2 id="risk-prediction">📉 Risk Prediction</h2>
+<ul>
+<li>Risk is modeled as <strong>cumulative probability over time</strong>  </li>
+<li>Multiple heads allow:</li>
+<li>View-specific supervision  </li>
+<li>Improved training stability  </li>
+</ul>
               
             </div>
           </div><footer>
