@@ -115,7 +115,7 @@ These outputs are consumed by two helper methods:
     - `prior`: Uses `prior` with `years_to_cancer_prior` and `years_to_last_followup_prior`  
     - `difference`: Uses `difference` with `years_to_cancer` and `years_to_last_followup`  
 
-  Each head contains:
+- Each head contains:
 
     - `risk`: Predicted logits  
     - `risk_label`: Time-to-event target  
