@@ -95,7 +95,7 @@ These outputs are consumed by two helper methods:
 LMV-Net is implemented as a subclass of `BaseRiskModel` and:
 
 - Uses the shared data interface  
-- Supports multi-view and longitudinal inputs  
+- Supports longitudinal multi-view inputs  
 - Produces multiple risk heads for multi-task training  
 - Uses a unified evaluation pipeline via the primary risk head  
 
