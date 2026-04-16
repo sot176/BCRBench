@@ -249,20 +249,21 @@
 <li>
 <p><strong><code>get_risk_heads(outputs, batch)</code></strong><br />
   Uses the outputs from <code>forward</code> to construct structured dictionaries for each prediction head:</p>
-</li>
-<li>
-<p><code>final</code>: Uses <code>final</code> with <code>years_to_cancer</code> and <code>years_to_last_followup</code>  </p>
-</li>
+<ul>
+<li><code>final</code>: Uses <code>final</code> with <code>years_to_cancer</code> and <code>years_to_last_followup</code>  </li>
 <li><code>current</code>: Uses <code>current</code> with <code>years_to_cancer</code> and <code>years_to_last_followup</code>  </li>
 <li><code>prior</code>: Uses <code>prior</code> with <code>years_to_cancer_prior</code> and <code>years_to_last_followup_prior</code>  </li>
 <li><code>difference</code>: Uses <code>difference</code> with <code>years_to_cancer</code> and <code>years_to_last_followup</code>  </li>
 </ul>
-<p>Each head contains:
-  - <code>risk</code>: Predicted logits<br />
-  - <code>risk_label</code>: Time-to-event target<br />
-  - <code>years_lfu</code>: Follow-up / censoring information<br />
-  - <code>emb</code>, <code>log_var</code>: Optional probabilistic embeddings (if POE is enabled)<br />
-  - <code>weight</code>: Contribution to the total training loss  </p>
+</li>
+</ul>
+<p>Each head contains:</p>
+<pre><code>- `risk`: Predicted logits  
+- `risk_label`: Time-to-event target  
+- `years_lfu`: Follow-up / censoring information  
+- `emb`, `log_var`: Optional probabilistic embeddings (if POE is enabled)  
+- `weight`: Contribution to the total training loss
+</code></pre>
 <p>This enables <strong>multi-head supervision</strong>, where the model jointly learns:
   - Fused longitudinal risk (primary task)<br />
   - Current-only and prior-only predictions (auxiliary supervision)<br />
