@@ -217,10 +217,12 @@
 <p>These outputs are consumed by two helper methods:</p>
 <ul>
 <li><strong><code>get_risk_heads(outputs, batch)</code></strong><br />
-  Uses the outputs from <code>forward</code> to construct <code>(logits, target, mask)</code> tuples for each prediction head:</li>
+  Uses the outputs from <code>forward</code> to construct <code>(logits, target, mask)</code> tuples for each prediction head:<ul>
 <li><code>multi</code>: Uses <code>risk_multi</code> with <code>target</code> and <code>y_mask</code>  </li>
 <li><code>cc</code>: Uses <code>risk_cc</code> with <code>target</code> and <code>y_mask</code>  </li>
 <li><code>mlo</code>: Uses <code>risk_mlo</code> with <code>target</code> and <code>y_mask</code>  </li>
+</ul>
+</li>
 </ul>
 <p>This enables <strong>multi-head supervision</strong>, encouraging both view-specific learning and improved fused predictions.</p>
 <ul>
