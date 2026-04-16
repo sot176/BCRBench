@@ -256,14 +256,17 @@
 <li><code>difference</code>: Uses <code>difference</code> with <code>years_to_cancer</code> and <code>years_to_last_followup</code>  </li>
 </ul>
 </li>
-</ul>
+<li>
 <p>Each head contains:</p>
-<pre><code>- `risk`: Predicted logits  
-- `risk_label`: Time-to-event target  
-- `years_lfu`: Follow-up / censoring information  
-- `emb`, `log_var`: Optional probabilistic embeddings (if POE is enabled)  
-- `weight`: Contribution to the total training loss
-</code></pre>
+<ul>
+<li><code>risk</code>: Predicted logits  </li>
+<li><code>risk_label</code>: Time-to-event target  </li>
+<li><code>years_lfu</code>: Follow-up / censoring information  </li>
+<li><code>emb</code>, <code>log_var</code>: Optional probabilistic embeddings (if POE is enabled)  </li>
+<li><code>weight</code>: Contribution to the total training loss  </li>
+</ul>
+</li>
+</ul>
 <p>This enables <strong>multi-head supervision</strong>, where the model jointly learns:
   - Fused longitudinal risk (primary task)<br />
   - Current-only and prior-only predictions (auxiliary supervision)<br />
