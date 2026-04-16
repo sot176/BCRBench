@@ -117,7 +117,6 @@ These outputs are consumed by two helper methods:
 
 - **`get_primary_risk_head(outputs)`**  
   Uses the outputs from `forward` to return the final prediction for evaluation, defined as:
-
   `sigmoid(pred_fused)`
 
   This represents the model’s **primary risk estimate**, derived from the fused longitudinal representation.
