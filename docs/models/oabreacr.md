@@ -158,11 +158,10 @@ OA-BreaCR is implemented as a subclass of `BaseRiskModel` and:
 
 - **CNN Encoder:** Extracts deep visual features from mammograms  
 - **Attention Pooling Module:** Produces spatial attention maps for alignment  
-- **Flow Network:** Estimates deformation fields between timepoints  
+- **Feature Registration Network:** Estimates deformation fields between timepoints in the feature space
 - **Spatial Transformer Block:** Warps prior features into current space  
 - **Continuous Positional Encoding:** Injects time-gap information into difference features  
 - **POE Latent Module (optional):** Models uncertainty in ordinal embedding space  
-- **Fusion MLP:** Combines multimodal longitudinal features  
 
 ---
 
