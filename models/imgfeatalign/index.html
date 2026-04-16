@@ -180,7 +180,6 @@
 </ul>
 </li>
 </ul>
-<hr />
 <h3 id="2-registration-image-space">2. Registration (Image Space)</h3>
 <ul>
 <li>A pre-trained <strong>MammoRegNet</strong> estimates deformation fields between:<ul>
@@ -279,7 +278,8 @@
 <ul>
 <li><strong>Encoder (Mirai backbone):</strong> Extracts deep feature representations  </li>
 <li><strong>MammoRegNet:</strong> Provides deformation fields for temporal alignment (frozen)  </li>
-<li><strong>SpatialTransformerBlock:</strong> Applies deformation fields to feature maps  </li>
+<li><strong>SpatialTransformerBlock:</strong> Applies deformation fields to feature maps </li>
+<li><strong>Continuous Positional Encoding:</strong> Injects time-gap information into difference features  </li>
 <li><strong>Temporal self-attention block:</strong> Aggregates multi-source features for prediction  </li>
 </ul>
 <hr />

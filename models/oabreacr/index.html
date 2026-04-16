@@ -71,6 +71,16 @@
     <li class="toctree-l2"><a class="reference internal" href="#key-idea">🧠 Key Idea</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#architecture">🏗️ Architecture</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#1-feature-encoder">1. Feature Encoder</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#2-attention-based-longitudinal-alignment">2. Attention-Based Longitudinal Alignment</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#3-ordinal-feature-modeling">3. Ordinal Feature Modeling</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#4-feature-fusion-and-prediction">4. Feature Fusion and Prediction</a>
+    </li>
+        </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#input-output">🔄 Input / Output</a>
         <ul>
@@ -137,10 +147,30 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="oa-breacr">Oa-BreaCR</h1>
+                <h1 id="oa-breacr">OA-BreaCR</h1>
 <h2 id="overview">📌 Overview</h2>
+<p>OA-BreaCR  is a longitudinal breast cancer risk prediction model that combines <strong>ordinal learning</strong>, <strong>temporal alignment of breast tissue changes</strong>, and <strong>probabilistic latent embeddings</strong> to improve both risk prediction and time-to-event estimation.</p>
+<p>The model operates on <strong>two-timepoint mammograms (current and prior exams)</strong> and explicitly models the <strong>temporal evolution of breast tissue</strong> using attention-based registration and feature-level deformation.</p>
+<p>It is designed to support both:
+- Breast cancer risk prediction
+- Time-to-event (ordinal) prediction of future cancer occurrence</p>
 <hr />
 <h2 id="key-idea">🧠 Key Idea</h2>
+<p>OA-BreaCR is built around three core principles:</p>
+<ul>
+<li>
+<p><strong>Ordinal learning for time-to-event prediction:</strong><br />
+  The model learns structured risk over time using mean-variance ordinal loss and probabilistic ordinal embeddings (POE), enabling more informative time-to-cancer predictions.</p>
+</li>
+<li>
+<p><strong>Attention-based longitudinal alignment:</strong><br />
+  Breast tissue changes between prior and current exams are modeled using attention maps and learned flow fields in the feature space, improving interpretability of temporal changes.</p>
+</li>
+<li>
+<p><strong>Feature-level fusion of longitudinal information:</strong><br />
+  Current, prior, and difference features are combined to form a unified representation for final risk prediction.</p>
+</li>
+</ul>
 <hr />
 <h2 id="architecture">🏗️ Architecture</h2>
 <p align="center">
@@ -148,15 +178,146 @@
 </p>
 
 <hr />
+<p>The model consists of four main components:</p>
+<h3 id="1-feature-encoder">1. Feature Encoder</h3>
+<ul>
+<li>A shared CNN backbone (ResNet-18) extracts feature maps from:<ul>
+<li>Current mammogram</li>
+<li>Prior mammogram  </li>
+</ul>
+</li>
+<li>Input images are converted to 3-channel format if needed</li>
+</ul>
+<hr />
+<h3 id="2-attention-based-longitudinal-alignment">2. Attention-Based Longitudinal Alignment</h3>
+<ul>
+<li>Attention pooling extracts spatial representations from both time points  </li>
+<li>A small flow network estimates a <strong>deformation field</strong> between exams  </li>
+<li>A spatial transformer aligns prior features to the current features  </li>
+<li>The model computes:<ul>
+<li>Aligned prior features  </li>
+<li>Absolute difference features (|current − aligned prior|)</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h3 id="3-ordinal-feature-modeling">3. Ordinal Feature Modeling</h3>
+<ul>
+<li>Difference features are enriched with <strong>continuous positional encoding</strong> using time gap information  </li>
+<li>This allows the model to explicitly learn <strong>temporal progression patterns</strong></li>
+</ul>
+<hr />
+<h3 id="4-feature-fusion-and-prediction">4. Feature Fusion and Prediction</h3>
+<ul>
+<li>Three feature streams are combined:<ul>
+<li>Current features  </li>
+<li>Prior features  </li>
+<li>Time-aware difference features  </li>
+</ul>
+</li>
+<li>A fusion MLP integrates all representations  </li>
+<li>Optional <strong>Probabilistic Ordinal Embedding (POE)</strong> introduces stochastic latent structure  </li>
+<li>Final risk is predicted using a linear classification head</li>
+</ul>
+<hr />
 <h2 id="input-output">🔄 Input / Output</h2>
 <h3 id="input">Input</h3>
+<p>The model expects a batch dictionary with:</p>
+<ul>
+<li><code>current_image</code>: Current mammogram <code>[B, 1, H, W]</code>  </li>
+<li><code>previous_image</code>: Prior mammogram <code>[B, 1, H, W]</code>  </li>
+<li><code>time_gap</code>: Time between exams <code>[B]</code>  </li>
+<li><code>years_to_cancer</code>: Target time-to-event for current exam  </li>
+<li><code>years_to_cancer_prior</code>: Target time-to-event for prior exam  </li>
+<li><code>years_to_last_followup</code>: Censoring information  </li>
+</ul>
 <hr />
 <h3 id="output">Output</h3>
+<p>The <code>forward</code> method returns a dictionary containing:</p>
+<ul>
+<li><code>final</code>: Primary fused risk logits  </li>
+<li><code>current</code>: Risk prediction from current exam only  </li>
+<li><code>prior</code>: Risk prediction from prior exam only  </li>
+<li><code>difference</code>: Risk prediction from temporal difference features  </li>
+<li><code>flow_field</code>: Learned deformation field for alignment  </li>
+<li><code>emb_final</code>: Optional probabilistic ordinal embedding  </li>
+<li><code>log_var_final</code>: Uncertainty estimate (if POE is enabled)  </li>
+<li><code>loss</code>: Registration alignment loss (attention consistency)</li>
+</ul>
+<p>These outputs are consumed by two helper methods:</p>
+<ul>
+<li>
+<p><strong><code>get_risk_heads(outputs, batch)</code></strong><br />
+  Uses the outputs from <code>forward</code> to construct structured dictionaries for each prediction head:</p>
+</li>
+<li>
+<p><code>final</code>: Uses <code>final</code> with <code>years_to_cancer</code> and <code>years_to_last_followup</code>  </p>
+</li>
+<li><code>current</code>: Uses <code>current</code> with <code>years_to_cancer</code> and <code>years_to_last_followup</code>  </li>
+<li><code>prior</code>: Uses <code>prior</code> with <code>years_to_cancer_prior</code> and <code>years_to_last_followup_prior</code>  </li>
+<li><code>difference</code>: Uses <code>difference</code> with <code>years_to_cancer</code> and <code>years_to_last_followup</code>  </li>
+</ul>
+<p>Each head contains:
+  - <code>risk</code>: Predicted logits<br />
+  - <code>risk_label</code>: Time-to-event target<br />
+  - <code>years_lfu</code>: Follow-up / censoring information<br />
+  - <code>emb</code>, <code>log_var</code>: Optional probabilistic embeddings (if POE is enabled)<br />
+  - <code>weight</code>: Contribution to the total training loss  </p>
+<p>This enables <strong>multi-head supervision</strong>, where the model jointly learns:
+  - Fused longitudinal risk (primary task)<br />
+  - Current-only and prior-only predictions (auxiliary supervision)<br />
+  - Difference-based predictions capturing temporal change  </p>
+<ul>
+<li>
+<p><strong><code>get_primary_risk_head(outputs)</code></strong><br />
+  Uses the outputs from <code>forward</code> to return the final prediction for evaluation:</p>
+<ul>
+<li>Uses the logits from the final fully connected layer (<code>final</code>)  </li>
+<li>If stochastic embeddings are used, predictions are averaged across samples  </li>
+<li>Softmax is applied to obtain a probability distribution over time horizons  </li>
+<li>The probabilities are converted into a <strong>cumulative risk score</strong> over a specified follow-up period  </li>
+</ul>
+</li>
+</ul>
+<p>This represents the model’s <strong>primary time-to-event risk estimate</strong>, incorporating both longitudinal information and ordinal structure.</p>
 <hr />
 <h2 id="integration-in-this-framework">🧩 Integration in This Framework</h2>
+<p>OA-BreaCR is implemented as a subclass of <code>BaseRiskModel</code> and:</p>
+<ul>
+<li>Supports <strong>longitudinal two-timepoint mammography input</strong></li>
+<li>Integrates <strong>ordinal learning for time-to-event prediction</strong></li>
+<li>Includes <strong>attention-based feature alignment</strong></li>
+<li>Optionally uses <strong>probabilistic ordinal embeddings (POE)</strong> for uncertainty modeling</li>
+<li>Produces multiple prediction heads for auxiliary supervision</li>
+</ul>
 <hr />
 <h2 id="key-components">⚙️ Key Components</h2>
+<ul>
+<li><strong>CNN Encoder:</strong> Extracts deep visual features from mammograms  </li>
+<li><strong>Attention Pooling Module:</strong> Produces spatial attention maps for alignment  </li>
+<li><strong>Flow Network:</strong> Estimates deformation fields between timepoints  </li>
+<li><strong>Spatial Transformer Block:</strong> Warps prior features into current space  </li>
+<li><strong>Continuous Positional Encoding:</strong> Injects time-gap information into difference features  </li>
+<li><strong>POE Latent Module (optional):</strong> Models uncertainty in ordinal embedding space  </li>
+<li><strong>Fusion MLP:</strong> Combines multimodal longitudinal features  </li>
+</ul>
+<hr />
 <h2 id="risk-prediction">📉 Risk Prediction</h2>
+<p>OA-BreaCR performs <strong>ordinal risk prediction over time</strong>, explicitly modeling:</p>
+<ul>
+<li>Time-to-cancer as an ordered regression problem  </li>
+<li>Uncertainty via probabilistic embeddings (optional POE)  </li>
+<li>Longitudinal change through feature alignment  </li>
+</ul>
+<p>The final prediction is derived from:</p>
+<ul>
+<li><code>final</code> logits → softmax → cumulative risk score  </li>
+<li>Optional probabilistic aggregation when POE is enabled  </li>
+</ul>
+<p>Additionally, auxiliary heads (<code>current</code>, <code>prior</code>, <code>difference</code>) provide:
+- Regularization<br />
+- Improved temporal representation learning<br />
+- Better interpretability of longitudinal changes  </p>
               
             </div>
           </div><footer>
