@@ -73,6 +73,18 @@
     <li class="toctree-l2"><a class="reference internal" href="#key-idea">🧠 Key Idea</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#architecture">🏗️ Architecture</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#1-feature-extraction">1. Feature Extraction</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#2-registration-image-space">2. Registration (Image Space)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#3-feature-alignment">3. Feature Alignment</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#4-temporal-difference-learning">4. Temporal Difference Learning</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#5-risk-prediction">5. Risk Prediction</a>
+    </li>
+        </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#input-output">🔄 Input / Output</a>
         <ul>
@@ -139,24 +151,139 @@
               
                 <h1 id="imgfeatalign">ImgFeatAlign</h1>
 <h2 id="overview">📌 Overview</h2>
+<p>ImgFeatAlign is a longitudinal breast cancer risk prediction model that focuses on <strong>feature-level temporal alignment</strong> between current and prior mammograms. </p>
+<p>Instead of aligning images directly, the model leverages a pre-trained registration network (MammoRegNet) to estimate deformation fields and applies them <strong>in feature space</strong>, enabling more robust comparison of temporal changes.</p>
+<p>The model builds on a single-view setting and enhances longitudinal modeling through explicit feature alignment and temporal difference learning.</p>
 <hr />
 <h2 id="key-idea">🧠 Key Idea</h2>
+<p>ImgFeatAlign is built around three core ideas:</p>
+<ul>
+<li><strong>Feature-level alignment:</strong> Instead of warping images, deformation fields from a pretrained deep learning based registration network are applied to <strong>feature maps</strong>, improving robustness to noise and artifacts  </li>
+<li><strong>Explicit temporal comparison:</strong> The model computes absolute differences between current and aligned prior features to capture meaningful temporal changes  </li>
+<li><strong>Attention-based risk prediction:</strong> A dedicated risk model aggregates current, prior, aligned, and difference features along with time gap information  </li>
+</ul>
+<p>This design allows the model to better capture <strong>subtle longitudinal changes</strong> that are critical for early cancer risk prediction.</p>
 <hr />
 <h2 id="architecture">🏗️ Architecture</h2>
 <p align="center">
   <img src="../figs/ImgFeatAlign.png" alt="ImgFeatAlign Architecture" width="700"/>
 </p>
 
+<p>The model consists of four main stages:</p>
+<h3 id="1-feature-extraction">1. Feature Extraction</h3>
+<ul>
+<li>Uses a shared encoder (Mirai backbone)  </li>
+<li>Converts grayscale mammograms to 3-channel input  </li>
+<li>Extracts feature maps for:</li>
+<li>Current image  </li>
+<li>Prior image  </li>
+</ul>
+<hr />
+<h3 id="2-registration-image-space">2. Registration (Image Space)</h3>
+<ul>
+<li>A pre-trained <strong>MammoRegNet</strong> estimates deformation fields between:</li>
+<li>Current image  </li>
+<li>Prior image  </li>
+<li>The registration network is <strong>frozen</strong> during training  </li>
+<li>The resulting deformation field is resized to match feature resolution  </li>
+</ul>
+<hr />
+<h3 id="3-feature-alignment">3. Feature Alignment</h3>
+<ul>
+<li>A spatial transformer applies the deformation field to prior feature maps  </li>
+<li>Produces <strong>aligned prior features</strong>  </li>
+<li>Enables spatially consistent comparison with current features  </li>
+</ul>
+<hr />
+<h3 id="4-temporal-difference-learning">4. Temporal Difference Learning</h3>
+<ul>
+<li>Computes:</li>
+<li>Absolute difference between current and aligned prior features  </li>
+<li>Captures localized temporal changes  </li>
+</ul>
+<hr />
+<h3 id="5-risk-prediction">5. Risk Prediction</h3>
+<ul>
+<li>A risk model with attention takes:</li>
+<li>Current features  </li>
+<li>Original prior features  </li>
+<li>Aligned prior features  </li>
+<li>Difference features  </li>
+<li>Time gap  </li>
+<li>Outputs multiple risk predictions  </li>
+</ul>
 <hr />
 <h2 id="input-output">🔄 Input / Output</h2>
 <h3 id="input">Input</h3>
+<p>The model expects a batch dictionary with:</p>
+<ul>
+<li><code>current_image</code>: Current mammogram <code>[B, 1, H, W]</code>  </li>
+<li><code>previous_image</code>: Prior mammogram <code>[B, 1, H, W]</code>  </li>
+<li><code>time_gap</code>: Time between exams <code>[B]</code>  </li>
+<li><code>target</code>: Risk labels <code>[B, num_years]</code>  </li>
+<li><code>y_mask</code>: Valid label mask <code>[B, num_years]</code>  </li>
+<li><code>target_prior</code>: Prior risk labels <code>[B, num_years]</code>  </li>
+<li><code>y_mask_prior</code>: Prior label mask <code>[B, num_years]</code>  </li>
+</ul>
 <hr />
 <h3 id="output">Output</h3>
+<p>The <code>forward</code> method returns a dictionary containing:</p>
+<ul>
+<li><code>risk_prediction</code>: Dictionary with risk logits for different prediction heads  </li>
+<li><code>deformation_field</code>: Estimated deformation field between current and prior images  </li>
+<li><code>aligned_prior_feature</code>: Prior feature maps after spatial alignment  </li>
+<li><code>prior_feature</code>: Original prior feature maps  </li>
+<li><code>current_feature</code>: Current feature maps  </li>
+<li><code>diff_feature</code>: Absolute difference between current and aligned prior features  </li>
+</ul>
+<p>The <code>risk_prediction</code> dictionary contains:</p>
+<ul>
+<li><code>pred_fused</code>: Fused risk logits <code>[B, num_years]</code>  </li>
+<li><code>pred_cur</code>: Current-only risk logits <code>[B, num_years]</code>  </li>
+<li><code>pred_pri</code>: Prior-only risk logits <code>[B, num_years]</code>  </li>
+</ul>
+<p>These outputs are consumed by two helper methods:</p>
+<ul>
+<li><strong><code>get_risk_heads(outputs, batch)</code></strong><br />
+  Uses the outputs from <code>forward</code> to construct <code>(logits, target, mask)</code> tuples for each prediction head:</li>
+<li><code>fused</code>: Uses <code>pred_fused</code> with <code>target</code> and <code>y_mask</code>  </li>
+<li><code>cur</code>: Uses <code>pred_cur</code> with <code>target</code> and <code>y_mask</code>  </li>
+<li><code>pri</code>: Uses <code>pred_pri</code> with <code>target_prior</code> and <code>y_mask_prior</code>  </li>
+</ul>
+<p>This enables <strong>multi-task supervision</strong>, where the model is trained jointly on fused, current-only, and prior-only predictions.</p>
+<ul>
+<li><strong><code>get_primary_risk_head(outputs)</code></strong><br />
+  Uses the outputs from <code>forward</code> to return the final prediction for evaluation, defined as:</li>
+</ul>
+<p><code>sigmoid(pred_fused)</code></p>
+<p>This represents the model’s <strong>primary risk estimate</strong>, derived from the fused longitudinal representation.</p>
 <hr />
 <h2 id="integration-in-this-framework">🧩 Integration in This Framework</h2>
+<p>ImgFeatAlign is implemented as a subclass of <code>BaseRiskModel</code> and:</p>
+<ul>
+<li>Uses the shared data interface  </li>
+<li>Supports longitudinal single-view inputs  </li>
+<li>Produces multiple prediction heads for multi-task learning  </li>
+<li>Integrates seamlessly with the training and evaluation pipeline  </li>
+</ul>
 <hr />
 <h2 id="key-components">⚙️ Key Components</h2>
+<ul>
+<li><strong>Encoder (Mirai backbone):</strong> Extracts deep feature representations  </li>
+<li><strong>MammoRegNet:</strong> Provides deformation fields for temporal alignment (frozen)  </li>
+<li><strong>SpatialTransformerBlock:</strong> Applies deformation fields to feature maps  </li>
+<li><strong>Temporal self-attention block:</strong> Aggregates multi-source features for prediction  </li>
+</ul>
+<hr />
 <h2 id="risk-prediction">📉 Risk Prediction</h2>
+<ul>
+<li>Risk is modeled as <strong>cumulative probability over time</strong>  </li>
+<li>Multiple heads allow:</li>
+<li>Fusion-based prediction (primary)  </li>
+<li>Current-only supervision  </li>
+<li>Prior-only supervision  </li>
+</ul>
+<p>This multi-head design improves training stability and encourages better temporal feature learning.</p>
               
             </div>
           </div><footer>
