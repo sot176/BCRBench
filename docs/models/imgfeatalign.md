@@ -14,7 +14,7 @@
 
 
 <p align="center">
-  <img src="../figs/ImgFeatAlign.png" alt="LMV-Net Architecture" width="700"/>
+  <img src="../figs/ImgFeatAlign.png" alt="ImgFeatAlign Architecture" width="700"/>
 </p>
  
  
