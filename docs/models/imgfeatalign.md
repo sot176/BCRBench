@@ -49,7 +49,7 @@ The model consists of four main stages:
 ---
 
 ### 3. Feature Alignment
-- A spatial transformer applies the deformation field to prior feature maps  
+- A spatial transformer applies the deformation field from MammoRegNet to prior feature maps  
 - Produces **aligned prior features**  
 - Enables spatially consistent comparison with current features  
 
