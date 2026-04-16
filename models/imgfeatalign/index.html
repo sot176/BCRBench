@@ -260,9 +260,9 @@
 <p>This enables <strong>multi-task supervision</strong>, where the model is trained jointly on fused, current-only, and prior-only predictions.</p>
 <ul>
 <li><strong><code>get_primary_risk_head(outputs)</code></strong><br />
-  Uses the outputs from <code>forward</code> to return the final prediction for evaluation, defined as:</li>
+  Uses the outputs from <code>forward</code> to return the final prediction for evaluation, defined as:
+  <code>sigmoid(pred_fused)</code></li>
 </ul>
-<p><code>sigmoid(pred_fused)</code></p>
 <p>This represents the model’s <strong>primary risk estimate</strong>, derived from the fused longitudinal representation.</p>
 <hr />
 <h2 id="integration-in-this-framework">🧩 Integration in This Framework</h2>
