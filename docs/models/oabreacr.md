@@ -110,17 +110,18 @@ These outputs are consumed by two helper methods:
 - **`get_risk_heads(outputs, batch)`**  
   Uses the outputs from `forward` to construct structured dictionaries for each prediction head:
 
-  - `final`: Uses `final` with `years_to_cancer` and `years_to_last_followup`  
-  - `current`: Uses `current` with `years_to_cancer` and `years_to_last_followup`  
-  - `prior`: Uses `prior` with `years_to_cancer_prior` and `years_to_last_followup_prior`  
-  - `difference`: Uses `difference` with `years_to_cancer` and `years_to_last_followup`  
+    - `final`: Uses `final` with `years_to_cancer` and `years_to_last_followup`  
+    - `current`: Uses `current` with `years_to_cancer` and `years_to_last_followup`  
+    - `prior`: Uses `prior` with `years_to_cancer_prior` and `years_to_last_followup_prior`  
+    - `difference`: Uses `difference` with `years_to_cancer` and `years_to_last_followup`  
 
   Each head contains:
-  - `risk`: Predicted logits  
-  - `risk_label`: Time-to-event target  
-  - `years_lfu`: Follow-up / censoring information  
-  - `emb`, `log_var`: Optional probabilistic embeddings (if POE is enabled)  
-  - `weight`: Contribution to the total training loss  
+
+    - `risk`: Predicted logits  
+    - `risk_label`: Time-to-event target  
+    - `years_lfu`: Follow-up / censoring information  
+    - `emb`, `log_var`: Optional probabilistic embeddings (if POE is enabled)  
+    - `weight`: Contribution to the total training loss  
 
   This enables **multi-head supervision**, where the model jointly learns:
   - Fused longitudinal risk (primary task)  
