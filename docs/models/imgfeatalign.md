@@ -34,15 +34,15 @@ The model consists of four main stages:
 - Uses a shared encoder (Mirai backbone)  
 - Converts grayscale mammograms to 3-channel input  
 - Extracts feature maps for:
-  - Current image  
-  - Prior image  
+    - Current image  
+    - Prior image  
 
 ---
 
 ### 2. Registration (Image Space)
 - A pre-trained **MammoRegNet** estimates deformation fields between:
-  - Current image  
-  - Prior image  
+    - Current image  
+    - Prior image  
 - The registration network is **frozen** during training  
 - The resulting deformation field is resized to match feature resolution  
 
@@ -64,11 +64,11 @@ The model consists of four main stages:
 
 ### 5. Risk Prediction
 - A risk model with attention takes:
-  - Current features  
-  - Original prior features  
-  - Aligned prior features  
-  - Difference features  
-  - Time gap  
+    - Current features  
+    - Original prior features  
+    - Aligned prior features  
+    - Difference features  
+    - Time gap  
 - Outputs multiple risk predictions  
 
 ---
@@ -109,9 +109,9 @@ These outputs are consumed by two helper methods:
 
 - **`get_risk_heads(outputs, batch)`**  
   Uses the outputs from `forward` to construct `(logits, target, mask)` tuples for each prediction head:
-  - `fused`: Uses `pred_fused` with `target` and `y_mask`  
-  - `cur`: Uses `pred_cur` with `target` and `y_mask`  
-  - `pri`: Uses `pred_pri` with `target_prior` and `y_mask_prior`  
+    - `fused`: Uses `pred_fused` with `target` and `y_mask`  
+    - `cur`: Uses `pred_cur` with `target` and `y_mask`  
+    - `pri`: Uses `pred_pri` with `target_prior` and `y_mask_prior`  
 
   This enables **multi-task supervision**, where the model is trained jointly on fused, current-only, and prior-only predictions.
 
@@ -122,7 +122,7 @@ These outputs are consumed by two helper methods:
 
   This represents the model’s **primary risk estimate**, derived from the fused longitudinal representation.
 
-  
+
 ---
 
 ## 🧩 Integration in This Framework
@@ -149,8 +149,8 @@ ImgFeatAlign is implemented as a subclass of `BaseRiskModel` and:
 
 - Risk is modeled as **cumulative probability over time**  
 - Multiple heads allow:
-  - Fusion-based prediction (primary)  
-  - Current-only supervision  
-  - Prior-only supervision  
+    - Fusion-based prediction (primary)  
+    - Current-only supervision  
+    - Prior-only supervision  
 
 This multi-head design improves training stability and encourages better temporal feature learning.
