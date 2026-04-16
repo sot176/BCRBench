@@ -37,7 +37,7 @@ The model consists of four main stages:
     - Current image  
     - Prior image  
 
----
+ 
 
 ### 2. Registration (Image Space)
 - A pre-trained **MammoRegNet** estimates deformation fields between:
@@ -140,7 +140,8 @@ ImgFeatAlign is implemented as a subclass of `BaseRiskModel` and:
 
 - **Encoder (Mirai backbone):** Extracts deep feature representations  
 - **MammoRegNet:** Provides deformation fields for temporal alignment (frozen)  
-- **SpatialTransformerBlock:** Applies deformation fields to feature maps  
+- **SpatialTransformerBlock:** Applies deformation fields to feature maps 
+- **Continuous Positional Encoding:** Injects time-gap information into difference features  
 - **Temporal self-attention block:** Aggregates multi-source features for prediction  
 
 ---

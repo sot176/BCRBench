@@ -113,6 +113,7 @@ LMV-Net is implemented as a subclass of `BaseRiskModel` and:
 
 - **LongitudinalFeatureProcessor**: Handles temporal feature alignment using registration  
 - **Multi-View Dual Stream-Attention Block**: Performs cross-view feature fusion using self-attention and cross-attention  
+- **Continuous Positional Encoding:** Injects time-gap information into difference features  
 - **CumulativeProbabilityLayer**: Outputs risk over time horizons  
 
 ---
