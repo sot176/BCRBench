@@ -84,16 +84,14 @@ These outputs are consumed by two helper methods:
 
 - **`get_risk_heads(outputs, batch)`**  
   Uses the outputs from `forward` to construct `(logits, target, mask)` tuples for each prediction head:
-    - `multi`: Uses `risk_multi` with `target` and `y_mask`  
-    - `cc`: Uses `risk_cc` with `target` and `y_mask`  
-    - `mlo`: Uses `risk_mlo` with `target` and `y_mask`  
+      - `multi`: Uses `risk_multi` with `target` and `y_mask`  
+      - `cc`: Uses `risk_cc` with `target` and `y_mask`  
+      - `mlo`: Uses `risk_mlo` with `target` and `y_mask`  
 
   This enables **multi-head supervision**, encouraging both view-specific learning and improved fused predictions.
 
 - **`get_primary_risk_head(outputs)`**  
-  Uses the outputs from `forward` to return the final prediction for evaluation, defined as:
-
-  `sigmoid(risk_multi)`
+  Uses the outputs from `forward` to return the final prediction for evaluation, defined as: `sigmoid(risk_multi)`
 
   This represents the model’s **primary risk estimate**, based on fused multi-view information.
 
