@@ -77,6 +77,12 @@
     <li class="toctree-l2"><a class="reference internal" href="#key-idea">🧠 Key Idea</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#architecture">🏗️ Architecture</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#1-image-encoding">1. Image Encoding</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#2-transformer">2. Transformer</a>
+    </li>
+        </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#input-output">🔄 Input / Output</a>
         <ul>
@@ -139,24 +145,120 @@
               
                 <h1 id="mirai">Mirai</h1>
 <h2 id="overview">📌 Overview</h2>
+<p><strong>Mirai</strong> is a longitudinal breast cancer risk prediction model that combines a <strong>deep image encoder</strong> with a <strong>transformer-based temporal model</strong> to estimate future cancer risk from a sequence of mammograms.</p>
+<p>The model processes multiple screening exams jointly and learns temporal patterns directly from image-derived representations, enabling it to capture <strong>long-term risk signals across time</strong>.</p>
 <hr />
 <h2 id="key-idea">🧠 Key Idea</h2>
+<p>Mirai is built around three core ideas:</p>
+<ul>
+<li><strong>Learned image representations:</strong> A convolutional encoder extracts compact feature vectors from each mammogram  </li>
+<li><strong>Sequence modeling with transformers:</strong> A transformer processes the sequence of image features to capture view and breast dependencies  </li>
+<li><strong>End-to-end risk prediction:</strong> The model outputs risk scores directly from feature sequences  </li>
+</ul>
 <hr />
 <h2 id="architecture">🏗️ Architecture</h2>
 <p align="center">
   <img src="../figs/mirai.png" alt="Mirai Architecture" width="280"/>
 </p>
 
+<p>The model consists of two main stages:</p>
+<h3 id="1-image-encoding">1. Image Encoding</h3>
+<ul>
+<li>Uses a <strong>ResNet-based encoder</strong> (<code>custom_resnet</code>)  </li>
+<li>Processes each image independently  </li>
+<li>Input shape: <code>(B, C, N, H, W)</code> → reshaped to <code>(B×N, C, H, W)</code>  </li>
+<li>Outputs a feature vector per image  </li>
+</ul>
+<p>Key details:
+- Encoder can be initialized from a <strong>pretrained snapshot</strong><br />
+- Encoder can be <strong>frozen</strong> during training for efficiency and stability  </p>
+<hr />
+<h3 id="2-transformer">2. Transformer</h3>
+<ul>
+<li>Takes per-image feature vectors as a sequence <code>(B, N, D)</code>  </li>
+<li>Models  dependencies across views and breasts</li>
+<li>Outputs:</li>
+<li>Risk logits  </li>
+<li>Transformer hidden representations  </li>
+</ul>
+<p>Key details:
+- Can be initialized from a pretrained encoder snapshot<br />
+- Can be initialized from a pretrained transformer snapshot<br />
+- Learns interactions between vies and breasts</p>
 <hr />
 <h2 id="input-output">🔄 Input / Output</h2>
 <h3 id="input">Input</h3>
+<p>The model expects a batch dictionary with:</p>
+<ul>
+<li><code>images</code>: Mammogram sequence <code>[B, C, N, H, W]</code>  </li>
+<li><code>B</code>: Batch size  </li>
+<li><code>C</code>: Channels  </li>
+<li><code>N</code>: Number of images (should be 4, 2 images for each breast)  </li>
+<li><code>target</code>: Risk labels <code>[B, num_years]</code>  </li>
+<li><code>y_mask</code>: Valid label mask <code>[B, num_years]</code>  </li>
+</ul>
 <hr />
 <h3 id="output">Output</h3>
+<p>The <code>forward</code> method returns:</p>
+<ul>
+<li><code>logit</code>: Risk prediction logits <code>[B, num_years]</code>  </li>
+<li><code>transformer_hidden</code>: Final transformer representations  </li>
+<li><code>activ_dict</code>: Optional intermediate activations  </li>
+</ul>
 <hr />
 <h2 id="integration-in-this-framework">🧩 Integration in This Framework</h2>
+<p>Mirai is implemented as a subclass of <code>BaseRiskModel</code> and:</p>
+<ul>
+<li>Uses the shared batch-based data interface  </li>
+<li>Supports <strong>multi-timepoint (longitudinal) inputs</strong>  </li>
+<li>Integrates pretrained components (encoder + transformer)  </li>
+<li>Provides standardized risk head interfaces for training and evaluation  </li>
+</ul>
 <hr />
 <h2 id="key-components">⚙️ Key Components</h2>
+<ul>
+<li>
+<p><strong>Image Encoder:</strong><br />
+  Extracts feature vectors from  mammograms  </p>
+</li>
+<li>
+<p><strong>Transformer Model:</strong><br />
+  Learn dependencies across rbeasts and views </p>
+</li>
+<li>
+<p><strong>Snapshot Loading (<code>load_model</code>):</strong><br />
+  Enables reuse of pretrained encoder and transformer weights  </p>
+</li>
+<li>
+<p><strong>Freezing Mechanism:</strong><br />
+  Allows encoder weights to remain fixed during training  </p>
+</li>
+<li>
+<p><strong>Factory System (<code>get_model_by_name</code>):</strong><br />
+  Dynamically constructs encoder and transformer modules  </p>
+</li>
+</ul>
+<hr />
 <h2 id="risk-prediction">📉 Risk Prediction</h2>
+<ul>
+<li>Risk is modeled as <strong>multi-year probability logits</strong>  </li>
+<li>
+<p>The model outputs a <strong>single prediction head</strong>:</p>
+</li>
+<li>
+<p><code>logit_output</code>: Uses:</p>
+<ul>
+<li><code>logit</code> (predictions)  </li>
+<li><code>target</code> (labels)  </li>
+<li><code>y_mask</code> (validity mask)  </li>
+</ul>
+</li>
+<li>
+<p>Final prediction for evaluation is computed as:</p>
+</li>
+</ul>
+<p>```python
+sigmoid(logit)</p>
               
             </div>
           </div><footer>
