@@ -90,14 +90,9 @@ Mirai is implemented as a subclass of `BaseRiskModel` and:
 
 ## ⚙️ Key Components
 
-- **Image Encoder:**  
-  Extracts feature vectors from  mammograms  
-
-- **Transformer Model:**  
-  Learn dependencies across rbeasts and views 
-
-- **Snapshot Loading (`load_model`):**  
-  Enables reuse of pretrained encoder and transformer weights  
+- **Image Encoder:** : Extracts feature vectors from  mammograms  
+- **Transformer Model:** : Learn dependencies across rbeasts and views 
+- **Snapshot Loading (`load_model`):**:   Enables reuse of pretrained encoder and transformer weights  
 
 - **Freezing Mechanism:**  
   Allows encoder weights to remain fixed during training  
