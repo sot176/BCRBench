@@ -142,6 +142,7 @@ ImgFeatAlign is implemented as a subclass of `BaseRiskModel` and:
 - **SpatialTransformerBlock:** Applies deformation fields to feature maps 
 - **Continuous Positional Encoding:** Injects time-gap information into difference features  
 - **Temporal self-attention block:** Aggregates multi-source features for prediction  
+- **Freezing Mechanism:** : Allows pretrained encoder to be frozen during training  
 
 ---
 
