@@ -81,16 +81,14 @@ The `forward` method returns:
 ### Helper Methods
 
 #### **`get_risk_heads(outputs, batch)`**
-Returns:
-- `("logit_output", (logit, target, y_mask))`
+Returns:  `("logit_output", (logit, target, y_mask))`
 
 Used for training with survival or multi-horizon loss.
 
 ---
 
 #### **`get_primary_risk_head(outputs)`**
-Returns:
-- `sigmoid(logit)`
+Returns: `sigmoid(logit)`
 
 This is the **final risk prediction** used for evaluation.
 
