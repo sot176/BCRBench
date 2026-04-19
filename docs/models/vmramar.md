@@ -6,7 +6,7 @@
 
 VMRAMaR is a deep learning architecture for breast cancer risk prediction that combines:
 
-- **Multi-view mammography encoding (e.g., CC / MLO)**
+- **Patient-vise mammography encoding (e.g., CC / MLO of both breasts)**
 - **Longitudinal temporal modeling via VMRNN**
 - **Optional asymmetry analysis between left/right breasts**
 
@@ -175,29 +175,4 @@ VMRAMaR extends `BaseRiskModel` and:
 
 - Risk is modeled as a **cumulative probability distribution over future time horizons**  
 - The model outputs logits which are transformed via sigmoid for probability interpretation  
-
----
-
-## ✅ Key Features
-
-- Handles **multi-view + longitudinal data jointly**  
-- Optional **asymmetry-aware modeling**  
-- Modular design for easy ablation (toggle asymmetry branch)  
-- Compatible with pretrained encoders (snapshot loading supported)  
-- Stable training via:
-  - Frozen encoders  
-  - Disabled in-place ReLU  
-  - Layer normalization  
-
----
-
-## 🧪 Summary
-
-VMRAMaR is a **hybrid temporal + asymmetry-aware risk model** that:
-
-- Learns progression patterns across time  
-- Fuses multi-view imaging intelligently  
-- Enhances prediction with biologically meaningful asymmetry signals  
-
-It is particularly suited for **longitudinal screening scenarios**, where both **temporal evolution** and **left-right differences** are critical for early cancer risk estimation.
 

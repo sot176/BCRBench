@@ -2,9 +2,9 @@
 
 ## 📌 Overview
 
-**Mirai** is a longitudinal breast cancer risk prediction model that combines a **deep image encoder** with a **transformer-based temporal model** to estimate future cancer risk from a sequence of mammograms.
+Mirai is a longitudinal breast cancer risk prediction model that combines a **deep image encoder** with a **transformer-based temporal model** to estimate future cancer risk from a sequence of mammograms.
 
-The model processes multiple screening exams jointly and learns temporal patterns directly from image-derived representations, enabling it to capture **long-term risk signals across time**.
+The model processes all screening images from a patient jointly and learns a patient wise breast cancer risk directly from image-derived representations.
 
 ---
 
@@ -48,7 +48,7 @@ Key details:
 Key details:
 - Can be initialized from a pretrained encoder snapshot  
 - Can be initialized from a pretrained transformer snapshot  
-- Learns interactions between vies and breasts
+- Learns interactions between views and breasts
 
 ---
 
@@ -74,6 +74,25 @@ The `forward` method returns:
 - `logit`: Risk prediction logits `[B, num_years]`  
 - `transformer_hidden`: Final transformer representations  
 - `activ_dict`: Optional intermediate activations  
+
+---
+ 
+
+### Helper Methods
+
+#### **`get_risk_heads(outputs, batch)`**
+Returns:
+- `("logit_output", (logit, target, y_mask))`
+
+Used for training with survival or multi-horizon loss.
+
+---
+
+#### **`get_primary_risk_head(outputs)`**
+Returns:
+- `sigmoid(logit)`
+
+This is the **final risk prediction** used for evaluation.
 
 ---
 
