@@ -4,7 +4,7 @@
  
 ## 📌 Overview
 
-**VMRAMaR (VMRNN-Asymmetry Mammogram Risk Model)** is a deep learning architecture for breast cancer risk prediction that combines:
+VMRAMaR is a deep learning architecture for breast cancer risk prediction that combines:
 
 - **Multi-view mammography encoding (e.g., CC / MLO)**
 - **Longitudinal temporal modeling via VMRNN**
