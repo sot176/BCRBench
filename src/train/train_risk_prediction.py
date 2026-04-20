@@ -101,7 +101,7 @@ def train_val(
     # --- WandB Initialization ---
     if accelerator.is_main_process:
         wandb.init(project="Breast_Cancer_Risk_Prediction", config={
-            "Optimizer": "AdamW", "architecture": "TemporalMultiViewRiskPrediction", "dataset": args.dataset,
+            "Optimizer": "AdamW", "architecture": args.model, "dataset": args.dataset,
             "epochs": args.num_epochs, "learning_rate": args.learning_rate, "Weight_decay": args.weight_decay,
         })
         wandb.define_metric("epoch", hidden=True)
