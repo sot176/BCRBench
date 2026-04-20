@@ -8,6 +8,7 @@ This guide walks you through everything needed to run a training job: prerequisi
 
 **🧪 Environment**  
 Ensure all dependencies are installed. The pipeline requires:
+
 - PyTorch  
 - Hugging Face Accelerate  
 - Kornia  
@@ -15,6 +16,7 @@ Ensure all dependencies are installed. The pipeline requires:
 
 **📂 Data**  
 Training expects:
+
 - A CSV file with predefined `train` / `val` split columns  
 - A root directory containing the image data  
 
@@ -124,6 +126,7 @@ When training starts, the following steps occur:
 ### 1️⃣ Argument Parsing & Setup
 
 `main_train.py`:
+
 - Parses CLI arguments  
 - Loads YAML config  
 - Creates a timestamped output directory:
@@ -150,6 +153,7 @@ This enables:
 ### 3️⃣ 🔁 Reproducibility
 
 Seeds are set for:
+
 - `random`  
 - `torch`  
 - `torch.cuda`  
@@ -161,6 +165,7 @@ cuDNN runs in deterministic mode.
 ### 4️⃣ 📦 Data Loading
 
 `get_dataset_and_loader()`:
+
 - Creates training and validation `DataLoader`s  
 - Automatically shards training data across GPUs  
 
@@ -195,12 +200,12 @@ This prevents destabilising pretrained encoders.
 **Schedulers:**
 
 - 🔥 **Warmup (LambdaLR)**  
-  - Linear increase from 0 → base LR  
-  - Steps every batch  
+    - Linear increase from 0 → base LR  
+    - Steps every batch  
 
 - ⏳ **Plateau (ReduceLROnPlateau, optional)**  
-  - Reduces LR when validation C-index plateaus  
-  - Activates only after warmup  
+    - Reduces LR when validation C-index plateaus  
+    - Activates only after warmup  
 
 All components are wrapped with:
 
@@ -215,6 +220,7 @@ accelerator.prepare()
 Each epoch consists of:
 
 **🏋️ Training (`train_one_epoch`)**
+
 - Forward pass  
 - Loss computation  
 - `accelerator.backward()`  
@@ -222,12 +228,14 @@ Each epoch consists of:
 - Warmup scheduler step (per batch)  
 
 Metrics:
+
 - C-index  
 - Per-year AUC  
 
 ---
 
 **🧪 Validation (`evaluate`)**
+
 - Runs under `torch.no_grad()`  
 - Computes:
   - Loss  
@@ -237,18 +245,21 @@ Metrics:
 ---
 
 **📊 Logging**
+
 - Written to log file  
 - Logged to WandB (main process only)
 
 ---
 
 **📉 Scheduler Step**
+
 - Plateau scheduler updates after warmup  
 - Uses validation C-index  
 
 ---
 
 **💾 Checkpointing & Early Stopping**
+
 - Handled automatically (see below)
 
 ---
@@ -280,6 +291,7 @@ best_model_risk_prediction_id-{id}.pth
 ```
 
 Each checkpoint includes:
+
 - Model state  
 - Optimiser state  
 - Scheduler states  
