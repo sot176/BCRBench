@@ -29,7 +29,7 @@ Each model has a YAML configuration file under `config/models/`. For example, `L
 config/models/lmv_net.yaml
 ```
 
-These files define model-specific hyperparameters (e.g. `distance`, `alpha_coeff`, `margin`) that extend the base CLI arguments. If no YAML is found, the pipeline falls back to CLI defaults.
+These files define model-specific hyperparameters (e.g. `distance`, `alpha_coeff`, `margin`, `dropout`, `num_attn_blocks`, etc.) that extend the base CLI arguments. If no YAML is found, the pipeline falls back to CLI defaults.
 
 **🧩 Registration model**  
 `ImgFeatAlign` and `LMV-Net` require a pretrained `MammoRegNet` registration model. The path is defined in:
