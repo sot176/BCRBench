@@ -1,24 +1,51 @@
-# Training a Model
+# 🧠 Training a Model
 
-This page walks through everything you need to run a training job: prerequisites, configuration, launching training, and understanding what happens at each stage.
-
----
-
-## Prerequisites
-
-**Environment** — Ensure all dependencies are installed. The pipeline requires PyTorch, Hugging Face Accelerate, Kornia, and WandB, among others.
-
-**Data** — Training expects a CSV file with pre-defined `train` / `val` split columns, and a root directory containing the image data. The exact CSV schema depends on the dataset (`EMBED` or `CSAW`).
-
-**Model config** — Each model has a YAML configuration file under `config/models/`. For example, `OA-BreaCR` loads from `config/models/oa_breacr.yaml`. These files define model-specific hyperparameters (e.g. `distance`, `alpha_coeff`, `margin`) that extend the base CLI arguments. If no YAML is found, the pipeline falls back to CLI defaults.
-
-**Registration model** — `ImgFeatAlign` and `LMV-Net` require a pretrained `MammoRegNet` registration model. The path is set in `config/config.py` under `paths.csaw_path_saved_reg_model` or `paths.embed_path_saved_reg_model` depending on the dataset.
+This guide walks you through everything needed to run a training job: prerequisites, configuration, launching training, and understanding what happens at each stage.
 
 ---
 
-## Running Training
+## ✅ Prerequisites
 
-Each model has a shell script that sets all required arguments:
+**🧪 Environment**  
+Ensure all dependencies are installed. The pipeline requires:
+- PyTorch  
+- Hugging Face Accelerate  
+- Kornia  
+- Weights & Biases (WandB)  
+
+**📂 Data**  
+Training expects:
+- A CSV file with predefined `train` / `val` split columns  
+- A root directory containing the image data  
+
+The exact CSV schema depends on the dataset (`EMBED` or `CSAW`).
+
+**⚙️ Model configuration**  
+Each model has a YAML configuration file under `config/models/`. For example, `LMV-Net` uses:
+
+```
+config/models/lmv_net.yaml
+```
+
+These files define model-specific hyperparameters (e.g. `distance`, `alpha_coeff`, `margin`) that extend the base CLI arguments. If no YAML is found, the pipeline falls back to CLI defaults.
+
+**🧩 Registration model**  
+`ImgFeatAlign` and `LMV-Net` require a pretrained `MammoRegNet` registration model. The path is defined in:
+
+```
+config/config.py
+```
+
+- `paths.csaw_path_saved_reg_model`  
+- `paths.embed_path_saved_reg_model`  
+
+(depending on the dataset)
+
+---
+
+## 🚀 Running Training
+
+Each model has a dedicated shell script that sets all required arguments:
 
 ```bash
 bash scripts/train_lmv_net.sh
@@ -28,195 +55,316 @@ bash scripts/train_oa_breacr.sh
 bash scripts/train_mirai.sh
 ```
 
-Use `accelerate launch` (rather than `python`) to enable multi-GPU training. 
+👉 Use `accelerate launch` (instead of `python`) to enable multi-GPU training.
 
 ---
 
-## CLI Arguments
+## 🧾 CLI Arguments
 
-### Required
+### 🔴 Required
 
 | Argument | Description |
 |---|---|
-| `--model` | Model name, e.g. `Mirai`, `OA-BreaCR`, `VMRA-MaR`, `ImgFeatAlign`, `LMV-Net` |
+| `--model` | Model name (e.g. `Mirai`, `OA-BreaCR`, `VMRA-MaR`, `ImgFeatAlign`, `LMV-Net`) |
 | `--dataset` | Dataset name: `EMBED` or `CSAW` |
 | `--csv_file` | Path to CSV file containing data splits |
 | `--data_root` | Root directory of image data |
-| `--path_out_dir` | Base output directory (a timestamped subdirectory is created automatically) |
+| `--path_out_dir` | Base output directory (timestamped subdirectory is created automatically) |
 
-### Key Optional
+---
+
+### 🟡 Key Optional
 
 | Argument | Default | Description |
 |---|---|---|
 | `--num_epochs` | 100 | Number of training epochs |
 | `--batch_size` | 12 | Batch size per GPU |
-| `--learning_rate` | 5e-5 | Base learning rate for new modules |
+| `--learning_rate` | 5e-5 | Learning rate for newly added modules |
 | `--weight_decay` | 1e-4 | AdamW weight decay |
-| `--warmup_steps` | 5000 | Number of linear warmup steps |
-| `--use_scheduler` | False | Enable `ReduceLROnPlateau` after warmup |
-| `--patience_lr_scheduler` | 5 | Epochs without improvement before LR reduction |
-| `--lr_decay` | 0.5 | LR reduction factor for plateau scheduler |
-| `--patience` | 15 | Epochs without improvement before early stopping |
-| `--augmentations` | False | Enable Kornia data augmentation |
-| `--resume_from` | None | Path to checkpoint file to resume from |
-| `--wandb_id` | None | WandB run ID for resuming an existing experiment |
-| `--seed` | 2023 | Random seed for reproducibility |
+| `--warmup_steps` | 5000 | Number of warmup steps |
+| `--use_scheduler` | True | Enable `ReduceLROnPlateau` |
+| `--patience_lr_scheduler` | 5 | Epochs before LR reduction |
+| `--lr_decay` | 0.5 | LR reduction factor |
+| `--patience` | 15 | Early stopping patience |
+| `--augmentations` | True | Enable data augmentation |
+| `--resume_from` | None | Path to checkpoint |
+| `--wandb_id` | None | WandB run ID for resuming |
+| `--seed` | 2023 | Random seed |
 
 ---
 
-## Configuration System
+## ⚙️ Configuration System
 
-Argument loading happens in two stages:
+Argument loading occurs in two stages:
 
-1. **CLI arguments** are parsed first, including the `--model` flag.
-2. **Model YAML** is loaded from `config/models/<model_name>.yaml` and its keys are added as additional CLI arguments with their YAML values as defaults.
+1. **CLI arguments** are parsed first (including `--model`)
+2. **Model YAML config** is loaded from:
 
-This means YAML values can always be overridden from the command line. For example, if `oa_breacr.yaml` sets `margin: 1.0`, you can override it with `--margin 2.0` at runtime.
+```
+config/models/<model_name>.yaml
+```
+
+YAML values are added as CLI defaults and can always be overridden.
+
+**Example:**
+```bash
+--dropout 0.3
+```
+overrides:
+```yaml
+dropout: 0.1
+```
 
 ---
 
-## Training Pipeline
+## 🔄 Training Pipeline
 
-When you launch training, the following happens in order:
+When training starts, the following steps occur:
 
-### 1. Argument Parsing and Setup
+### 1️⃣ Argument Parsing & Setup
 
-`main.py` parses CLI arguments, loads the model YAML config, constructs a timestamped output directory path of the form:
+`main_train.py`:
+- Parses CLI arguments  
+- Loads YAML config  
+- Creates a timestamped output directory:
 
 ```
 {path_out_dir}_Model_{model}_lr_{lr}_wd_{wd}_epochs_{n}_bs_{bs}_{timestamp}/
 ```
 
-### 2. Accelerator Initialisation
+---
 
-A Hugging Face `Accelerator` is created with `find_unused_parameters=True` to handle models where not all parameters participate in every forward pass. This transparently manages device placement, mixed precision, and gradient synchronisation across GPUs.
+### 2️⃣ Accelerator Initialisation
 
-### 3. Reproducibility
+A Hugging Face `Accelerator` is created:
 
-Seeds are set for Python `random`, `torch`, and `torch.cuda` on all processes. cuDNN is set to deterministic mode.
+This enables:
 
-### 4. Data Loading
-
-`get_dataset_and_loader()` creates training and validation `DataLoader`s. Accelerate shards the training data across GPUs automatically — `len(train_loader)` already reflects the per-GPU length. No augmentation is applied to the validation set.
-
-### 5. Model Initialisation
-
-The model is loaded via `get_model()` from `models/model_factory.py`. Parameter groups are then created with **differential learning rates**:
-
-- **New modules** (non-encoder parameters): trained at `learning_rate`
-- **Encoder parameters**: trained at `learning_rate × 0.1` (or `× 1.0` for OA-BreaCR, which is trained from scratch)
-
-This prevents a pretrained encoder from being destabilised early in training.
-
-### 6. Optimiser and Schedulers
-
-An `AdamW` optimiser is created over the parameter groups. Two schedulers are set up:
-
-- **Warmup scheduler** (`LambdaLR`): linearly ramps the LR from 0 to the base LR over `warmup_steps` steps. Steps on every gradient update.
-- **Plateau scheduler** (`ReduceLROnPlateau`, optional): reduces LR by `lr_decay` when validation C-index does not improve for `patience_lr_scheduler` epochs. Only activated after warmup completes.
-
-All components are wrapped with `accelerator.prepare()` before training begins.
-
-### 7. Epoch Loop
-
-For each epoch:
-
-**Training** (`train_one_epoch`) — Runs the forward pass, computes loss, calls `accelerator.backward()`, and steps the optimiser. The warmup scheduler steps on every batch while `global_step < warmup_steps`. Predictions and labels are gathered across GPUs, and C-index and per-year AUC are computed on the main process.
-
-**Validation** (`evaluate`) — Runs inference under `torch.no_grad()`. Loss, C-index, and per-year AUC are computed identically to training.
-
-**Logging** — On the main process, metrics are written to the log file and to WandB.
-
-**Scheduler step** — If `use_scheduler` is enabled and `global_step >= warmup_steps`, the plateau scheduler steps on the validation C-index.
-
-**Checkpointing and early stopping** — See the sections below.
+- Multi-GPU training  
+- Mixed precision  
+- Automatic device placement  
+- Gradient synchronisation  
 
 ---
 
-## Learning Rate Scheduling
+### 3️⃣ 🔁 Reproducibility
 
-The warmup and plateau schedulers work in two non-overlapping phases:
+Seeds are set for:
+- `random`  
+- `torch`  
+- `torch.cuda`  
 
-```
-Steps 0 → warmup_steps    LR ramps linearly from 0 → base_lr (warmup_scheduler steps every batch)
-Steps > warmup_steps       LR held constant unless val C-index plateaus (plateau scheduler steps every epoch)
-```
-
-The plateau scheduler is guarded so it cannot reduce the LR during the warmup phase, preventing premature LR decay before the model has stabilised.
+cuDNN runs in deterministic mode.
 
 ---
 
-## Checkpointing
+### 4️⃣ 📦 Data Loading
 
-Checkpoints are saved to the output directory in two situations:
+`get_dataset_and_loader()`:
+- Creates training and validation `DataLoader`s  
+- Automatically shards training data across GPUs  
 
-- **Every 10 epochs** — `checkpoint_{epoch:04d}.pth`
-- **New best validation C-index** — `best_model_risk_prediction_id-{id}.pth`
+👉 `len(train_loader)` already reflects per-GPU size  
+👉 No augmentation is applied to validation data  
 
-Each checkpoint contains the model state dict, optimiser state, both scheduler states, current epoch, global step, and best C-index achieved.
+---
 
-To resume training from a checkpoint:
+### 5️⃣ 🧠 Model Initialisation
+
+Models are loaded via:
+
+```
+models/model_factory.py
+```
+
+**Differential learning rates:**
+
+- 🔹 New modules → `learning_rate`  
+- 🔹 Encoder → `learning_rate × 0.1`  (for pretrained Mirai encoder)
+- 🔹 OA-BreaCR → Encoder trained from scratch (no reduction)  
+
+This prevents destabilising pretrained encoders.
+
+---
+
+### 6️⃣ 📉 Optimiser & Schedulers
+
+**Optimiser:**  
+- AdamW over parameter groups  
+
+**Schedulers:**
+
+- 🔥 **Warmup (LambdaLR)**  
+  - Linear increase from 0 → base LR  
+  - Steps every batch  
+
+- ⏳ **Plateau (ReduceLROnPlateau, optional)**  
+  - Reduces LR when validation C-index plateaus  
+  - Activates only after warmup  
+
+All components are wrapped with:
+
+```python
+accelerator.prepare()
+```
+
+---
+
+### 7️⃣ 🔁 Epoch Loop
+
+Each epoch consists of:
+
+**🏋️ Training (`train_one_epoch`)**
+- Forward pass  
+- Loss computation  
+- `accelerator.backward()`  
+- Optimiser step  
+- Warmup scheduler step (per batch)  
+
+Metrics:
+- C-index  
+- Per-year AUC  
+
+---
+
+**🧪 Validation (`evaluate`)**
+- Runs under `torch.no_grad()`  
+- Computes:
+  - Loss  
+  - C-index  
+  - Per-year AUC  
+
+---
+
+**📊 Logging**
+- Written to log file  
+- Logged to WandB (main process only)
+
+---
+
+**📉 Scheduler Step**
+- Plateau scheduler updates after warmup  
+- Uses validation C-index  
+
+---
+
+**💾 Checkpointing & Early Stopping**
+- Handled automatically (see below)
+
+---
+
+## 📉 Learning Rate Scheduling
+
+Two-phase schedule:
+
+```
+Steps 0 → warmup_steps     LR increases linearly (per batch)
+Steps > warmup_steps       LR constant or reduced on plateau (per epoch)
+```
+
+The plateau scheduler is disabled during warmup to avoid premature LR decay.
+
+---
+
+## 💾 Checkpointing
+
+Checkpoints are saved:
+
+- 📌 Every 10 epochs  
+- 🏆 When a new best validation C-index is achieved  
+
+**Files:**
+```
+checkpoint_{epoch:04d}.pth
+best_model_risk_prediction_id-{id}.pth
+```
+
+Each checkpoint includes:
+- Model state  
+- Optimiser state  
+- Scheduler states  
+- Epoch  
+- Global step  
+- Best C-index  
+
+---
+
+### 🔄 Resume Training
 
 ```bash
 accelerate launch main_train.py \
   ... \
   --resume_from /path/to/checkpoint_0050.pth \
-  --wandb_id <your-wandb-run-id>
+  --wandb_id <run-id>
 ```
 
-The `--wandb_id` flag resumes the associated WandB run so metrics are appended to the existing experiment rather than starting a new one.
+👉 `--wandb_id` ensures metrics continue in the same experiment
 
 ---
 
-## Early Stopping
+## ⏹️ Early Stopping
 
-If validation C-index does not improve for `--patience` consecutive epochs (default 15), training stops and the model at that point is saved as:
+Triggered if validation C-index does not improve for `--patience` epochs.
+
+Saved as:
 
 ```
 early_stopping_risk_prediction_id-{id}.pth
 ```
 
-The best model checkpoint (saved whenever a new best C-index was achieved) is always preserved separately.
+👉 Best model is always saved separately
 
 ---
 
-## Output Directory Contents
-
-After training completes, the output directory contains:
+## 📁 Output Directory
 
 ```
 {results_dir}/
-  train_risk_prediction_training_id_{id}.log       # Full training log
-  checkpoint_0010.pth                              # Periodic checkpoints (every 10 epochs)
+  train_risk_prediction_training_id_{id}.log
+  checkpoint_0010.pth
   checkpoint_0020.pth
   ...
-  best_model_risk_prediction_id-{id}.pth           # Best validation C-index checkpoint
-  early_stopping_risk_prediction_id-{id}.pth       # Present only if early stopping triggered
-  model_risk_prediction_training_id_{id}_last_epoch.pth  # Final model weights
+  best_model_risk_prediction_id-{id}.pth
+  early_stopping_risk_prediction_id-{id}.pth
+  model_risk_prediction_training_id_{id}_last_epoch.pth
 ```
 
 ---
 
-## Data Augmentation
+## 🖼️ Data Augmentation
 
-Enable augmentation with `--augmentations`. The following transforms are applied **to training data only**, in sequence:
+Enable with:
 
-- `RandomCrop` to (1946 × 1581) with p=0.2
-- `Resize` to (2048 × 1664)
-- `RandomAffine` — translation up to 10%, scale up to 1.1×, with p=0.5
-- `ColorJitter` — brightness, contrast, saturation ±0.4, with p=0.5
-- `RandomGamma` — gamma in (0.8, 1.2), with p=0.5
+```bash
+--augmentations
+```
 
-Validation loaders never receive augmentation.
+Applied **only to training data**:
+
+- RandomCrop (1946 × 1581), p=0.2  
+- Resize (2048 × 1664)  
+- RandomAffine (translation ±10%, scale up to 1.1×), p=0.5  
+- ColorJitter (±0.4), p=0.5  
+- RandomGamma (0.8–1.2), p=0.5  
+
+👉 No augmentation is applied to validation data
 
 ---
 
-## Experiment Tracking (WandB)
+## 📊 Experiment Tracking (WandB)
 
-The following metrics are logged to WandB per epoch:
+Logged per epoch:
 
-- `Training Risk Loss`, `Validation Risk Loss`
-- `Training C-index`, `Validation C-index`
-- `Train Year {1–5} AUC`, `Val Year {1–5} AUC`
+- Training & Validation Loss  
+- Training & Validation C-index  
+- Year 1–5 AUC (train + validation)  
 
-All metrics use `epoch` as their step metric. To resume a WandB run, pass `--wandb_id <run-id>` when resuming from a checkpoint.
+👉 All metrics use `epoch` as the step  
+
+### 🔄 Resume Logging
+
+```bash
+--wandb_id <run-id>
+```
+
+This appends metrics to an existing run instead of creating a new one.
