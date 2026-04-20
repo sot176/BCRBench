@@ -237,9 +237,9 @@ Metrics:
 
 - Runs under `torch.no_grad()`  
 - Computes:
-  - Loss  
-  - C-index  
-  - Per-year AUC  
+    - Loss  
+    - C-index  
+    - Per-year AUC  
 
 ---
 
