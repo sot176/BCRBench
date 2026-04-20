@@ -191,9 +191,9 @@ This prevents destabilising pretrained encoders.
 
 ---
 
-### 6️⃣ 📉 Optimiser & Schedulers
+### 6️⃣ 📉 Optimizer & Schedulers
 
-**Optimiser:**  
+**Optimizer:**  
 - AdamW over parameter groups  
 
 **Schedulers:**
@@ -223,7 +223,7 @@ Each epoch consists of:
 - Forward pass  
 - Loss computation  
 - `accelerator.backward()`  
-- Optimiser step  
+- Optimizer step  
 - Warmup scheduler step (per batch)  
 
 Metrics:
