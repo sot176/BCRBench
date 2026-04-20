@@ -169,7 +169,6 @@ cuDNN runs in deterministic mode.
 - Creates training and validation `DataLoader`s  
 - Automatically shards training data across GPUs  
 
-👉 `len(train_loader)` already reflects per-GPU size  
 👉 No augmentation is applied to validation data  
 
 ---
