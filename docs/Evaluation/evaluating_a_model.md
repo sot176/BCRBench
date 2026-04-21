@@ -214,8 +214,6 @@ After inference, the main process:
 ```
 {path_test_folder}/
   test_risk_prediction_training_id_{id}.log
-  cindex_scores.npy
-  auc_scores.npz
   c_index_by_density.json
   c_index_by_cancer_type.json
   c_index_by_race.json        # EMBED only
