@@ -26,7 +26,7 @@ class LongitudinalFeatureProcessor(nn.Module):
               - finetune_all: Whether to fine-tune encoder (default: frozen)
     """
 
-    def __init__(self, mammo_reg_net: nn.Module, args) -> None:
+    def __init__(self, mammo_reg_net, args):
         """
         Initialize longitudinal feature processor with encoder and registration components.
 
@@ -49,7 +49,7 @@ class LongitudinalFeatureProcessor(nn.Module):
             self.encoder.train()
 
     @staticmethod
-    def _to_3ch(x: torch.Tensor) -> torch.Tensor:
+    def _to_3ch(x):
         """
         Convert grayscale images to 3-channel format for encoder compatibility.
 
@@ -62,8 +62,7 @@ class LongitudinalFeatureProcessor(nn.Module):
         return x.expand(-1, 3, -1, -1)
 
     def _process_view(
-        self, img_cur: torch.Tensor, img_pri: torch.Tensor, time_gap: torch.Tensor
-    ) -> torch.Tensor:
+        self, img_cur, img_pri, time_gap):
         """
         Process single mammography view with longitudinal alignment and temporal encoding.
 
@@ -100,9 +99,7 @@ class LongitudinalFeatureProcessor(nn.Module):
         return f_long
 
     @staticmethod
-    def _resize_flow(
-        flow: torch.Tensor, target_shape: Tuple[int, ...], src_shape: Tuple[int, ...]
-    ) -> torch.Tensor:
+    def _resize_flow(flow, target_shape, src_shape):
         """
         Resize and rescale deformation field to match feature map resolution.
 
@@ -127,14 +124,7 @@ class LongitudinalFeatureProcessor(nn.Module):
         flow_resized[:, 1] *= Hf / Hi
         return flow_resized
 
-    def forward(
-        self,
-        img_cur_cc: torch.Tensor,
-        img_pri_cc: torch.Tensor,
-        img_cur_mlo: torch.Tensor,
-        img_pri_mlo: torch.Tensor,
-        time_gap: torch.Tensor,
-    ) -> Dict[str, torch.Tensor]:
+    def forward(self,img_cur_cc,img_pri_cc,img_cur_mlo,img_pri_mlo,time_gap):
         """
         Process both CC and MLO views with longitudinal alignment.
 
@@ -168,7 +158,7 @@ class DropPath(nn.Module):
         drop_prob: Probability of dropping a sample [0.0, 1.0]
     """
 
-    def __init__(self, drop_prob: float = 0.0) -> None:
+    def __init__(self, drop_prob= 0.0):
         """
         Initialize DropPath module.
 
@@ -178,7 +168,7 @@ class DropPath(nn.Module):
         super().__init__()
         self.drop_prob = drop_prob
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x):
         """
         Apply stochastic depth to input tensor.
 
@@ -211,7 +201,7 @@ class FFN(nn.Module):
         dropout: Dropout probability
     """
 
-    def __init__(self, dim: int, hidden_dim: int, dropout: float = 0.0) -> None:
+    def __init__(self, dim, hidden_dim, dropout = 0.0):
         """
         Initialize feed-forward network.
 
@@ -229,7 +219,7 @@ class FFN(nn.Module):
             nn.Dropout(dropout),
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x):
         """
         Forward pass through feed-forward network.
 
@@ -268,13 +258,13 @@ class CrossAttentionBlock(nn.Module):
 
     def __init__(
         self,
-        in_channels: int,
-        reduced_channels: int,
-        heads: int = 4,
-        dropout: float = 0.3,
-        drop_path: float = 0.2,
-        ffn_expansion_factor: int = 4,
-    ) -> None:
+        in_channels,
+        reduced_channels,
+        heads = 4,
+        dropout = 0.3,
+        drop_path = 0.2,
+        ffn_expansion_factor = 4,
+    ):
         """
         Initialize cross-attention block.
 
@@ -313,9 +303,7 @@ class CrossAttentionBlock(nn.Module):
             DropPath(drop_path) if drop_path > 0 else nn.Identity()
         )
 
-    def forward(
-        self, f_cc: torch.Tensor, f_mlo: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, f_cc, f_mlo):
         """
         Forward pass with bidirectional cross-attention between views.
 
@@ -340,7 +328,7 @@ class CrossAttentionBlock(nn.Module):
         skip_cc, skip_mlo = x_cc, x_mlo
 
         # Step 2: Self and cross-attention with residual connections
-        def attend(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        def attend(x, y):
             """
             Apply self-attention and cross-attention with dropout.
 
