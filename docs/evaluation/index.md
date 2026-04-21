@@ -39,13 +39,6 @@ All metrics are computed with **bootstrapped 95% confidence intervals**:
 - Overall **C-index** and **yearly AUC** (years 1–5)
 - Stratified by **breast density**, **cancer type**, and **race** (EMBED dataset)
 
-**💾 Results persistence**  
-Predictions and metric scores are saved to disk for reproducibility:
-- `cindex_scores.npy`
-- `auc_scores.npz`
-- Per-subgroup JSON files
-- Full results log via a file logger
-
 ---
 
 ## 🏗️ Code Structure
