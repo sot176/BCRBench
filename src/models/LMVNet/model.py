@@ -30,9 +30,8 @@ class LMVNet(BaseRiskModel):
 
     def __init__(
         self,
-        mammo_reg_net: nn.Module,
-        args: Any,
-    ) -> None:
+        mammo_reg_net,
+        args ):
         """
         Initialize LMVNet components.
 
@@ -79,7 +78,7 @@ class LMVNet(BaseRiskModel):
             max_followup=self.args.max_followup
         )
 
-    def forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, batch):
         """
         Forward pass of LMVNet with longitudinal alignment and cross-attention fusion.
 
@@ -142,8 +141,7 @@ class LMVNet(BaseRiskModel):
         }
 
     def get_risk_heads(
-        self, outputs: Dict[str, torch.Tensor], batch: Dict[str, torch.Tensor]
-    ) -> Dict[str, Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]:
+        self, outputs, batch):
         """
         Extract risk heads for multi-task loss computation.
 
@@ -169,7 +167,7 @@ class LMVNet(BaseRiskModel):
             "mlo": (outputs["risk_mlo"], target, mask),
         }
 
-    def get_primary_risk_head(self, outputs: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def get_primary_risk_head(self, outputs):
         """
         Extract primary risk prediction head for evaluation metrics.
 
