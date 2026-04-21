@@ -6,7 +6,8 @@ This chapter describes the evaluation pipeline for breast cancer risk prediction
 
 A unified evaluation framework handles:
 
-- 📂 Data loading for the test split
+- ⚙️ Model loading and configuration  
+- 📂 Test data loading  
 - 🔍 Model inference and prediction aggregation
 - 📊 Metric computation with bootstrapped confidence intervals
 - 💾 Results saving and logging
@@ -54,7 +55,7 @@ evaluate/
   ▶️ Entry point. Handles argument parsing, initializes the Accelerator, builds the test loader, resolves model checkpoint paths, and launches evaluation.
 
 - `evaluate/test_risk_prediction.py`  
-  🔁 Contains the main evaluation logic: inference loop, result aggregation, metric computation, and logging.
+  🔁 Contains the main evaluation logic: model loading, inference loop, result aggregation, metric computation, and logging.
 
 - `evaluate/test_utils.py`  
   🧰 Utility functions for model loading (`load_model`) and distributed tensor gathering (`gather_tensor`).
