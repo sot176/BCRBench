@@ -151,7 +151,6 @@ class BreastCancerRiskDatasetEMBED_VMRA(Dataset):
         ])
 
         all_imgs = torch.stack([prior_imgs, curr_imgs], dim=0)  # [2, 4, 3, H, W]
-        all_imgs = all_imgs.permute(0, 2,1, 3, 4)  #  [2, 4, 3, H, W]→ [2, 3, 4, H, W]
         # --- metadata + target logic (unchanged) ---
         metadata = self._get_metadata_for_image(curr_views['R_CC'])
         if metadata is None:

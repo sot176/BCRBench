@@ -148,7 +148,6 @@ class BreastCancerRiskDatasetCSAWCC_VMRA(Dataset):
         curr_imgs = load_views(curr_views)
         prior_imgs = load_views(prior_views)
         all_imgs = torch.stack([prior_imgs, curr_imgs], dim=0)  # [2, 4, 3, H, W]
-        all_imgs = all_imgs.permute(0, 2,1, 3, 4)  #  [2, 4, 3, H, W]→ [2, 3, 4, H, W]
 
         # Use metadata from current exam
         meta = curr_views['L_CC']
