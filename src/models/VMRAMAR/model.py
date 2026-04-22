@@ -157,9 +157,7 @@ class VMRAMaR(BaseRiskModel):
         history_embedding, _, _ = self.vmrnn(exam_embeddings, exam_mask)
 
         # Safe last valid timestep
-        last_idx = (exam_mask.sum(dim=1) - 1).clamp(min=0)
-        temporal_feature = history_embedding[torch.arange(B), last_idx]  # (B, D)
-
+        temporal_feature = history_embedding 
         features = [temporal_feature]
 
         # -------------------------
@@ -180,23 +178,7 @@ class VMRAMaR(BaseRiskModel):
                 exam_mask,
                 window_size=window_size,
             )
-
-            if r_aa.dim() == 1:
-                # (D,) → (B, D)
-                r_aa = r_aa.unsqueeze(0).expand(B, -1)
-
-            elif r_aa.dim() == 2:
-                if r_aa.size(0) == B:
-                    pass  # correct
-                elif r_aa.size(0) == B * T:
-                    # (B*T, D) → (B, T, D) → (B, D)
-                    r_aa = r_aa.view(B, T, -1).mean(dim=1)
-                else:
-                    raise ValueError(f"Unexpected r_aa shape: {r_aa.shape}")
-
-            else:
-                # e.g. (B, T, something, ...)
-                r_aa = r_aa.view(B, -1)
+            r_aa = r_aa.unsqueeze(-1)
 
             features.append(r_aa)
 
