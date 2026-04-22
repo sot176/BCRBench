@@ -33,52 +33,29 @@ def hybrid_asymmetry(
     """
     B, C, H, W = left.shape
 
-    # Warn if dimensions not divisible by latent block size
-    if verbose:
-        if H % latent_h != 0:
-            print(f"WARNING: Height dimension {H} not divisible by latent_h={latent_h}")
-        if W % latent_w != 0:
-            print(f"WARNING: Width dimension {W} not divisible by latent_w={latent_w}")
-
-    # Compute absolute difference with optional bias
-    dif = torch.abs(left - right + bias_params) if bias_params is not None else torch.abs(left - right)
-
-    # Pooling kernel size
-    kernel_h, kernel_w = H // latent_h, W // latent_w
-    stride_h, stride_w = (1, 1) if flexible else (kernel_h, kernel_w)
-
-    # Max pooling over spatial blocks
-    dif_pooled = F.max_pool2d(dif, kernel_size=(kernel_h, kernel_w), stride=(stride_h, stride_w))
-
-    # Compute norm over channels
-    dif_norm = torch.norm(dif_pooled, dim=1)  # shape: [B, latent_h, latent_w]
+    diff = torch.abs(left - right if bias_params is None else left - right + bias_params)
+    kernel_h = max(diff.shape[-2] // latent_h, 1)
+    kernel_w = max(diff.shape[-1] // latent_w, 1)
+    stride = (1, 1) if flexible else (kernel_h, kernel_w)
+    diff = F.max_pool2d(diff, (kernel_h, kernel_w), stride=stride)
+    diff = torch.norm(diff, dim=-3)
 
     # -------------------------
     # Select top asymmetry or top-k
     # -------------------------
     if topk is None:
-        # Max across width
-        max_by_h, y_idx = torch.max(dif_norm, dim=2)  # [B, latent_h]
-        # Max across height
-        max_asym, x_idx = torch.max(max_by_h, dim=1)  # [B]
-
-        # Select winning y position corresponding to x
-        best_y_idx = y_idx[torch.arange(B, device=y_idx.device), x_idx]
-
-        metadata = {
-            'y_argmin': best_y_idx.detach(),
-            'x_argmin': x_idx.detach(),
-            'heatmap': dif_norm.detach()
+        max_by_row, x_indices = torch.max(diff, dim=-1)
+        max_scores, y_indices = torch.max(max_by_row, dim=-1)
+        x_indices = x_indices.gather(1, y_indices.unsqueeze(-1)).squeeze(-1)
+        return max_scores, {
+            "y_argmax": y_indices.detach(),
+            "x_argmax": x_indices.detach(),
+            "heatmap": diff.detach(),
         }
-        return max_asym, metadata
 
-    else:
-        # Flatten spatial dimensions and select top-k
-        dif_flat = dif_norm.view(B, -1)
-        topk_vals, topk_indices = torch.topk(dif_flat, topk, dim=1)
-        metadata = {
-            'y_argmin': -1,
-            'x_argmin': -1,
-            'heatmap': dif_norm.detach()
-        }
-        return topk_vals, metadata
+    topk_scores, _ = torch.topk(diff.view(diff.shape[0], -1), topk, dim=-1)
+    return topk_scores, {
+        "y_argmax": torch.full((diff.shape[0],), -1, device=diff.device, dtype=torch.long),
+        "x_argmax": torch.full((diff.shape[0],), -1, device=diff.device, dtype=torch.long),
+        "heatmap": diff.detach(),
+    }

@@ -3,123 +3,87 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Dict
 
-
-def hybrid_asymmetry(
-    left,
-    right,
-    latent_h = 5,
-    latent_w = 5,
-    flexible = False,
-    topk = None,
-    bias_params = None
-):
-    """
-    Compute hybrid asymmetry between left and right feature maps.
-
-    Args:
-        left:  (B, C, H, W)
-        right: (B, C, H, W)
-        latent_h: target latent height
-        latent_w: target latent width
-        flexible: use stride=1 pooling instead of block pooling
-        topk: if specified, return topk max values instead of softmax
-        bias_params: optional learnable bias to add before abs
-
-    Returns:
-        max_asym: (B,)
-        details: dict with keys
-            x_argmin, y_argmin: soft coordinates (B,)
-            heatmap: pooled difference map (B, H_out, W_out)
-    """
-    dif = torch.abs(left - right + bias_params) if bias_params is not None else torch.abs(left - right)
-    dif = dif.contiguous()
-
-    kernel_h = max(dif.shape[-2] // latent_h, 1)
-    kernel_w = max(dif.shape[-1] // latent_w, 1)
-
-    # Max pooling
-    stride = (1, 1) if flexible else (kernel_h, kernel_w)
-    dif = F.max_pool2d(dif, kernel_size=(kernel_h, kernel_w), stride=stride)
-
-    # Reduce channel dimension
-    dif = dif.mean(dim=1)  # (B, H_out, W_out)
-    B, H_out, W_out = dif.shape
-
-    if topk is None:
-        # Softmax over spatial dimensions for differentiable argmax
-        weights = F.softmax(dif.view(B, -1), dim=-1).view(B, H_out, W_out)
-
-        x_coords = torch.arange(H_out, device=dif.device).float()
-        y_coords = torch.arange(W_out, device=dif.device).float()
-
-        x_mean = (weights.sum(dim=2) * x_coords).sum(dim=1)
-        y_mean = (weights.sum(dim=1) * y_coords).sum(dim=1)
-        max_asym = (dif * weights).sum(dim=(1, 2))
-        return max_asym, {"x_argmin": x_mean, "y_argmin": y_mean, "heatmap": dif}
-    else:
-        topk_vals, _ = torch.topk(dif.view(B, -1), topk, dim=-1)
-        return topk_vals, {"x_argmin": torch.zeros(B, device=dif.device), "y_argmin": torch.zeros(B, device=dif.device), "heatmap": dif.detach()}
-
+from .asymmetry_metrics import hybrid_asymmetry
 
 class SpatialAsymmetryDetector(nn.Module):
-    """
-    Detect spatial asymmetry between left/right features over multiple timesteps.
-
-    Input:
-        left_features:  (B, T, C, H, W)
-        right_features: (B, T, C, H, W)
-    Output:
-        dict with
-            asymmetry_values: (B, T)
-            asymmetry_coords: (B, T, 2)
-            heatmap: (B, T, H_out, W_out)
-    """
-
-    def __init__(self, args):
+    def __init__(
+        self,
+        latent_h: int = 5,
+        latent_w: int = 5,
+        flexible: bool = False,
+        embedding_channel: int = 512,
+        initial_asym_mean: float = 8_000_000.0,
+        initial_asym_std: float = 1_520_381.0,
+    ) -> None:
         super().__init__()
-        self.feature_dim = getattr(args, "feature_dim", 512)
-        self.latent_h = getattr(args, "latent_h", 5)
-        self.latent_w = getattr(args, "latent_w", 5)
-        self.flexible = getattr(args, "flexible_asymmetry", False)
+        self.latent_h = latent_h
+        self.latent_w = latent_w
+        self.flexible = flexible
+        self.cc_stretch_params = nn.Parameter(torch.ones(embedding_channel))
+        self.mlo_stretch_params = nn.Parameter(torch.ones(embedding_channel))
+        self.learned_asym_mean = nn.Parameter(torch.tensor(float(initial_asym_mean), dtype=torch.float32))
+        self.learned_asym_std = nn.Parameter(torch.tensor(float(initial_asym_std), dtype=torch.float32))
+        self.pair_definitions = (
+            (0, 1, "CC"),
+            (2, 3, "MLO"),
+        )
 
-        self.use_bias = getattr(args, "use_sad_bias", False)
-        if self.use_bias:
-            self.bias = nn.Parameter(torch.zeros(1, self.feature_dim, 1, 1))
+    def _stretch(self, tensor: torch.Tensor, view_name: str) -> torch.Tensor:
+        params = self.cc_stretch_params if view_name == "CC" else self.mlo_stretch_params
+        return tensor * params.view(1, -1, 1, 1)
 
-        self.use_bn = getattr(args, "use_sad_bn", False)
-        if self.use_bn:
-            self.bn = nn.BatchNorm2d(self.feature_dim)
+    def forward(self, feature_maps: torch.Tensor, view_mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        batch_size, time_steps, _, _, _, _ = feature_maps.shape
+        raw_pair_scores = []
+        normalized_pair_scores = []
+        pair_coords = []
+        pair_valid = []
 
-    def forward(self, left_features, right_features):
-        B, T, C, H, W = left_features.shape
-        asym_values, asym_coords, asym_maps = [], [], []
+        for left_index, right_index, view_name in self.pair_definitions:
+            left = feature_maps[:, :, left_index]
+            right = torch.flip(feature_maps[:, :, right_index], dims=[-1])
+            valid = view_mask[:, :, left_index] & view_mask[:, :, right_index]
 
-        for t in range(T):
-            lt = left_features[:, t]
-            rt = right_features[:, t]
+            flat_left = left.reshape(batch_size * time_steps, *left.shape[2:])
+            flat_right = right.reshape(batch_size * time_steps, *right.shape[2:])
+            flat_valid = valid.reshape(batch_size * time_steps)
 
-            if self.use_bn:
-                lt = self.bn(lt)
-                rt = self.bn(rt)
+            flat_raw_scores = flat_left.new_zeros(batch_size * time_steps)
+            flat_normalized_scores = flat_left.new_zeros(batch_size * time_steps)
+            flat_coords = flat_left.new_zeros(batch_size * time_steps, 2)
+            if flat_valid.any():
+                valid_left = self._stretch(flat_left[flat_valid], view_name)
+                valid_right = self._stretch(flat_right[flat_valid], view_name)
+                valid_scores, details = hybrid_asymmetry(
+                    valid_left,
+                    valid_right,
+                    latent_h=self.latent_h,
+                    latent_w=self.latent_w,
+                    flexible=self.flexible,
+                )
+                normalized = (valid_scores - self.learned_asym_mean) / self.learned_asym_std.abs().clamp(min=1e-6)
+                flat_raw_scores[flat_valid] = valid_scores.to(flat_raw_scores.dtype)
+                flat_normalized_scores[flat_valid] = torch.sigmoid(normalized).to(flat_normalized_scores.dtype)
+                flat_coords[flat_valid, 0] = details["y_argmax"].to(flat_coords.dtype)
+                flat_coords[flat_valid, 1] = details["x_argmax"].to(flat_coords.dtype)
 
-            max_asym, other = hybrid_asymmetry(
-                lt, rt,
-                latent_h=self.latent_h,
-                latent_w=self.latent_w,
-                flexible=self.flexible,
-                bias_params=self.bias if self.use_bias else None,
-            )
+            raw_pair_scores.append(flat_raw_scores.reshape(batch_size, time_steps))
+            normalized_pair_scores.append(flat_normalized_scores.reshape(batch_size, time_steps))
+            pair_coords.append(flat_coords.reshape(batch_size, time_steps, 2))
+            pair_valid.append(valid)
 
-            # Safe stacking
-            x_arg = other["x_argmin"].unsqueeze(-1) if other["x_argmin"].dim() == 1 else other["x_argmin"]
-            y_arg = other["y_argmin"].unsqueeze(-1) if other["y_argmin"].dim() == 1 else other["y_argmin"]
+        raw_scores = torch.stack(raw_pair_scores, dim=-1)
+        normalized_scores = torch.stack(normalized_pair_scores, dim=-1)
+        coords = torch.stack(pair_coords, dim=-2)
+        valid = torch.stack(pair_valid, dim=-1)
 
-            asym_coords.append(torch.cat([x_arg, y_arg], dim=-1))
-            asym_maps.append(other["heatmap"])
-            asym_values.append(max_asym)
-
-        return {
-            "asymmetry_values": torch.stack(asym_values, dim=1),  # (B, T)
-            "asymmetry_coords": torch.stack(asym_coords, dim=1),  # (B, T, 2)
-            "heatmap": torch.stack(asym_maps, dim=1),             # (B, T, H_out, W_out)
-        }
+        valid_float = valid.float()
+        exam_scores = (normalized_scores * valid_float).sum(dim=-1) / valid_float.sum(dim=-1).clamp(min=1.0)
+        dominant_pair = raw_scores.masked_fill(~valid, float("-inf")).argmax(dim=-1)
+        dominant_coords = coords.gather(
+            dim=2,
+            index=dominant_pair.unsqueeze(-1).unsqueeze(-1).expand(batch_size, time_steps, 1, 2),
+        ).squeeze(2)
+        coord_valid = valid.any(dim=-1)
+        dominant_coords = dominant_coords * coord_valid.unsqueeze(-1).float()
+        return exam_scores, dominant_coords, coord_valid
