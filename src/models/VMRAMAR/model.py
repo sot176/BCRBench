@@ -181,7 +181,8 @@ class VMRAMaR(BaseRiskModel):
                 window_size=window_size,
             )
 
-            features.append(r_aa.unsqueeze(-1))
+            r_aa = r_aa.view(r_aa.size(0), -1)   # ensure (B, D_asym)
+            features.append(r_aa)   
 
         # -------------------------
         # Final prediction
