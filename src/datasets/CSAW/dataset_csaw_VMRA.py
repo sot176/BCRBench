@@ -188,9 +188,13 @@ class BreastCancerRiskDatasetCSAWCC_VMRA(Dataset):
         time_seq = pad_to_length(time_stamps, MAX_TIME, len(all_images))
         view_seq = pad_to_length(all_views, MAX_VIEWS, len(all_images))
         side_seq = pad_to_length(all_sides, MAX_SIDES, len(all_images))
+        exam_mask = torch.ones(2, dtype=torch.bool)
+        view_mask = torch.ones(2, 4, dtype=torch.bool)
 
         return {
             'images': all_imgs,
+            'exam_mask': exam_mask,
+            'view_mask': view_mask,
             'target': target,
             'y_mask': y_mask,
             'event_observed': event_observed,

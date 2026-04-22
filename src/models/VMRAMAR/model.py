@@ -121,6 +121,8 @@ class VMRAMaR(BaseRiskModel):
     def forward(self, batch):
         x = batch["images"]          # (B, T, V, C, H, W)
         exam_mask = batch["exam_mask"]  # (B, T)
+        view_mask = batch["view_mask"]  # (B, T, V)
+
         B, T, V, C, H, W = x.size()
 
         # -------------------------
@@ -160,7 +162,7 @@ class VMRAMaR(BaseRiskModel):
         # Asymmetry branch (FIXED)
         # -------------------------
         if self.use_asymmetry and V >= 2:
-            asymmetry_scores, coords, coord_valid = self.sad(feat_maps, None)
+            asymmetry_scores, coords, coord_valid = self.sad(feat_maps, view_mask)
 
             r_aa = self.lat(
                 asymmetry_scores,
