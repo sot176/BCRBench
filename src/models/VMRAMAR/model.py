@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .vmrnn import VMRNN
+from .vmrnn import VMRNNEncoder
 from .sad import SpatialAsymmetryDetector
 from .lat import LongitudinalAsymmetryTracker
 from models.common_parts import CumulativeProbabilityLayer
@@ -76,11 +76,8 @@ class VMRAMaR(BaseRiskModel):
         # -------------------------
         self.temporal_projection = nn.Linear(self.args.embed_dim, self.args.embed_dim)
 
-        self.vmrnn = VMRNN(
-            embed_dim=self.args.embed_dim,
-            depths_downsample=self.args.depths_downsample,
-            depths_upsample=self.args.depths_upsample,
-            feature_resolution=(1, 1),
+        self.vmrnn = VMRNNEncoder(
+            input_dim=512, hidden_dim=128, dropout=0.1, vss_backend="vmamba", vmamba_d_state=16, vmamba_drop_path=0.0, released_weight_path=None,
         )
 
         # -------------------------
