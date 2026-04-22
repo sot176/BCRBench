@@ -1,3 +1,4 @@
+from pyexpat import features
 import sys
 import torch
 import torch.nn as nn
@@ -84,8 +85,11 @@ class VMRAMaR(BaseRiskModel):
         self.use_asymmetry = getattr(self.args, "use_asymmetry", True)
 
         if self.use_asymmetry:
-            self.sad = SpatialAsymmetryDetector(self.args)
-            self.lat = LongitudinalAsymmetryTracker(self.args)
+            self.sad = SpatialAsymmetryDetector( latent_h=int(self.args.latent_h), latent_w=int(self.args.latent_w),)
+            self.lat = LongitudinalAsymmetryTracker(
+            threshold_ratio=float(getattr(self.args, "threshold_ratio", 0.4)),
+            persistent_weight=float(getattr(self.args, "persistent_weight", 1.0)),
+        )
 
         # -------------------------
         # 5. Final Prediction
@@ -164,12 +168,17 @@ class VMRAMaR(BaseRiskModel):
         if self.use_asymmetry and V >= 2:
             asymmetry_scores, coords, coord_valid = self.sad(feat_maps, view_mask)
 
+            window_size = max(
+                int(getattr(self.sad, "latent_h")),
+                int(getattr(self.sad, "latent_w")),
+            )
+
             r_aa = self.lat(
                 asymmetry_scores,
                 coords,
                 coord_valid,
                 exam_mask,
-                window_size=max(self.sad.latent_h, self.sad.latent_w),
+                window_size=window_size,
             )
 
             features.append(r_aa.unsqueeze(-1))
