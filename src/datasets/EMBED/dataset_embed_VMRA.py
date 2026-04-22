@@ -191,6 +191,11 @@ class BreastCancerRiskDatasetEMBED_VMRA(Dataset):
         all_views = [0, 1, 0, 1]  # CC=0, MLO=1
         all_sides = [0, 0, 1, 1]  # Right=0, Left=1
         time_stamps = [0] * len(all_images)
+        
+        T = all_imgs.shape[0]  # = 2
+        V = all_imgs.shape[2]  # = 4
+
+        exam_mask = torch.ones(2, dtype=torch.bool)
 
        # Fix padding values to match MAX constants:
         time_seq = pad_to_length(time_stamps, MAX_TIME,   len(all_images))  # pad with 10
@@ -200,6 +205,7 @@ class BreastCancerRiskDatasetEMBED_VMRA(Dataset):
 
         return {
             'images': all_imgs,
+            'exam_mask': exam_mask,
             'target': target,
             'y_mask': y_mask,
             'event_observed': event_observed,

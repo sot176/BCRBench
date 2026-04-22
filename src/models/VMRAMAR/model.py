@@ -48,17 +48,14 @@ class VMRAMaR(BaseRiskModel):
     def __init__(self, args):
         super().__init__(args)
 
-
         # -------------------------
-        # Image Encoder
+        # 1. Image Encoder
         # -------------------------
         self.image_encoder = self._init_image_encoder(self.args)
 
-        # Freeze encoder if requested
         if getattr(self.args, "freeze_image_encoder", True):
             self._freeze_encoder(self.image_encoder)
 
-        # Replace pooling / fc layers with identity to extract features
         self.image_encoder._model.pool = IdentityPool()
         self.image_encoder._model.fc = nn.Identity()
         self.image_encoder._model.prob_of_failure_layer = nn.Identity()
@@ -66,17 +63,19 @@ class VMRAMaR(BaseRiskModel):
 
         self.image_repr_dim = self.image_encoder._model.args.img_only_dim
 
-        # ── 2. View Aggregation (CC / MLO) ───────────────────────────
+        # -------------------------
+        # 2. View → Exam Aggregation 
+        # -------------------------
         self.view_fc = nn.Linear(self.image_repr_dim, self.args.embed_dim)
         self.view_attn = nn.MultiheadAttention(
             self.args.embed_dim, num_heads=4, batch_first=True
         )
 
-        # ── 3. Temporal Projection + VMRNN ───────────────────────────
-        self.vmrnn_out_proj = nn.Sequential(
-            nn.Linear(self.args.embed_dim, self.args.embed_dim),
-            nn.LayerNorm(self.args.embed_dim),
-        )
+        # -------------------------
+        # 3. Temporal Projection + VMRNN
+        # -------------------------
+        self.temporal_projection = nn.Linear(self.args.embed_dim, self.args.embed_dim)
+
         self.vmrnn = VMRNN(
             embed_dim=self.args.embed_dim,
             depths_downsample=self.args.depths_downsample,
@@ -84,23 +83,22 @@ class VMRAMaR(BaseRiskModel):
             feature_resolution=(1, 1),
         )
 
-        # ── 4. Asymmetry Branch ──────────────────────────────────────
-        self.use_asymmetry = getattr(self.args, "use_asymmetry", False)
+        # -------------------------
+        # 4. Asymmetry Branch (fixed)
+        # -------------------------
+        self.use_asymmetry = getattr(self.args, "use_asymmetry", True)
+
         if self.use_asymmetry:
             self.sad = SpatialAsymmetryDetector(self.args)
             self.lat = LongitudinalAsymmetryTracker(self.args)
-            latent_h = getattr(self.args, "latent_h", 5)
-            latent_w = getattr(self.args, "latent_w", 5)
-            self.asym_proj = nn.Sequential(
-                nn.Linear(latent_h * latent_w, 512),
-                nn.ReLU(),
-                nn.LayerNorm(512),
-            )
 
-        # ── 5. Final Fusion + AHL ────────────────────────────────────
-        final_dim = self.args.embed_dim + (512 if self.use_asymmetry else 0)
+        # -------------------------
+        # 5. Final Prediction
+        # -------------------------
+        final_dim = self.args.embed_dim + (1 if self.use_asymmetry else 0)
         self.fusion_norm = nn.LayerNorm(final_dim)
         self.ahl = CumulativeProbabilityLayer(final_dim, max_followup=5)
+
 
     def _init_image_encoder(self, args):
         """Initialize the image encoder, optionally loading a snapshot."""
@@ -126,59 +124,65 @@ class VMRAMaR(BaseRiskModel):
         print("[INFO] Image encoder frozen.")
 
     def forward(self, batch):
-        """
-        Forward pass.
+        x = batch["images"]          # (B, T, V, C, H, W)
+        exam_mask = batch["exam_mask"]  # (B, T)
+        B, T, V, C, H, W = x.size()
 
-        Args:
-            batch: dict containing keys:
-                images: (B, T, V, C, H, W)
+        # -------------------------
+        # Encode images
+        # -------------------------
+        x_flat = x.view(B * T * V, C, H, W)
+        _, feat_maps, _ = self.image_encoder(x_flat, None, batch)
 
-        Returns:
-            dict with key "logit" (B, max_followup)
-        """
-        x = batch["images"]  # (B, T, V, C, H, W)
-        B, T, C, V, H, W = x.size()
-        x = x.view(B * T * V, C, H, W)
+        C_feat, Hf, Wf = feat_maps.shape[1:]
+        feat_maps = feat_maps.view(B, T, V, C_feat, Hf, Wf)
 
-        # ── Encode images ─────────────────────────────
-        _, img_feats, _ = self.image_encoder(x, None, batch)
-        C_feat, H_feat, W_feat = img_feats.shape[1:]
-        img_feats = img_feats.view(B, T, V, C_feat, H_feat, W_feat)
+        # -------------------------
+        # View → exam embedding
+        # -------------------------
+        feats = feat_maps.mean(dim=(-2, -1))   # (B, T, V, C)
+        feats = self.view_fc(feats)            # (B, T, V, D)
 
-        # ── Spatial pooling ───────────────────────────
-        feats = img_feats.mean(dim=(-2, -1))  # (B, T, V, C_feat)
-
-        # ── View aggregation ──────────────────────────
-        feats = self.view_fc(feats)             # (B, T, V, D)
         feats_bt = feats.view(B * T, V, -1)
         attn_out, _ = self.view_attn(feats_bt, feats_bt, feats_bt)
-        visit_embeddings = attn_out.mean(dim=1).view(B, T, -1)  # (B, T, D)
 
-        # ── VMRNN temporal processing ───────────────
-        out, _, _ = self.vmrnn(visit_embeddings)  # (B, T, D)
-        temporal_feature = self.vmrnn_out_proj(out.mean(dim=1))  # (B, D)
+        exam_embeddings = attn_out.mean(dim=1).view(B, T, -1)  # (B, T, D)
+
+        # -------------------------
+        # Temporal modeling  
+        # -------------------------
+        exam_embeddings = self.temporal_projection(exam_embeddings)
+
+        history_embedding, _, _ = self.vmrnn(exam_embeddings, exam_mask)
+
+        # Use LAST valid timestep  
+        last_idx = exam_mask.sum(dim=1) - 1
+        temporal_feature = history_embedding[torch.arange(B), last_idx]
 
         features = [temporal_feature]
 
-        # ── Asymmetry branch ─────────────────────────
+        # -------------------------
+        # Asymmetry branch (FIXED)
+        # -------------------------
         if self.use_asymmetry and V >= 2:
-            left_feats = img_feats[:, :, 0]   # (B, T, C, Hf, Wf)
-            right_feats = img_feats[:, :, 1]  # (B, T, C, Hf, Wf)
+            asymmetry_scores, coords, coord_valid = self.sad(feat_maps, None)
 
-            sad_out = self.sad(left_feats, right_feats)
-            asym_maps = sad_out["heatmap"]        # (B, T, H_lat, W_lat)
-            asym_coords = sad_out["asymmetry_coords"]
+            r_aa = self.lat(
+                asymmetry_scores,
+                coords,
+                coord_valid,
+                exam_mask,
+                window_size=max(self.sad.latent_h, self.sad.latent_w),
+            )
 
-            # Project to 512-dim features
-            B_a, T_a, H_lat, W_lat = asym_maps.shape
-            asym_feature = self.asym_proj(asym_maps.view(B_a, T_a, H_lat * W_lat))  # (B, T, 512)
+            features.append(r_aa.unsqueeze(-1))
 
-            # Longitudinal aggregation
-            asym_feature = self.lat(asym_feature, asym_coords, asym_maps)  # (B, 512)
-            features.append(asym_feature)
+        # -------------------------
+        # Final prediction
+        # -------------------------
+        combined = torch.cat(features, dim=-1)
+        combined = self.fusion_norm(combined)
 
-        # ── Fusion + risk prediction ────────────────
-        combined = self.fusion_norm(torch.cat(features, dim=1))
         risk = self.ahl(combined)
 
         return {"logit": risk}
