@@ -32,7 +32,13 @@ def hybrid_asymmetry(
             - metadata dictionary with indices and heatmap
     """
     B, C, H, W = left.shape
+    if not isinstance(latent_h, int):
+        latent_h = getattr(latent_h, "latent_h", latent_h)
+    if not isinstance(latent_w, int):
+        latent_w = getattr(latent_w, "latent_w", latent_w)
 
+    latent_h = int(latent_h)
+    latent_w = int(latent_w)
     diff = torch.abs(left - right if bias_params is None else left - right + bias_params)
     kernel_h = max(diff.shape[-2] // latent_h, 1)
     kernel_w = max(diff.shape[-1] // latent_w, 1)
