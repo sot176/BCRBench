@@ -21,10 +21,12 @@ To add a new model, you need to:
 
 Navigate to the `models/` directory and create a new subfolder for your model:
 
+```
 models/
 └── your_model_name/
-├── model.py
-└── model_utils.py
+    ├── model.py
+    └── model_utils.py
+```
 
 ### Recommended structure:
 - **`model.py`** → Main model implementation  
@@ -37,21 +39,60 @@ models/
 All models must inherit from the shared base class: `models/common_parts/base_models.py`
 
 
+### Base Class Interface
+
+```python
+class BaseRiskModel(nn.Module, ABC):
+
+    def __init__(self, args):
+        super().__init__()
+        self.args = args   
+
+    @abstractmethod
+    def forward(self, batch):
+        """Run forward pass. Returns dict of outputs."""
+        pass
+
+    @abstractmethod
+    def get_risk_heads(self, outputs, batch):
+        """
+        Returns dict of {head_name: (logits, target, mask)}
+        used for loss computation.
+        """
+        pass
+
+    @abstractmethod
+    def get_primary_risk_head(self, outputs):
+        """
+        Returns main prediction tensor used for evaluation
+        (e.g., AUC, C-index).
+        """
+        pass
+```
 
 ### Example:
 
-```python
+```
 from models.common_parts.base_models import BaseRiskModel
 
 class YourModel(BaseRiskModel):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, args):
+        super().__init__(args)
         # define layers
 
     def forward(self, batch):
-        # implement forward pass
-        return output
+        outputs = {}
+        return outputs
+
+    def get_risk_heads(self, outputs, batch):
+        return {
+            "main": (logits, target, mask)
+        }
+
+    def get_primary_risk_head(self, outputs):
+        return outputs["main"]
 ```
+
 
 ## 3. ⚙️ 3. Add Model Configuration
 Create a YAML configuration file for your model in:
@@ -66,6 +107,7 @@ Store model-specific hyperparameters that are:
 - but configurable by users
 
 **Example:**
+
 ```
 model_name: your_model_name
 
@@ -80,6 +122,43 @@ num_layers: 3
 To make your model available in the pipeline, register it in:
 
 `models/model_factory.py`
+
+### Step 1: Add a builder function
+
+```
+def _build_your_model():
+    from models.your_model_name.model import YourModel
+    return _build_model(YourModel, args=args, **kwargs)
+```
+
+### Step 2: Add it to the registry
+
+```
+MODEL_REGISTRY = {
+    "Mirai":        _build_mirai,
+    "ImgFeatAlign": _build_imgfeatalign,
+    "LMV-Net":      _build_lmvnet,
+    "VMRA-MaR":     _build_vmramar,
+    "OA-BreaCR":    _build_oa_breacr,
+    "YourModel":    _build_your_model,   # ← add here
+}
+```
+
+### ⚠️ Special Case: Registration-Based Models
+
+If your model uses image registration (e.g., MammoRegNet), you must:
+
+#### 1: Add your model name to:
+```
+REGISTRATION_MODELS = {"ImgFeatAlign", "LMV-Net", "YourModel"}
+```
+
+#### 2: Accept `mammo_reg_net` in your constructor:
+```
+def __init__(self, mammo_reg_net=None, args=None):
+    super().__init__(args)
+    self.mammo_reg_net = mammo_reg_net
+```
 
 
 ## ✅ Final Checklist
