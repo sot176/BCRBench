@@ -1,7 +1,6 @@
 import logging
 from typing import Tuple, Dict, List, Optional, Any
 
-import numpy as np
 import torch
 from accelerate import Accelerator
 from torch.optim import Optimizer
@@ -11,9 +10,6 @@ from utils import (
     concordance_index_ipcw,
     get_censoring_dist,
     compute_auc_x_year_auc,
-    loss_factory,
-    MeanVarianceLoss,
-    ProbOrdiLoss,
 )
 
 def train_one_epoch(

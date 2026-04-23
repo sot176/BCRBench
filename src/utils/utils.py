@@ -322,7 +322,6 @@ def bootstrap_c_index_by_cancer_type(
     return results
 
 
-
 def auc_by_cancer_type(
     event_times,
     predictions,
@@ -372,10 +371,10 @@ def auc_by_cancer_type(
 
     return auc_summary_by_cancer
 
+
 # --------------------------------------
 # Performance acorss density categories
 # ---------------------------------------
-
 
 def compute_auc_by_density_category(predictions, event_times, event_observed, density_categories):
     """
@@ -527,7 +526,6 @@ def bootstrap_c_index_by_density(
     return c_index_summary_by_density, c_index_results_by_density
 
 
-
 def bootstrap_auc_by_density(
     event_times,
     predictions,
@@ -538,7 +536,6 @@ def bootstrap_auc_by_density(
 ):
     """
     Compute bootstrap confidence intervals for AUC by density categories
-    WITHOUT balancing cancer vs non-cancer during resampling.
     """
 
     auc_results_by_density = {
@@ -613,7 +610,6 @@ def bootstrap_c_index_by_density(
 ):
     """
     Compute bootstrap confidence intervals for concordance index by density categories
-    WITHOUT balancing cancer vs non-cancer during resampling.
     """
 
     c_index_results_by_density = {d: [] for d in ["A", "B", "C", "D"]}
@@ -688,10 +684,10 @@ def bootstrap_c_index_by_density(
 
     return c_index_summary_by_density, c_index_results_by_density
 
+
 # --------------------------------------
 # Performance acorss race categories
 # ---------------------------------------
-
 
 def bootstrap_auc_by_race(
     event_times,
@@ -703,8 +699,6 @@ def bootstrap_auc_by_race(
 ):
     """
     Compute bootstrap confidence intervals for AUC by race categories.
-    Uses simple (non-stratified) bootstrap, consistent with
-    bootstrap_auc_by_cancer_type.
     """
 
     race_categories = np.array([
@@ -789,9 +783,7 @@ def bootstrap_c_index_by_race(
 ):
     """
        Compute bootstrap confidence intervals for C-index by race categories.
-       Uses simple (non-stratified) bootstrap, consistent with
-       bootstrap_auc_by_cancer_type.
-       """
+    """
 
     race_categories = np.array([
         r if isinstance(r, str) and r.strip() != "" else "Unknown"
@@ -837,7 +829,6 @@ def bootstrap_c_index_by_race(
             pred_sample = pred_r[boot_idx]
             obs_sample = obs_r[boot_idx]
 
-           
             try:
                 cidx = concordance_index_ipcw(
                     et_sample,

@@ -101,7 +101,6 @@ def loss_factory(args, criterion_POE=None, criterion_MV=None):
 # ------------------ Risk loss ----------------------
 #########################################################################
 
-
 def get_risk_loss_BCE(pred, y_true, y_mask):
 
     y_mask = y_mask.to(pred.device)
@@ -168,10 +167,11 @@ class risk_BCE_loss(nn.Module):
         loss = loss * self.weight_loss
 
         return loss
+
+
 #########################################################################
 # ------------------ Mean Variance loss ------------------
 #########################################################################
-
 
 class MeanVarianceLoss(nn.Module):
 
@@ -184,7 +184,6 @@ class MeanVarianceLoss(nn.Module):
 
     def forward(self, input, target_label, years_last_followup, weights=None):
         class_dim = input.shape[-1]
-        batch_size = input.shape[0]
 
         target_ = target_label.detach()
         target_[target_ > (class_dim - 1)] = class_dim - 1
@@ -197,23 +196,19 @@ class MeanVarianceLoss(nn.Module):
             years_last_followup = years_last_followup[mask == 1, ...]
 
             p = F.softmax(input, dim=-1)
-            # mean loss
             a = torch.arange(class_dim, dtype=torch.float32, device=device)
             target = target_.to(device)
             mean = torch.squeeze((p * (a + self.start_label)).sum(1, keepdim=True), dim=1)
             mse = (mean - target)**2
-            # new_weights = torch.zeros_like(target)
-            # weights = None
+          
             if weights is not None:
                 weights_ = torch.tensor(weights, dtype=torch.float).view(1, -1)
                 weights_ = weights_.repeat([count,1])
                 weights_ = weights_[range(count), target_.cpu()]
                 weights_ = weights_.to(device)  # move weights to device
                 mean_loss = sum(mse * weights_) / sum(weights_) / 2.0
-                # mean_loss = (mse * weights_).mean() / 2.0
 
                 b = (a[None, :] - mean[:, None]) ** 2
-                # variance_loss = ((p * b).sum(1, keepdim=False) * weights_).mean()
                 variance_loss = sum((p * b).sum(1, keepdim=False) * weights_) / sum(weights_)
             else:
                 mean_loss = mse.mean() / 2.0
@@ -320,7 +315,6 @@ class ProbOrdiLoss(nn.Module):
         mask = 1 - ((target_.cpu() == (class_dim - 1)) & (years_last_followup.cpu() < (class_dim - 1))).int()
         KLLoss = torch.mean(torch.sum(torch.pow(emb, 2) + torch.exp(log_var) - log_var - 1.0, dim=1) * 0.5)
 
-        count = sum(mask)
         if sum(mask) > 0:
             emb = emb[mask == 1, ...]
             log_var = log_var[mask == 1, ...]
