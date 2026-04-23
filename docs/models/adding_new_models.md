@@ -80,16 +80,19 @@ class YourModel(BaseRiskModel):
         # define layers
 
     def forward(self, batch):
-        outputs = {}
+        # define flow of data through the network
+        outputs = {"logit": logits, "fcur": f_cur, "fpri": f_pri}
         return outputs
 
     def get_risk_heads(self, outputs, batch):
+        target = batch["target"]
+        mask = batch["y_mask"]
         return {
-            "main": (logits, target, mask)
+            "main": (outputs["logit"], target, mask)
         }
 
     def get_primary_risk_head(self, outputs):
-        return torch.sigmoid(outputs["main"])
+        return torch.sigmoid(outputs["logit"])
 ```
 
 
