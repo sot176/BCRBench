@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
-from typing import Tuple, Dict
 import numpy as np
 
 
@@ -148,7 +147,6 @@ class SimpleAttentionPool(nn.Module):
         '''
         output = {}
         B, C, W, H = x.shape
-        # spatially_flat_size = (*x.size()[:2], -1)  # B, C, N
 
         spatially_flat_size = (B, C, -1)
         x = x.view(spatially_flat_size)

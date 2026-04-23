@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Dict
 
 from models.common_parts import ContinuousPosEncoding, SpatialTransformerBlock
 from .model_utils import SimpleAttentionPool, POELatent, Feedforward, BaselineModel, prob_to_score
