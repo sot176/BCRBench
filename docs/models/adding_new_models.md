@@ -89,7 +89,7 @@ class YourModel(BaseRiskModel):
         }
 
     def get_primary_risk_head(self, outputs):
-        return outputs["main"]
+        return torch.sigmoid(outputs["main"])
 ```
 
 
