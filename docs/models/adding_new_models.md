@@ -8,8 +8,7 @@ This guide explains how to integrate a new model into the framework.
 
 ## 📦 Overview
 
-To add a new model, you need to:
-
+To add a new model, you need to:<br>
 1. Create a new model module  
 2. Inherit from the base model class  
 3. Define model-specific configuration  
@@ -94,15 +93,14 @@ class YourModel(BaseRiskModel):
 ```
 
 
-## 3. ⚙️ 3. Add Model Configuration
+## ⚙️ 3. Add Model Configuration
 Create a YAML configuration file for your model in:
 
  `config/models/your_model_name.yaml`      
 
 **Purpose:**
 
-Store model-specific hyperparameters that are:
-
+Store model-specific hyperparameters that are:<br>
 - fixed by default
 - but configurable by users
 
@@ -163,24 +161,32 @@ def __init__(self, mammo_reg_net=None, args=None):
 
 ## ✅ Final Checklist
 
-Before using your model, make sure:
+Before using your model, ensure:
 
- Model folder created in models/
- Inherits from BaseRiskModel
- forward() implemented correctly
- YAML config added in config/models/
- Model registered in model_factory.py
+ ✔ Model folder created in `models/`<br>
+ ✔ Inherits from `BaseRiskModel`<br>
+ ✔ Implements required methods:<br>
+        • `__init__()`<br>
+        • `forward()`<br>
+        • `get_risk_heads()`<br>
+        • `get_primary_risk_head()`<br>
+ ✔ YAML config added in `config/models/`<br>
+ ✔ Model registered in `model_factory.py`<br>
+ ✔ (If applicable) Added to `REGISTRATION_MODELS`<br>
+ ✔ Model runs with a small test batch without errors<br>
+ ✔ Output format matches expected pipeline interface
+
 
 ## 💡 Tips
-Keep your model modular and readable
-Use model_utils.py for reusable components
-Follow naming conventions for consistency
-Test your model with a small batch before full training
+- Keep your model modular and readable<br>
+- Use model_utils.py for reusable components<br>
+- Follow naming conventions for consistency<br>
+- Test your model with a small batch before full training<br>
 
 ## 🤝 Contributing
 
 If you’re adding a new model for benchmarking:
 
-Ensure it follows this structure
-Provide a short description of the model (add a model page in the Documentation)
-Optionally include references or related papers
+- Ensure it follows this structure
+- Provide a short description of the model (add a model page in the Documentation)
+- Optionally include references or related papers
