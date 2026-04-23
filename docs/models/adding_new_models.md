@@ -169,10 +169,10 @@ Before using your model, ensure:
  ✔ Model folder created in `models/`<br>
  ✔ Inherits from `BaseRiskModel`<br>
  ✔ Implements required methods:<br>
-        • `__init__()`<br>
-        • `forward()`<br>
-        • `get_risk_heads()`<br>
-        • `get_primary_risk_head()`<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; • `__init__()`<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; • `forward()`<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; • `get_risk_heads()`<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; • `get_primary_risk_head()`<br>
  ✔ YAML config added in `config/models/`<br>
  ✔ Model registered in `model_factory.py`<br>
  ✔ (If applicable) Added to `REGISTRATION_MODELS`<br>
