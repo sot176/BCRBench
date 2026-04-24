@@ -82,8 +82,10 @@ class VMRAMaR(BaseRiskModel):
         self.visit_aggregator = VisitAggregator(self.args)
 
         self.vmrnn = VMRNN(
-            input_dim=self.args.embed_dim,
-            hidden_dim=self.args.embed_dim
+            embed_dim=self.args.embed_dim,
+            depths_downsample=self.args.depths_downsample,
+            depths_upsample=self.args.depths_upsample,
+            feature_resolution=(1, 1),
         )
         # -------------------------
         # 4. Asymmetry Branch (fixed)
