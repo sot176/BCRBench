@@ -171,7 +171,7 @@ class VMRAMaR(BaseRiskModel):
         # history_embedding: (B, T, C)
         # exam_mask: (B, T)
 
-        lengths = exam_mask.sum(dim=1) - 1  # (B,)
+        lengths = exam_mask.sum(dim=1) - 1
         lengths = lengths.clamp(min=0)
 
         temporal_feature = history_embedding[
@@ -179,9 +179,8 @@ class VMRAMaR(BaseRiskModel):
             lengths
         ]  # (B, C)
 
-        # Safe last valid timestep
-        temporal_feature = history_embedding 
         features = [temporal_feature]
+
 
         # -------------------------
         # Asymmetry branch (FIXED)
@@ -201,7 +200,6 @@ class VMRAMaR(BaseRiskModel):
                 exam_mask,
                 window_size=window_size,
             )
-            r_aa = r_aa.unsqueeze(-1)
 
             features.append(r_aa)
 
