@@ -7,10 +7,12 @@ import torch.nn.functional as F
 from .vmrnn import TransformerVMRNNEncoder
 from .sad import SpatialAsymmetryDetector
 from .lat import LongitudinalAsymmetryTracker
+from .visit_aggregator import VisitAggregator
 from models.common_parts import CumulativeProbabilityLayer
 from models.Mirai import onconet as _onconet
 from models.common_parts import BaseRiskModel
 from models.Mirai.onconet.models.factory import get_model_by_name, load_model
+
 
 sys.modules.setdefault("onconet", _onconet)
 for _key in list(sys.modules.keys()):
@@ -72,13 +74,17 @@ class VMRAMaR(BaseRiskModel):
             self.args.embed_dim, num_heads=4, batch_first=True
         )
 
-        # -------------------------
-        # 3. Temporal Projection + VMRNN
+       # -------------------------
+        # 3. Temporal Projection + Aggregator + VMRNN
         # -------------------------
         self.temporal_projection = nn.Linear(self.args.embed_dim, self.args.embed_dim)
 
-        self.vmrnn = TransformerVMRNNEncoder( input_dim=self.args.embed_dim, hidden_dim=self.args.embed_dim )
+        self.visit_aggregator = VisitAggregator(self.args)
 
+        self.vmrnn = TransformerVMRNNEncoder(
+            input_dim=self.args.embed_dim,
+            hidden_dim=self.args.embed_dim
+        )
         # -------------------------
         # 4. Asymmetry Branch (fixed)
         # -------------------------
@@ -154,7 +160,13 @@ class VMRAMaR(BaseRiskModel):
         # -------------------------
         exam_embeddings = self.temporal_projection(exam_embeddings)
 
-        history_embedding, _, _ = self.vmrnn(exam_embeddings, exam_mask)
+        #  Image Aggregator (Transformer across visits)
+        exam_embeddings = self.visit_aggregator(exam_embeddings, exam_mask)  # (B, T, D)
+
+        #   VMRNN (temporal dynamics)
+        history_embedding, states, reconstructions = self.vmrnn(exam_embeddings, exam_mask)
+
+        temporal_feature = history_embedding
 
         # Safe last valid timestep
         temporal_feature = history_embedding 
