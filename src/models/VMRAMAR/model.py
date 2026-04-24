@@ -93,9 +93,9 @@ class VMRAMaR(BaseRiskModel):
         self.fusion_norm = nn.LayerNorm(final_dim)
         self.ahl = CumulativeProbabilityLayer(final_dim, max_followup=5)
 
-        # Assumed view grouping: [CC views..., MLO views...]
-        self.cc_indices = getattr(self.args, "cc_indices", [0, 1])
-        self.mlo_indices = getattr(self.args, "mlo_indices", [2, 3])
+        # Assumed view grouping: ['R_CC', 'R_MLO', 'L_CC', 'L_MLO']
+        self.cc_indices = getattr(self.args, "cc_indices", [0, 2])
+        self.mlo_indices = getattr(self.args, "mlo_indices", [1, 3])
 
     def _init_image_encoder(self, args):
         if getattr(args, "img_encoder_snapshot", None):
