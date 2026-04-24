@@ -101,7 +101,7 @@ def get_dataset_and_loader(
     dataset = dataset_builder(
     csv_file=csv_file,
     image_dir=data_root,
-    split=split,
+    mode=split,
     transforms=transforms,
     **dataset_kwargs
 )
