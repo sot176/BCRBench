@@ -166,9 +166,18 @@ class VMRAMaR(BaseRiskModel):
         exam_embeddings = self.visit_aggregator(exam_embeddings, exam_mask)  # (B, T, D)
 
         #   VMRNN (temporal dynamics)
-        history_embedding, states, reconstructions = self.vmrnn(exam_embeddings, exam_mask)
+        history_embedding, states, reconstructions = self.vmrnn(exam_embeddings)
 
-        temporal_feature = history_embedding
+        # history_embedding: (B, T, C)
+        # exam_mask: (B, T)
+
+        lengths = exam_mask.sum(dim=1) - 1  # (B,)
+        lengths = lengths.clamp(min=0)
+
+        temporal_feature = history_embedding[
+            torch.arange(B, device=history_embedding.device),
+            lengths
+        ]  # (B, C)
 
         # Safe last valid timestep
         temporal_feature = history_embedding 
