@@ -99,11 +99,12 @@ def get_dataset_and_loader(
     print(f"[INFO] Dataset={dataset_name} | Model={model_name} | Split={split}")
 
     dataset = dataset_builder(
-        csv_file,
-        data_root,
-        split,
-        transforms,
-    )
+    csv_file=csv_file,
+    image_dir=data_root,
+    split=split,
+    transforms=transforms,
+    **dataset_kwargs
+)
 
     loader = DataLoader(
         dataset,
