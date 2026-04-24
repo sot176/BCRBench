@@ -200,6 +200,8 @@ class VMRAMaR(BaseRiskModel):
                 exam_mask,
                 window_size=window_size,
             )
+            if r_aa.dim() == 1:
+                r_aa = r_aa.unsqueeze(-1)
 
             features.append(r_aa)
 
