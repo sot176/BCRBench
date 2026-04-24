@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .vmrnn import TransformerVMRNNEncoder
+from .vmrnn import VMRNN
 from .sad import SpatialAsymmetryDetector
 from .lat import LongitudinalAsymmetryTracker
 from .visit_aggregator import VisitAggregator
@@ -81,7 +81,7 @@ class VMRAMaR(BaseRiskModel):
 
         self.visit_aggregator = VisitAggregator(self.args)
 
-        self.vmrnn = TransformerVMRNNEncoder(
+        self.vmrnn = VMRNN(
             input_dim=self.args.embed_dim,
             hidden_dim=self.args.embed_dim
         )
