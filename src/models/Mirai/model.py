@@ -81,28 +81,31 @@ class Mirai(BaseRiskModel):
     # Forward
     # -------------------------
     def forward(self, batch):
-        """
-        Forward pass: images → encoder → transformer → logits.
-
-        Args:
-            batch (dict): Batch dictionary containing:
-                "images": (B, C, N, H, W)
-        Returns:
-            tuple: (logit, transformer_hidden, activ_dict)
-        """
-        images = batch["images"]  # (B, C, N, H, W)
+        images = batch["images"]   # (B, C, N, H, W)
         B, C, N, H, W = images.size()
-
-        # Flatten views for encoder
         images_flat = images.transpose(1, 2).contiguous().view(B * N, C, H, W)
 
-        # Encode images
-        _, img_features, _ = self.image_encoder(images_flat, None, batch)
-        img_features = img_features.view(B, N, -1)[:, :, :self.image_repr_dim]
+        rf_dim = getattr(self.image_encoder._model.args, "risk_factor_dim", 1)
 
-        # Pass through transformer
+        if "risk_factors" in batch and batch["risk_factors"] is not None:
+            risk_factors = batch["risk_factors"]
+
+            if risk_factors.dim() == 2 and risk_factors.size(0) == B:
+                risk_factors = (
+                    risk_factors.unsqueeze(1)
+                    .expand(B, N, risk_factors.size(-1))
+                    .reshape(B * N, risk_factors.size(-1))
+                )
+        else:
+            risk_factors = torch.zeros(B * N, rf_dim, device=images.device)
+
+        _, img_features, _ = self.image_encoder(images_flat, risk_factors, batch)
+
+        img_features = img_features.view(B, N, -1)
+
         logit, transformer_hidden, activ_dict = self.transformer(img_features, None, batch)
         return logit, transformer_hidden, activ_dict
+
 
     # -------------------------
     # Risk head helpers
