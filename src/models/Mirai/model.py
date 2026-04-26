@@ -42,7 +42,12 @@ class Mirai(BaseRiskModel):
         self.transformer = self._init_transformer(self.args)
 
         # Update transformer output dim
-        self.args.img_only_dim = self.transformer.args.transformer_hidden_dim
+        hidden_dim = getattr(
+            self.transformer.args, "transformer_hidden_dim",
+            getattr(self.transformer.args, "transfomer_hidden_dim")
+        )
+
+        self.args.img_only_dim = hidden_dim
 
     # -------------------------
     # Helper methods
