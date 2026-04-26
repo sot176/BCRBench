@@ -4,7 +4,7 @@ name: Mirai
 # Snapshots / Pretrained
 # ----------------------------
 img_encoder_snapshot: "/mirai_pretrained_backbone/snapshots/mgh_mammo_MIRAI_Base_May20_2019.p"
-transformer_snapshot:  
+transformer_snapshot:   "/mirai_pretrained_backbone/snapshots/mgh_mammo_cancer_MIRAI_Transformer_Jan13_2020.p"
 snapshot:  
 freeze_image_encoder: false
 use_precomputed_hiddens: false
