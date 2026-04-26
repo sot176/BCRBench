@@ -45,6 +45,7 @@ accelerate launch  main_train.py \
             --data_root /scratch/project_465002861/thrunsol/embed_datasets/risk_dataset_1664_2048 \
             --path_out_dir /scratch/project_465002861/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/$SLURM_JOB_NAME-$SLURM_JOB_ID \
             --img_encoder_snapshot /scratch/project_465002861/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_MIRAI_Base_May20_2019.p \
+            --transformer_snapshot /scratch/project_465002861/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_cancer_MIRAI_Transformer_Jan13_2020.p \
             --freeze_image_encoder \
             --id_training 1 \
             --use_scheduler \
