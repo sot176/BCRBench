@@ -4,7 +4,7 @@ name: Mirai
 # Snapshots / Pretrained
 # ----------------------------
 img_encoder_snapshot: "/mirai_pretrained_backbone/snapshots/mgh_mammo_MIRAI_Base_May20_2019.p"
-transformer_snapshot:   "/mirai_pretrained_backbone/snapshots/mgh_mammo_cancer_MIRAI_Transformer_Jan13_2020.p"
+transformer_snapshot:  
 snapshot:  
 freeze_image_encoder: false
 use_precomputed_hiddens: false
@@ -14,7 +14,7 @@ state_dict_path: null
 # Transformer architecture
 # ----------------------------
 transformer_hidden_dim: 512
-num_layers: 3
+num_layers: 2
 num_heads: 4
 dropout: 0.1
 
