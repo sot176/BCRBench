@@ -71,7 +71,7 @@ class Mirai(BaseRiskModel):
         B, C, N, H, W = images.size()
 
         x = images.transpose(1,2).contiguous().view(B*N, C, H, W)
-        _, img_x, _ = self.image_encoder(x)
+        img_x = self.image_encoder(x)
         img_x = img_x.view(B, N, -1)
         logit, transformer_hidden, activ_dict = self.transformer(img_x, risk_factors, batch)
         
