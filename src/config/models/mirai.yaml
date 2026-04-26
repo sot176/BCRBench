@@ -14,7 +14,7 @@ state_dict_path: null
 # Transformer architecture
 # ----------------------------
 transformer_hidden_dim: 512
-num_layers: 2
+num_layers: 3
 num_heads: 4
 dropout: 0.1
 
