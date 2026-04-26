@@ -76,28 +76,15 @@ class Mirai(BaseRiskModel):
     # -------------------------
     def forward(self, batch):
         images = batch["images"]   # (B, C, N, H, W)
+        risk_factors = batch.get("risk_factors", None)
         B, C, N, H, W = images.size()
-        images_flat = images.transpose(1, 2).contiguous().view(B * N, C, H, W)
-
-        rf_dim = getattr(self.image_encoder._model.args, "risk_factor_dim", 1)
-
-        if "risk_factors" in batch and batch["risk_factors"] is not None:
-            risk_factors = batch["risk_factors"]
-
-            if risk_factors.dim() == 2 and risk_factors.size(0) == B:
-                risk_factors = (
-                    risk_factors.unsqueeze(1)
-                    .expand(B, N, risk_factors.size(-1))
-                    .reshape(B * N, risk_factors.size(-1))
-                )
-        else:
-            risk_factors = torch.zeros(B * N, rf_dim, device=images.device)
-
-        _, img_features, _ = self.image_encoder(images_flat, risk_factors, batch)
-
-        img_features = img_features.view(B, N, -1)
-
-        logit, transformer_hidden, activ_dict = self.transformer(img_features, None, batch)
+        x = images.transpose(1,2).contiguous().view(B*N, C, H, W)
+        risk_factors_per_img =  (lambda N, risk_factors: [factor.expand( [N, *factor.size()]).contiguous().view([-1, factor.size()[-1]]).contiguous() for factor in risk_factors])(N, risk_factors) if risk_factors is not None else None
+        _, img_x, _ = self.image_encoder(x, risk_factors_per_img, batch)
+        img_x = img_x.view(B, N, -1)
+        img_x = img_x[:,:,: self.image_repr_dim]
+        logit, transformer_hidden, activ_dict = self.transformer(img_x, risk_factors, batch)
+        
         return logit, transformer_hidden, activ_dict
 
 
