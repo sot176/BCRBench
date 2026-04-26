@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 import sys
 from models.common_parts import BaseRiskModel
-
+from models.common_parts import extract_mirai_backbone
+from config.config import cfg
 
 # ── Register onconet aliases before any import from factory ──────────
 from . import onconet as _onconet
@@ -27,7 +28,7 @@ class Mirai(BaseRiskModel):
         # -------------------------
         # Image Encoder
         # -------------------------
-        self.image_encoder = self._init_image_encoder(self.args)
+        self.image_encoder = extract_mirai_backbone(cfg["paths"]["mirai_path"])
 
         # Freeze encoder if requested
         if getattr(self.args, "freeze_image_encoder", True):
@@ -47,14 +48,6 @@ class Mirai(BaseRiskModel):
     # -------------------------
     # Helper methods
     # -------------------------
-    def _init_image_encoder(self, args):
-        """Initialize the image encoder, optionally loading a snapshot."""
-        if getattr(args, "img_encoder_snapshot", None):
-            encoder = load_model(args.img_encoder_snapshot, args, do_wrap_model=False)
-        else:
-            encoder = get_model_by_name("custom_resnet", False, args)
-        return encoder
-
     @staticmethod
     def _freeze_encoder(encoder):
         """Freeze all parameters of the encoder."""
@@ -78,19 +71,9 @@ class Mirai(BaseRiskModel):
         images = batch["images"]   # (B, C, N, H, W)
         risk_factors = batch.get("risk_factors", None)
         B, C, N, H, W = images.size()
+        
         x = images.transpose(1,2).contiguous().view(B*N, C, H, W)
-        rf_dim = getattr(self.image_encoder._model.args, "risk_factor_dim", 1)
-
-        if risk_factors is None:
-            risk_factors = torch.zeros(B, rf_dim, device=images.device)
-
-        risk_factors_per_img = (
-            risk_factors.unsqueeze(1)
-            .expand(B, N, rf_dim)
-            .contiguous()
-            .view(B * N, rf_dim)
-        )
-        _, img_x, _ = self.image_encoder(x, risk_factors_per_img, batch)
+        _, img_x, _ = self.image_encoder(x)
         img_x = img_x.view(B, N, -1)
         img_x = img_x[:,:,: self.image_repr_dim]
         logit, transformer_hidden, activ_dict = self.transformer(img_x, risk_factors, batch)

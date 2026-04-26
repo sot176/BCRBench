@@ -57,17 +57,6 @@ class VMRAMaR(BaseRiskModel):
         self.cc_fc = nn.Linear(self.image_repr_dim, self.embed_dim)
         self.mlo_fc = nn.Linear(self.image_repr_dim, self.embed_dim)
 
-        # Aggregate left/right inside each view type
-        self.cc_attn = nn.MultiheadAttention(self.embed_dim, num_heads=4, batch_first=True)
-        self.mlo_attn = nn.MultiheadAttention(self.embed_dim, num_heads=4, batch_first=True)
-
-        # Fuse CC and MLO into one exam embedding
-        self.exam_fusion = nn.Sequential(
-            nn.Linear(self.embed_dim * 2, self.embed_dim),
-            nn.ReLU(inplace=False),
-            nn.Dropout(getattr(self.args, "dropout", 0.0)),
-        )
-
         self.temporal_projection = nn.Linear(self.embed_dim, self.embed_dim)
         self.visit_aggregator = VisitAggregator(self.args)
 
@@ -100,12 +89,7 @@ class VMRAMaR(BaseRiskModel):
     def _init_image_encoder(self, args):
         if getattr(args, "img_encoder_snapshot", None):
             encoder = load_model(args.img_encoder_snapshot, args, do_wrap_model=False)
-            if getattr(args, "replace_snapshot_pool", True):
-                new_encoder = get_model_by_name("custom_resnet", False, args)
-                encoder._model.pool = new_encoder._model.pool
-                encoder._model.fc = new_encoder._model.fc
-                encoder._model.prob_of_failure_layer = new_encoder._model.prob_of_failure_layer
-                encoder._model.args = new_encoder._model.args
+           
         else:
             encoder = get_model_by_name("custom_resnet", False, args)
         return encoder
@@ -116,15 +100,6 @@ class VMRAMaR(BaseRiskModel):
             param.requires_grad = False
         encoder.eval()
         print("[INFO] Image encoder frozen.")
-
-    def _aggregate_view_type(self, feats, proj, attn):
-        # feats: (B, T, N_viewtype, C)
-        B, T, Nv, C = feats.shape
-        feats = proj(feats)                    # (B, T, Nv, D)
-        feats = feats.view(B * T, Nv, -1)     # (B*T, Nv, D)
-        attn_out, _ = attn(feats, feats, feats)
-        pooled = attn_out.mean(dim=1)         # (B*T, D)
-        return pooled.view(B, T, -1)          # (B, T, D)
 
     def forward(self, batch):
         x = batch["images"]          # (B, T, V, C, H, W)
