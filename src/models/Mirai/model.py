@@ -79,7 +79,17 @@ class Mirai(BaseRiskModel):
         risk_factors = batch.get("risk_factors", None)
         B, C, N, H, W = images.size()
         x = images.transpose(1,2).contiguous().view(B*N, C, H, W)
-        risk_factors_per_img =  (lambda N, risk_factors: [factor.expand( [N, *factor.size()]).contiguous().view([-1, factor.size()[-1]]).contiguous() for factor in risk_factors])(N, risk_factors) if risk_factors is not None else None
+        rf_dim = getattr(self.image_encoder._model.args, "risk_factor_dim", 1)
+
+        if risk_factors is None:
+            risk_factors = torch.zeros(B, rf_dim, device=images.device)
+
+        risk_factors_per_img = (
+            risk_factors.unsqueeze(1)
+            .expand(B, N, rf_dim)
+            .contiguous()
+            .view(B * N, rf_dim)
+        )
         _, img_x, _ = self.image_encoder(x, risk_factors_per_img, batch)
         img_x = img_x.view(B, N, -1)
         img_x = img_x[:,:,: self.image_repr_dim]
