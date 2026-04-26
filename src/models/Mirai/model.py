@@ -34,12 +34,10 @@ class Mirai(BaseRiskModel):
         if getattr(self.args, "freeze_image_encoder", True):
             self._freeze_encoder(self.image_encoder)
 
-        self.image_repr_dim = self.image_encoder._model.args.img_only_dim
-
         # -------------------------
         # Transformer
         # -------------------------
-        self.args.precomputed_hidden_dim = self.image_repr_dim
+        self.args.precomputed_hidden_dim = self.args.transformer_hidden_dim
         self.transformer = self._init_transformer(self.args)
 
         # Update transformer output dim
@@ -71,11 +69,10 @@ class Mirai(BaseRiskModel):
         images = batch["images"]   # (B, C, N, H, W)
         risk_factors = batch.get("risk_factors", None)
         B, C, N, H, W = images.size()
-        
+
         x = images.transpose(1,2).contiguous().view(B*N, C, H, W)
         _, img_x, _ = self.image_encoder(x)
         img_x = img_x.view(B, N, -1)
-        img_x = img_x[:,:,: self.image_repr_dim]
         logit, transformer_hidden, activ_dict = self.transformer(img_x, risk_factors, batch)
         
         return logit, transformer_hidden, activ_dict
