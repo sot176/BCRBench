@@ -131,12 +131,8 @@ class VMRAMaR(BaseRiskModel):
         lengths = exam_mask.sum(dim=1) - 1
         lengths = lengths.clamp(min=0)
 
-        temporal_feature = history_embedding[
-            torch.arange(B, device=history_embedding.device),
-            lengths
-        ]  # (B, D)
+        exam_embeddings = self.temporal_projection(exam_embeddings)
 
-        features = [temporal_feature]
 
         if self.use_asymmetry and V >= 2:
             asymmetry_scores, coords, coord_valid = self.sad(feat_maps, view_mask)
