@@ -57,7 +57,6 @@ class Mirai(BaseRiskModel):
                 encoder._model.pool = new_encoder._model.pool
                 encoder._model.fc = new_encoder._model.fc
                 encoder._model.prob_of_failure_layer = new_encoder._model.prob_of_failure_layer
-                encoder._model.args = new_encoder._model.args
         else:
             encoder = get_model_by_name("custom_resnet", False, args)
         return encoder
