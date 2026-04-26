@@ -36,7 +36,7 @@ block_layout:
   - "BasicBlock,2"
 block_widening_factor: 1
 num_groups: 1
-pool_name: GlobalMaxPool
+pool_name: Simple_AttentionPool
 deep_risk_factor_pool: false
 replace_snapshot_pool: true
 pretrained_on_imagenet: false
