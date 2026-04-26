@@ -51,12 +51,6 @@ class Mirai(BaseRiskModel):
         """Initialize the image encoder, optionally loading a snapshot."""
         if getattr(args, "img_encoder_snapshot", None):
             encoder = load_model(args.img_encoder_snapshot, args, do_wrap_model=False)
-            if getattr(args, "replace_snapshot_pool", True):
-                new_encoder = get_model_by_name("custom_resnet", False, args)
-                # Replace pool, fc, prob_of_failure_layer, and args
-                encoder._model.pool = new_encoder._model.pool
-                encoder._model.fc = new_encoder._model.fc
-                encoder._model.prob_of_failure_layer = new_encoder._model.prob_of_failure_layer
         else:
             encoder = get_model_by_name("custom_resnet", False, args)
         return encoder

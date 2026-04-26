@@ -40,7 +40,7 @@ block_widening_factor: 1
 num_groups: 1
 pool_name: GlobalMaxPool
 deep_risk_factor_pool: false
-replace_snapshot_pool: true
+replace_snapshot_pool: false
 pretrained_on_imagenet: false
 pretrained_imagenet_model_name: resnet18
 make_fc: false
