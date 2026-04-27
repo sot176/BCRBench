@@ -2,6 +2,8 @@ import sys
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from models.common_parts import extract_mirai_backbone
+from config.config import cfg
 
 from .vmrnn import VMRNN
 from .sad import SpatialAsymmetryDetector
@@ -21,45 +23,39 @@ for _key in list(sys.modules.keys()):
             sys.modules[_key]
         )
 
-
-def _disable_inplace_relu(module: nn.Module):
-    for m in module.modules():
-        if isinstance(m, nn.ReLU):
-            m.inplace = False
-
-
-class IdentityPool(nn.Module):
-    def forward(self, x):
-        return None, x
-
-    def replaces_fc(self):
-        return False
-
-
 class VMRAMaR(BaseRiskModel):
     def __init__(self, args):
         super().__init__(args)
 
-        self.image_encoder = self._init_image_encoder(self.args)
+        # -------------------------
+        # Frozen image encoder
+        # -------------------------
+        self.image_encoder = extract_mirai_backbone(cfg["paths"]["mirai_path"])
 
         if getattr(self.args, "freeze_image_encoder", True):
             self._freeze_encoder(self.image_encoder)
 
-        self.image_encoder._model.pool = IdentityPool()
-        self.image_encoder._model.fc = nn.Identity()
-        self.image_encoder._model.prob_of_failure_layer = nn.Identity()
-        _disable_inplace_relu(self.image_encoder)
+        # -------------------------
+        # Multi-view exam encoder
+        # -------------------------
+        self.cc_indices = getattr(self.args, "cc_indices", [0, 2])
+        self.mlo_indices = getattr(self.args, "mlo_indices", [1, 3])
 
-        self.image_repr_dim = self.image_encoder._model.args.img_only_dim
-        self.embed_dim = self.args.embed_dim
-
-        # Per-view-type projections: CC and MLO stay separate first
         self.cc_fc = nn.Linear(self.image_repr_dim, self.embed_dim)
         self.mlo_fc = nn.Linear(self.image_repr_dim, self.embed_dim)
+
+        self.exam_fusion = nn.Sequential(
+            nn.Linear(2 * self.embed_dim, self.embed_dim),
+            nn.GELU(),
+            nn.Dropout(getattr(self.args, "dropout", 0.1)),
+        )
 
         self.temporal_projection = nn.Linear(self.embed_dim, self.embed_dim)
         self.visit_aggregator = VisitAggregator(self.args)
 
+        # -------------------------
+        # Longitudinal encoder
+        # -------------------------
         self.vmrnn = VMRNN(
             embed_dim=self.embed_dim,
             depths_downsample=self.args.depths_downsample,
@@ -67,6 +63,9 @@ class VMRAMaR(BaseRiskModel):
             feature_resolution=(1, 1),
         )
 
+        # -------------------------
+        # Asymmetry branch
+        # -------------------------
         self.use_asymmetry = getattr(self.args, "use_asymmetry", True)
         if self.use_asymmetry:
             self.sad = SpatialAsymmetryDetector(
@@ -78,21 +77,12 @@ class VMRAMaR(BaseRiskModel):
                 persistent_weight=float(getattr(self.args, "persistent_weight", 1.0)),
             )
 
+        # -------------------------
+        # Risk head
+        # -------------------------
         final_dim = self.embed_dim + (1 if self.use_asymmetry else 0)
         self.fusion_norm = nn.LayerNorm(final_dim)
         self.ahl = CumulativeProbabilityLayer(final_dim, max_followup=5)
-
-        # Assumed view grouping: ['R_CC', 'R_MLO', 'L_CC', 'L_MLO']
-        self.cc_indices = getattr(self.args, "cc_indices", [0, 2])
-        self.mlo_indices = getattr(self.args, "mlo_indices", [1, 3])
-
-    def _init_image_encoder(self, args):
-        if getattr(args, "img_encoder_snapshot", None):
-            encoder = load_model(args.img_encoder_snapshot, args, do_wrap_model=False)
-           
-        else:
-            encoder = get_model_by_name("custom_resnet", False, args)
-        return encoder
 
     @staticmethod
     def _freeze_encoder(encoder):
@@ -101,60 +91,118 @@ class VMRAMaR(BaseRiskModel):
         encoder.eval()
         print("[INFO] Image encoder frozen.")
 
-    def forward(self, batch):
-        x = batch["images"]          # (B, T, V, C, H, W)
-        exam_mask = batch["exam_mask"]
-        view_mask = batch["view_mask"]
+    def _masked_mean(self, x, mask):
+        """
+        x:    (B, T, V, D)
+        mask: (B, T, V)
+        """
+        mask = mask.unsqueeze(-1).float()
+        summed = (x * mask).sum(dim=2)
+        denom = mask.sum(dim=2).clamp(min=1.0)
+        return summed / denom
 
-        B, T, V, C, H, W = x.size()
+    def _encode_images(self, images, batch):
+        """
+        images: (B, T, V, C, H, W)
+        returns:
+            pooled_feats: (B, T, V, C_feat)
+            feat_maps:    (B, T, V, C_feat, Hf, Wf)
+        """
+        B, T, V, C, H, W = images.size()
 
-        x_flat = x.view(B * T * V, C, H, W)
+        x_flat = images.view(B * T * V, C, H, W)
         _, feat_maps, _ = self.image_encoder(x_flat, None, batch)
 
-        C_feat, Hf, Wf = feat_maps.shape[1:]
-        feat_maps = feat_maps.view(B, T, V, C_feat, Hf, Wf)
+        c_feat, hf, wf = feat_maps.shape[1:]
+        feat_maps = feat_maps.view(B, T, V, c_feat, hf, wf)
+        pooled_feats = feat_maps.mean(dim=(-2, -1))
 
-        pooled_feats = feat_maps.mean(dim=(-2, -1))  # (B, T, V, C_feat)
+        return pooled_feats, feat_maps
 
+    def _encode_exams(self, pooled_feats, view_mask, exam_mask):
+        """
+        pooled_feats: (B, T, V, C_feat)
+        view_mask:    (B, T, V)
+        exam_mask:    (B, T)
+        returns:
+            exam_embeddings: (B, T, D)
+        """
         cc_feats = pooled_feats[:, :, self.cc_indices, :]
         mlo_feats = pooled_feats[:, :, self.mlo_indices, :]
 
-        cc_exam = self._aggregate_view_type(cc_feats, self.cc_fc, self.cc_attn)     # (B, T, D)
-        mlo_exam = self._aggregate_view_type(mlo_feats, self.mlo_fc, self.mlo_attn) # (B, T, D)
+        cc_mask = view_mask[:, :, self.cc_indices]
+        mlo_mask = view_mask[:, :, self.mlo_indices]
 
-        exam_embeddings = self.exam_fusion(torch.cat([cc_exam, mlo_exam], dim=-1))   # (B, T, D)
+        cc_tokens = self.cc_fc(cc_feats)
+        mlo_tokens = self.mlo_fc(mlo_feats)
+
+        cc_exam = self._masked_mean(cc_tokens, cc_mask)
+        mlo_exam = self._masked_mean(mlo_tokens, mlo_mask)
+
+        exam_embeddings = self.exam_fusion(torch.cat([cc_exam, mlo_exam], dim=-1))
         exam_embeddings = self.temporal_projection(exam_embeddings)
         exam_embeddings = self.visit_aggregator(exam_embeddings, exam_mask)
 
+        return exam_embeddings
+
+    def _compute_asymmetry_feature(self, feat_maps, view_mask, exam_mask):
+        """
+        returns:
+            r_aa: (B, 1)
+            asymmetry_scores, coords, coord_valid
+        """
+        asymmetry_scores, coords, coord_valid = self.sad(feat_maps, view_mask)
+
+        window_size = max(
+            int(self.sad.latent_h),
+            int(self.sad.latent_w),
+        )
+
+        r_aa = self.lat(
+            asymmetry_scores,
+            coords,
+            coord_valid,
+            exam_mask,
+            window_size=window_size,
+        )
+
+        if r_aa.dim() == 1:
+            r_aa = r_aa.unsqueeze(-1)
+        elif r_aa.dim() != 2:
+            raise ValueError(f"Unexpected asymmetry feature shape: {r_aa.shape}")
+
+        return r_aa, asymmetry_scores, coords, coord_valid
+
+    def forward(self, batch):
+        images = batch["images"]       # (B, T, V, C, H, W)
+        exam_mask = batch["exam_mask"] # (B, T)
+        view_mask = batch["view_mask"] # (B, T, V)
+
+        B = images.size(0)
+
+        # 1. Image encoding
+        pooled_feats, feat_maps = self._encode_images(images, batch)
+
+        # 2. Exam encoding
+        exam_embeddings = self._encode_exams(pooled_feats, view_mask, exam_mask)
+
+        # 3. Longitudinal encoding
         history_embedding, states, reconstructions = self.vmrnn(exam_embeddings)
 
-        lengths = exam_mask.sum(dim=1) - 1
-        lengths = lengths.clamp(min=0)
+        features = [history_embedding]
 
-        exam_embeddings = self.temporal_projection(exam_embeddings)
+        # 4. Asymmetry feature
+        asymmetry_scores = None
+        coords = None
+        coord_valid = None
+        r_aa = None
 
-
-        if self.use_asymmetry and V >= 2:
-            asymmetry_scores, coords, coord_valid = self.sad(feat_maps, view_mask)
-
-            window_size = max(
-                int(getattr(self.sad, "latent_h")),
-                int(getattr(self.sad, "latent_w")),
-            )
-
-            r_aa = self.lat(
-                asymmetry_scores,
-                coords,
-                coord_valid,
+        if self.use_asymmetry and images.size(2) >= 2:
+            r_aa, asymmetry_scores, coords, coord_valid = self._compute_asymmetry_feature(
+                feat_maps,
+                view_mask,
                 exam_mask,
-                window_size=window_size,
             )
-
-            if r_aa.dim() == 1:
-                r_aa = r_aa.unsqueeze(-1)
-            elif r_aa.dim() != 2:
-                raise ValueError(f"Unexpected asymmetry feature shape: {r_aa.shape}")
-
             features.append(r_aa)
 
         for i, f in enumerate(features):
@@ -163,14 +211,34 @@ class VMRAMaR(BaseRiskModel):
                     f"Feature {i} has invalid shape {f.shape}, expected (B, D)"
                 )
 
+        # 5. Risk prediction
         combined = torch.cat(features, dim=-1)
         combined = self.fusion_norm(combined)
-        risk = self.ahl(combined)
 
-        return {"logit": risk}
+        logits = self.ahl(combined)
+        probs = torch.sigmoid(logits)
+
+        return {
+            "logit": logits,
+            "probs": probs,
+            "history_embedding": history_embedding,
+            "exam_embeddings": exam_embeddings,
+            "states": states,
+            "vmrnn_reconstruction": reconstructions,
+            "exam_asymmetry": asymmetry_scores,
+            "coords": coords,
+            "coord_valid": coord_valid,
+            "r_aa": r_aa,
+        }
 
     def get_risk_heads(self, outputs, batch):
-        return {"logit_output": (outputs["logit"], batch["target"], batch["y_mask"])}
+        return {
+            "logit_output": (
+                outputs["logit"],
+                batch["target"],
+                batch["y_mask"],
+            )
+        }
 
     def get_primary_risk_head(self, outputs):
-        return torch.sigmoid(outputs["logit"])
+        return outputs["probs"]
