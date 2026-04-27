@@ -15,8 +15,8 @@ state_dict_path: null
 # ----------------------------
 transformer_hidden_dim: 512
 num_layers: 1
-num_heads: 4
-dropout: 0.1
+num_heads: 8
+dropout: 0.0
 
 # ----------------------------
 # Image / input settings
