@@ -73,7 +73,7 @@ class Mirai(BaseRiskModel):
         x = images.transpose(1,2).contiguous().view(B*N, C, H, W)
         img_x = self.image_encoder(x)
         if img_x.dim() == 4:  # (B*N, C, H, W)
-            img_x = img_x.mean(dim=[2, 3])  # global average pooling
+            img_x = torch.nn.functional.adaptive_avg_pool2d(img_x, (1, 1)).flatten(1)
         img_x = img_x.view(B, N, -1)
         logit, transformer_hidden, activ_dict = self.transformer(img_x, risk_factors, batch)
         
