@@ -147,7 +147,7 @@ class Mirai(BaseRiskModel):
             None,
             transformer_batch
         )
-        print("Transformer output shape:", pooled_hidden.shape)
+        pooled_hidden = pooled_hidden.mean(dim=1) 
         logit = self.risk_head(pooled_hidden)
 
         return logit, pooled_hidden, activ
