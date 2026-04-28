@@ -42,23 +42,23 @@ class VMRAMaR(BaseRiskModel):
         self.cc_indices = getattr(self.args, "cc_indices", [0, 2])
         self.mlo_indices = getattr(self.args, "mlo_indices", [1, 3])
 
-        self.cc_fc = nn.Linear(self.args.image_repr_dim, self.embed_dim)
-        self.mlo_fc = nn.Linear(self.args.image_repr_dim, self.embed_dim)
+        self.cc_fc = nn.Linear(self.args.image_repr_dim, self.args.embed_dim)
+        self.mlo_fc = nn.Linear(self.args.image_repr_dim, self.args.embed_dim)
 
         self.exam_fusion = nn.Sequential(
-            nn.Linear(2 * self.embed_dim, self.embed_dim),
+            nn.Linear(2 * self.args.embed_dim, self.args.embed_dim),
             nn.GELU(),
             nn.Dropout(getattr(self.args, "dropout", 0.1)),
         )
 
-        self.temporal_projection = nn.Linear(self.embed_dim, self.embed_dim)
+        self.temporal_projection = nn.Linear(self.args.embed_dim, self.args.embed_dim)
         self.visit_aggregator = VisitAggregator(self.args)
 
         # -------------------------
         # Longitudinal encoder
         # -------------------------
         self.vmrnn = VMRNN(
-            embed_dim=self.embed_dim,
+            embed_dim=self.args.embed_dim,
             depths_downsample=self.args.depths_downsample,
             depths_upsample=self.args.depths_upsample,
             feature_resolution=(1, 1),
@@ -81,7 +81,7 @@ class VMRAMaR(BaseRiskModel):
         # -------------------------
         # Risk head
         # -------------------------
-        final_dim = self.embed_dim + (1 if self.use_asymmetry else 0)
+        final_dim = self.args.embed_dim + (1 if self.use_asymmetry else 0)
         self.fusion_norm = nn.LayerNorm(final_dim)
         self.ahl = CumulativeProbabilityLayer(final_dim, max_followup=5)
 
