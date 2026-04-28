@@ -4,10 +4,6 @@ import torch
 import torch.nn as nn
 import sys
 
-from models.common_parts import BaseRiskModel
-from models.common_parts import extract_mirai_backbone
-from config.config import cfg
-from models.common_parts import CumulativeProbabilityLayer
 
 # ----------------------------------------------------
 # Register OncoNet aliases
@@ -25,108 +21,61 @@ for _key in list(sys.modules.keys()):
 from .onconet.models.factory import get_model_by_name, load_model
 
 
-# ----------------------------------------------------
-# Constants
-# ----------------------------------------------------
-MAX_FOLLOWUP = 5
-
-FORMAL_VIEW_SEQUENCE = (
-    ("LCC", 0, 1),
-    ("RCC", 0, 0),
-    ("LMLO", 1, 1),
-    ("RMLO", 1, 0),
-)
-
-
-# ====================================================
-# Mirai
-# ====================================================
-class Mirai(BaseRiskModel):
-
+class Mirai(nn.Module):
     def __init__(self, args):
-        super().__init__(args)
-
+        super().__init__()
         self.args = args
-        self.num_years = getattr(args, "num_years", MAX_FOLLOWUP)
 
-        # ------------------------------------------------
-        # Pretrained image encoder
-        # ------------------------------------------------
-        self.image_encoder = extract_mirai_backbone(
-            cfg["paths"]["mirai_path"]
-        )
+        if args.img_encoder_snapshot is not None:
+            self.image_encoder = load_model(
+                args.img_encoder_snapshot,
+                args,
+                do_wrap_model=False,
+            )
+        else:
+            self.image_encoder = get_model_by_name("custom_resnet", False, args)
 
-        self.hidden_dim = args.transformer_hidden_dim
+        if getattr(args, "freeze_image_encoder", False):
+            for param in self.image_encoder.parameters():
+                param.requires_grad = False
 
-        # freeze encoder (official Mirai stage 2 behavior)
-        self._freeze_encoder(self.image_encoder)
+        self.image_repr_dim = self._get_img_repr_dim()
 
-        # ------------------------------------------------
-        # Transformer fusion module
-        # ------------------------------------------------
-        self.args.precomputed_hidden_dim = self.hidden_dim
-        self.transformer = self._init_transformer(args)
-
-        # ------------------------------------------------
-        # Risk head
-        # ------------------------------------------------
-        self.risk_head =CumulativeProbabilityLayer(self.hidden_dim, max_followup=5)
-
-    # =================================================
-    # Helpers
-    # =================================================
-    @staticmethod
-    def _freeze_encoder(module):
-        for p in module.parameters():
-            p.requires_grad = False
-        module.eval()
-
-    def _init_transformer(self, args):
-
-        if getattr(args, "transformer_snapshot", None):
-            return load_model(
+        if args.transformer_snapshot is not None:
+            self.transformer = load_model(
                 args.transformer_snapshot,
                 args,
-                do_wrap_model=False
+                do_wrap_model=False,
             )
+        else:
+            args.precomputed_hidden_dim = self.image_repr_dim
+            self.transformer = get_model_by_name("transformer", False, args)
 
-        return get_model_by_name(
-            "transformer",
-            False,
-            args
-        )
+        args.img_only_dim = self.transformer.args.transfomer_hidden_dim
+    
+    def _get_img_repr_dim(self):
+        if hasattr(self.image_encoder, "_model"):
+            return self.image_encoder._model.args.img_only_dim
+        return self.image_encoder.args.img_only_dim
 
-    def _make_transformer_batch(
-        self,
-        batch_size,
-        device
-    ):
-        view_seq = torch.tensor(
-            [x[1] for x in FORMAL_VIEW_SEQUENCE],
-            device=device,
-            dtype=torch.long
-        )
+    def forward(self, batch):
+        """
+        x: (B, C, N, H, W)
+        """
+        x = batch["images"]        # (B,4,C,H,W)
 
-        side_seq = torch.tensor(
-            [x[2] for x in FORMAL_VIEW_SEQUENCE],
-            device=device,
-            dtype=torch.long
-        )
+        bsz, channels, num_imgs, height, width = x.size()
 
-        return {
-            "time_seq": torch.zeros(
-                batch_size,
-                4,
-                device=device,
-                dtype=torch.long
-            ),
-            "view_seq": view_seq.unsqueeze(0).expand(batch_size, -1),
-            "side_seq": side_seq.unsqueeze(0).expand(batch_size, -1),
-        }
+        x = x.transpose(1, 2).contiguous().view(bsz * num_imgs, channels, height, width)
 
-    # =================================================
-    # Forward
-    # =================================================
+        _, img_x, _ = self.image_encoder(x, None, batch)
+        img_x = img_x.view(bsz, num_imgs, -1)
+        img_x = img_x[:, :, :self.image_repr_dim]
+
+        logit, transformer_hidden, activ_dict = self.transformer(img_x, None, batch)
+        return logit, transformer_hidden, activ_dict
+
+    
     def forward(self, batch):
 
         images = batch["images"]        # (B,4,C,H,W)
@@ -134,23 +83,6 @@ class Mirai(BaseRiskModel):
         B,C,V,H,W = images.shape
         assert V == 4
 
-        x = images.reshape(B*4, C, H, W)
-
-        feat = self.image_encoder(x)        # (B*4,D)
-        img_x = feat.mean(dim=(2,3))  
-        img_x = img_x.reshape(B,4,-1)        # (B,4,D)
-
-        transformer_batch = self._make_transformer_batch(B, images.device)
-
-        logit_hidden, pooled_hidden, activ = self.transformer(
-            img_x,
-            None,
-            transformer_batch
-        )  # pooled_hidden: (B, 4, 512)
-        pooled_hidden = pooled_hidden.mean(dim=1) 
-        logit = self.risk_head(pooled_hidden)
-
-        return logit, pooled_hidden, activ
 
     # =================================================
     # Heads
