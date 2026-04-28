@@ -22,6 +22,7 @@ for _key in list(sys.modules.keys()):
             _key.replace("models.Mirai.onconet", "onconet"),
             sys.modules[_key]
         )
+
 class VMRAMaR(BaseRiskModel):
     def __init__(self, args):
         super().__init__(args)
@@ -235,3 +236,4 @@ class VMRAMaR(BaseRiskModel):
 
     def get_primary_risk_head(self, outputs):
         return outputs["probs"]
+
