@@ -1,490 +1,559 @@
+"""Formal multi-scale VMRNN blocks with optional VMamba or pure PyTorch VSS cells."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from pathlib import Path
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import math
-from functools import partial
-from einops import rearrange, repeat
-from timm.models.layers import DropPath
-from timm.models.swin_transformer import PatchMerging
-
-
-# ── Selective scan — pure PyTorch fallback ────────────────────────────────
-
-def selective_scan_ref(
-    u, delta, A, B, C, D=None, z=None,
-    delta_bias=None, delta_softplus=False,
-    return_last_state=False,
-):
-    """Pure PyTorch S6 selective scan. Matches mamba_ssm signature."""
-    dtype_in = u.dtype
-    u     = u.float()
-    delta = delta.float()
-    if delta_bias is not None:
-        delta = delta + delta_bias.unsqueeze(-1).float()
-    if delta_softplus:
-        delta = F.softplus(delta)
-    B_in = B.float()
-    C_in = C.float()
-    batch, d_model, L = u.shape
-    N = A.shape[1]
-    deltaA   = torch.exp(torch.einsum("bdl,dn->bdln", delta, A.float()))
-    if B_in.dim() == 3:
-        deltaB_u = torch.einsum("bdl,bnl,bdl->bdln", delta, B_in, u)
-    else:
-        deltaB_u = torch.einsum("bdl,bnl,bdl->bdln", delta, B_in[:, 0], u)
-    x  = torch.zeros(batch, d_model, N, device=u.device, dtype=torch.float32)
-    ys = []
-    for i in range(L):
-        x = deltaA[:, :, i] * x + deltaB_u[:, :, i]
-        if C_in.dim() == 3:
-            y = torch.einsum("bdn,bn->bd", x, C_in[:, :, i])
-        else:
-            y = torch.einsum("bdn,bn->bd", x, C_in[:, 0, :, i])
-        ys.append(y)
-    y = torch.stack(ys, dim=2)
-    if D is not None:
-        y = y + u * D.float().unsqueeze(-1)
-    if z is not None:
-        y = y * F.silu(z.float())
-    y = torch.clamp(y, -1e4, 1e4)      # numerical stability for fp16
-    y = y.to(dtype_in)
-    return (y, x) if return_last_state else y
-
+from torch import nn
 
 try:
-    from mamba_ssm.ops.selective_scan_interface import selective_scan_ref as selective_scan_fn
-    print("✅ Using mamba_ssm GPU kernel")
-except ImportError:
-    selective_scan_fn = selective_scan_ref
-    print("⚠️  mamba_ssm not found — using pure PyTorch selective scan")
+    from vmra_mar.modeling.vmamba_runtime import (
+        VMambaVSBBlock,
+        is_vmamba_kernel_available,
+        vmamba_kernel_backend_name,
+        vmamba_unavailable_reason,
+    )
+except Exception as exc:
+    VMambaVSBBlock = None
+
+    def is_vmamba_kernel_available() -> bool:
+        return False
+
+    def vmamba_kernel_backend_name() -> str:
+        return "none"
+
+    def vmamba_unavailable_reason() -> str:
+        return str(exc)
 
 
-# ── SS2D ──────────────────────────────────────────────────────────────────
+def _num_tokens(resolution: tuple[int, int]) -> int:
+    return resolution[0] * resolution[1]
 
-class SS2D(nn.Module):
-    def __init__(
-        self, d_model, d_state=16, d_conv=3, expand=2,
-        dt_rank="auto", dt_min=0.001, dt_max=0.1,
-        dt_init="random", dt_scale=1.0, dt_init_floor=1e-4,
-        dropout=0., conv_bias=True, bias=False, **kwargs,
-    ):
-        super().__init__()
-        self.d_model  = d_model
-        self.d_state  = d_state
-        self.d_inner  = int(expand * d_model)
-        self.dt_rank  = math.ceil(d_model / 16) if dt_rank == "auto" else dt_rank
 
-        self.in_proj  = nn.Linear(d_model, self.d_inner * 2, bias=bias)
-        self.conv2d   = nn.Conv2d(
-            self.d_inner, self.d_inner, groups=self.d_inner,
-            bias=conv_bias, kernel_size=d_conv, padding=(d_conv - 1) // 2,
+def _scale_resolution(resolution: tuple[int, int], factor: int) -> tuple[int, int]:
+    return resolution[0] // factor, resolution[1] // factor
+
+
+def _tokens_to_map(tokens: torch.Tensor, resolution: tuple[int, int]) -> torch.Tensor:
+    height, width = resolution
+    batch_size, token_count, channels = tokens.shape
+    if token_count != height * width:
+        raise ValueError(f"Expected {height * width} tokens for resolution {resolution}, got {token_count}.")
+    return tokens.view(batch_size, height, width, channels).permute(0, 3, 1, 2).contiguous()
+
+
+def _map_to_tokens(feature_map: torch.Tensor) -> torch.Tensor:
+    batch_size, channels, height, width = feature_map.shape
+    return feature_map.permute(0, 2, 3, 1).reshape(batch_size, height * width, channels)
+
+
+def _validate_multiscale_resolution(resolution: tuple[int, int], num_layers: int) -> None:
+    if num_layers < 1:
+        raise ValueError("VMRNN requires at least one recurrent scale.")
+
+    divisor = 2 ** num_layers
+    height, width = resolution
+    if height % divisor != 0 or width % divisor != 0:
+        raise ValueError(
+            f"Resolution {resolution} must be divisible by {divisor} to support {num_layers} downsampling stages."
         )
-        self.act = nn.SiLU()
-
-        self.x_proj_weight = nn.Parameter(torch.stack([
-            nn.Linear(self.d_inner, self.dt_rank + d_state * 2, bias=False).weight
-            for _ in range(4)
-        ], dim=0))
-        self.dt_projs_weight = nn.Parameter(torch.stack([
-            self._dt_init(self.dt_rank, self.d_inner, dt_scale, dt_init,
-                          dt_min, dt_max, dt_init_floor).weight
-            for _ in range(4)
-        ], dim=0))
-        self.dt_projs_bias = nn.Parameter(torch.stack([
-            self._dt_init(self.dt_rank, self.d_inner, dt_scale, dt_init,
-                          dt_min, dt_max, dt_init_floor).bias
-            for _ in range(4)
-        ], dim=0))
-        self.A_logs   = self._A_log_init(d_state, self.d_inner, copies=4, merge=True)
-        self.Ds       = self._D_init(self.d_inner, copies=4, merge=True)
-        self.out_norm = nn.LayerNorm(self.d_inner)
-        self.out_proj = nn.Linear(self.d_inner, d_model, bias=bias)
-        self.dropout  = nn.Dropout(dropout) if dropout > 0. else None
-
-    @staticmethod
-    def _dt_init(dt_rank, d_inner, dt_scale, dt_init, dt_min, dt_max, dt_init_floor):
-        dt_proj = nn.Linear(dt_rank, d_inner, bias=True)
-        dt_init_std = dt_rank ** -0.5 * dt_scale
-        if dt_init == "constant":
-            nn.init.constant_(dt_proj.weight, dt_init_std)
-        else:
-            nn.init.uniform_(dt_proj.weight, -dt_init_std, dt_init_std)
-        dt = torch.exp(
-            torch.rand(d_inner) * (math.log(dt_max) - math.log(dt_min)) + math.log(dt_min)
-        ).clamp(min=dt_init_floor)
-        inv_dt = dt + torch.log(-torch.expm1(-dt))
-        with torch.no_grad():
-            dt_proj.bias.copy_(inv_dt)
-        dt_proj.bias._no_reinit = True
-        return dt_proj
-
-    @staticmethod
-    def _A_log_init(d_state, d_inner, copies=1, merge=True):
-        A = repeat(
-            torch.arange(1, d_state + 1, dtype=torch.float32),
-            "n -> d n", d=d_inner,
-        ).contiguous()
-        A_log = nn.Parameter(
-            repeat(torch.log(A), "d n -> r d n", r=copies).flatten(0, 1).contiguous()
-        )
-        A_log._no_weight_decay = True
-        return A_log
-
-    @staticmethod
-    def _D_init(d_inner, copies=1, merge=True):
-        D = nn.Parameter(torch.ones(d_inner * copies))
-        D._no_weight_decay = True
-        return D
-
-    def forward_core(self, x):
-        B, C, H, W = x.shape
-        L = H * W
-        K = 4
-        x_hwwh = torch.stack([
-            x.view(B, -1, L),
-            torch.transpose(x, 2, 3).contiguous().view(B, -1, L),
-        ], dim=1).view(B, 2, -1, L)
-        xs  = torch.cat([x_hwwh, torch.flip(x_hwwh, dims=[-1])], dim=1)
-        x_dbl = torch.einsum("b k d l, k c d -> b k c l", xs.view(B, K, -1, L), self.x_proj_weight)
-        dts, Bs, Cs = torch.split(x_dbl, [self.dt_rank, self.d_state, self.d_state], dim=2)
-        dts = torch.einsum("b k r l, k d r -> b k d l", dts.view(B, K, -1, L), self.dt_projs_weight)
-        xs  = xs.float().view(B, -1, L)
-        dts = dts.contiguous().float().view(B, -1, L)
-        Bs  = Bs.float().view(B, K, -1, L)
-        Cs  = Cs.float().view(B, K, -1, L)
-        Ds  = self.Ds.float().view(-1)
-        As  = -torch.exp(self.A_logs.float().clamp(-10, 10)).view(-1, self.d_state)
-        dt_bias = self.dt_projs_bias.float().view(-1)
-        out_y = selective_scan_fn(
-            xs, dts, As, Bs, Cs, Ds, z=None,
-            delta_bias=dt_bias, delta_softplus=True, return_last_state=False,
-        ).view(B, K, -1, L)
-        inv_y   = torch.flip(out_y[:, 2:4], dims=[-1]).view(B, 2, -1, L)
-        wh_y    = torch.transpose(out_y[:, 1].view(B, -1, W, H), 2, 3).contiguous().view(B, -1, L)
-        invwh_y = torch.transpose(inv_y[:, 1].view(B, -1, W, H), 2, 3).contiguous().view(B, -1, L)
-        y = out_y[:, 0] + inv_y[:, 0] + wh_y + invwh_y
-        y = torch.transpose(y, 1, 2).contiguous().view(B, H, W, -1)
-        y = self.out_norm(y).to(x.dtype)
-        return y
-
-    def forward(self, x):
-        B, H, W, C = x.shape
-        xz = self.in_proj(x)
-        x, z = xz.chunk(2, dim=-1)
-        x = x.permute(0, 3, 1, 2).contiguous()
-        x = self.act(self.conv2d(x))
-        y = self.forward_core(x)
-        y = y * F.silu(z)
-        out = self.out_proj(y)
-        if self.dropout is not None:
-            out = self.dropout(out)
-        return out
 
 
-# ── VSB Block ─────────────────────────────────────────────────────────────
+def resolve_vss_backend(requested: str) -> str:
+    normalized = requested.lower()
+    if normalized not in {"auto", "formal", "vmamba", "torch", "fallback"}:
+        raise ValueError(f"Unsupported VSS backend: {requested}")
 
-class VSB(nn.Module):
-    """
-    Visual State Block. Wraps SS2D with LayerNorm, residual connection,
-    and optional hidden-state fusion (for LSTM-style recurrence).
+    if normalized in {"torch", "fallback"}:
+        return "torch"
 
-    In temporal mode (H=W=1): reshapes (B, L, C) → (B, 1, L, C) for SS2D.
-    In spatial mode: reshapes (B, L, C) → (B, H, W, C) for SS2D.
-    """
+    if is_vmamba_kernel_available():
+        return "vmamba"
 
-    def __init__(
-        self, hidden_dim, input_resolution,
-        drop_path=0.,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),
-        attn_drop_rate=0., d_state=16, **kwargs,
-    ):
+    if normalized == "auto":
+        return "torch"
+
+    raise RuntimeError(
+        f"VMamba backend requested but unavailable: {vmamba_unavailable_reason()}"
+    )
+
+
+def _extract_released_state_dict(checkpoint: object) -> dict[str, torch.Tensor]:
+    if isinstance(checkpoint, dict):
+        if "state_dict" in checkpoint and isinstance(checkpoint["state_dict"], dict):
+            checkpoint = checkpoint["state_dict"]
+        elif "model_state_dict" in checkpoint and isinstance(checkpoint["model_state_dict"], dict):
+            checkpoint = checkpoint["model_state_dict"]
+    if not isinstance(checkpoint, dict):
+        raise TypeError(f"Expected a state-dict like checkpoint, found {type(checkpoint)!r}.")
+    return checkpoint
+
+
+def _map_released_weight_key(key: str) -> str | None:
+    normalized = key.removeprefix("module.")
+    replacements = (
+        ("Downsample.layers.", "down_cells."),
+        ("Downsample.downsample.", "downsamplers."),
+        ("Upsample.layers.", "up_cells."),
+        ("Upsample.upsample.", "upsamplers."),
+        (".VSBs.", ".blocks."),
+    )
+    for source, target in replacements:
+        normalized = normalized.replace(source, target)
+    if normalized.startswith(("down_cells.", "up_cells.", "downsamplers.", "upsamplers.")):
+        return normalized
+    return None
+
+
+class PatchMerging(nn.Module):
+    def __init__(self, input_resolution: tuple[int, int], dim: int, norm_layer: type[nn.Module] = nn.LayerNorm) -> None:
         super().__init__()
         self.input_resolution = input_resolution
-        self.ln_1           = norm_layer(hidden_dim)
-        self.self_attention = SS2D(d_model=hidden_dim, dropout=attn_drop_rate, d_state=d_state)
-        self.drop_path      = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-        self.linear         = nn.Linear(hidden_dim * 2, hidden_dim)
+        self.reduction = nn.Linear(4 * dim, 2 * dim, bias=False)
+        self.norm = norm_layer(4 * dim)
 
-    def forward(self, x, hx=None):
-        H, W = self.input_resolution
-        B, L, C = x.shape
-        shortcut = x
-        x = self.ln_1(x)
+    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+        height, width = self.input_resolution
+        batch_size, token_count, channels = tokens.shape
+        if token_count != height * width:
+            raise ValueError(f"Expected {height * width} tokens for resolution {self.input_resolution}, got {token_count}.")
+        if height % 2 != 0 or width % 2 != 0:
+            raise ValueError(f"PatchMerging expects even resolutions, got {self.input_resolution}.")
 
-        if hx is not None:
-            hx = self.ln_1(hx)
-            x  = self.linear(torch.cat((x, hx), dim=-1))
+        feature_map = tokens.view(batch_size, height, width, channels)
+        x0 = feature_map[:, 0::2, 0::2, :]
+        x1 = feature_map[:, 1::2, 0::2, :]
+        x2 = feature_map[:, 0::2, 1::2, :]
+        x3 = feature_map[:, 1::2, 1::2, :]
+        merged = torch.cat([x0, x1, x2, x3], dim=-1)
+        merged = merged.view(batch_size, -1, 4 * channels)
+        merged = self.norm(merged)
+        return self.reduction(merged)
 
-        if H == 1 and W == 1:
-            # Temporal mode: treat T timesteps as width dimension
-            x = x.view(B, 1, L, C)
-            x = self.drop_path(self.self_attention(x))
-            x = x.view(B, L, C)
-        else:
-            assert L == H * W, f"Got L={L}, expected H*W={H*W}"
-            x = x.view(B, H, W, C)
-            x = self.drop_path(self.self_attention(x))
-            x = x.view(B, H * W, C)
-
-        return shortcut + x
-
-
-# ── VMRNNCell ─────────────────────────────────────────────────────────────
-
-class VMRNNCell(nn.Module):
-    """
-    LSTM-style recurrent cell using VSB blocks.
-    First VSB fuses input with previous hidden state;
-    subsequent VSBs refine without hidden state.
-    """
-
-    def __init__(
-        self, hidden_dim, input_resolution, depth,
-        drop=0., attn_drop=0., drop_path=0.,
-        norm_layer=nn.LayerNorm, d_state=16, **kwargs,
-    ):
-        super().__init__()
-        self.VSBs = nn.ModuleList([
-            VSB(
-                hidden_dim=hidden_dim,
-                input_resolution=input_resolution,
-                drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path,
-                norm_layer=norm_layer,
-                attn_drop_rate=attn_drop,
-                d_state=d_state,
-            )
-            for i in range(depth)
-        ])
-
-    def forward(self, xt, hidden_states):
-        """
-        xt:            (B, L, C)
-        hidden_states: None or (Ht, Ct) each (B, L, C)
-        Returns: Ht (B, L, C), (Ht, Ct)
-        """
-        B, L, C = xt.shape
-        if hidden_states is None:
-            hx = torch.zeros(B, L, C, device=xt.device, dtype=xt.dtype)
-            cx = torch.zeros(B, L, C, device=xt.device, dtype=xt.dtype)
-        else:
-            hx, cx = hidden_states
-
-        outputs = [self.VSBs[0](xt, hx)]
-        for vsb in self.VSBs[1:]:
-            outputs.append(vsb(outputs[-1], None))
-
-        o_t  = outputs[-1]
-        Ft   = torch.sigmoid(o_t)
-        cell = torch.tanh(o_t)
-        Ct   = Ft * (cx + cell)
-        Ht   = Ft * torch.tanh(Ct)
-        return Ht, (Ht, Ct)
-
-
-# ── PatchExpanding / PatchInflated ────────────────────────────────────────
 
 class PatchExpanding(nn.Module):
-    def __init__(self, input_resolution, dim, dim_scale=2, norm_layer=nn.LayerNorm):
+    def __init__(
+        self,
+        input_resolution: tuple[int, int],
+        dim: int,
+        dim_scale: int = 2,
+        norm_layer: type[nn.Module] = nn.LayerNorm,
+    ) -> None:
         super().__init__()
         self.input_resolution = input_resolution
-        self.expand = nn.Linear(dim, 2 * dim, bias=False) if dim_scale == 2 else nn.Identity()
-        self.norm   = norm_layer(dim // dim_scale)
+        self.expand = nn.Linear(dim, dim_scale * dim, bias=False) if dim_scale == 2 else nn.Identity()
+        self.norm = norm_layer(dim // dim_scale)
 
-    def forward(self, x):
-        H, W = self.input_resolution
-        x = self.expand(x)
-        B, L, C = x.shape
-        assert L == H * W
-        x = x.view(B, H, W, C)
-        x = rearrange(x, "b h w (p1 p2 c) -> b (h p1) (w p2) c", p1=2, p2=2, c=C // 4)
-        x = x.view(B, -1, C // 4)
-        x = self.norm(x)
-        return x
+    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+        height, width = self.input_resolution
+        tokens = self.expand(tokens)
+        batch_size, token_count, channels = tokens.shape
+        if token_count != height * width:
+            raise ValueError(f"Expected {height * width} tokens for resolution {self.input_resolution}, got {token_count}.")
 
-
-class PatchInflated(nn.Module):
-    def __init__(self, in_chans, embed_dim, input_resolution,
-                 stride=2, padding=1, output_padding=1):
-        super().__init__()
-        from timm.models.layers import to_2tuple
-        self.input_resolution = input_resolution
-        self.Conv = nn.ConvTranspose2d(
-            embed_dim, in_chans, kernel_size=(3, 3),
-            stride=to_2tuple(stride), padding=to_2tuple(padding),
-            output_padding=to_2tuple(output_padding),
-        )
-
-    def forward(self, x):
-        H, W = self.input_resolution
-        B, L, C = x.shape
-        assert L == H * W
-        x = x.view(B, H, W, C).permute(0, 3, 1, 2)
-        return self.Conv(x)
+        feature_map = tokens.view(batch_size, height, width, channels)
+        feature_map = feature_map.reshape(batch_size, height, width, 2, 2, channels // 4)
+        feature_map = feature_map.permute(0, 1, 3, 2, 4, 5).reshape(batch_size, height * 2, width * 2, channels // 4)
+        tokens = feature_map.view(batch_size, -1, channels // 4)
+        return self.norm(tokens)
 
 
-# ── DownSample / UpSample ─────────────────────────────────────────────────
-
-class DownSample(nn.Module):
-    def __init__(
-        self, embed_dim, depths_downsample, feature_resolution,
-        drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
-        norm_layer=nn.LayerNorm, d_state=16, **kwargs,
-    ):
-        super().__init__()
-        self.num_layers = len(depths_downsample)
-        patches_resolution = feature_resolution
-        is_temporal = feature_resolution[0] == 1 or feature_resolution[1] == 1
-        self.is_temporal = is_temporal
-        self.patch_embed = nn.Identity()
-
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths_downsample))]
-        self.layers     = nn.ModuleList()
-        self.downsample = nn.ModuleList()
-
-        for i in range(self.num_layers):
-            res = (
-                max(patches_resolution[0] // (2 ** i), 1),
-                max(patches_resolution[1] // (2 ** i), 1),
-            )
-            # In temporal mode: dim stays constant, no spatial downsampling
-            hidden_dim = embed_dim if is_temporal else int(embed_dim * 2 ** i)
-            down       = nn.Identity() if is_temporal else PatchMerging(
-                input_resolution=res, dim=hidden_dim,
-            )
-            self.layers.append(VMRNNCell(
-                hidden_dim=hidden_dim,
-                input_resolution=res,           # (1,1) in temporal mode
-                depth=depths_downsample[i],
-                drop=drop_rate,
-                attn_drop=attn_drop_rate,
-                drop_path=dpr[sum(depths_downsample[:i]):sum(depths_downsample[:i+1])],
-                norm_layer=norm_layer,
-                d_state=d_state,
-            ))
-            self.downsample.append(down)
-
-    def forward(self, x, states_down):
-        x = self.patch_embed(x)
-        new_states = []
-        for layer, down, state in zip(
-            self.layers, self.downsample,
-            states_down if states_down is not None else [None] * self.num_layers,
-        ):
-            x, hidden_state = layer(x, state)
-            x = down(x)
-            new_states.append(hidden_state)
-        return new_states, x
-
-
-class UpSample(nn.Module):
-    def __init__(
-        self, embed_dim, depths_upsample, feature_resolution,
-        drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
-        norm_layer=nn.LayerNorm, d_state=16, out_chans=None, **kwargs,
-    ):
-        super().__init__()
-        self.num_layers = len(depths_upsample)
-        patches_resolution = feature_resolution
-        is_temporal = feature_resolution[0] == 1 or feature_resolution[1] == 1
-        self.is_temporal = is_temporal
-
-        self.Unembed = nn.Identity() if is_temporal else PatchInflated(
-            in_chans=out_chans if out_chans is not None else embed_dim,
-            embed_dim=embed_dim,
-            input_resolution=patches_resolution,
-        )
-
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths_upsample))]
-        self.layers   = nn.ModuleList()
-        self.upsample = nn.ModuleList()
-
-        for i in range(self.num_layers):
-            res1 = max(patches_resolution[0] // (2 ** (self.num_layers - i)), 1)
-            res2 = max(patches_resolution[1] // (2 ** (self.num_layers - i)), 1)
-            # In temporal mode: dim stays constant
-            dim  = embed_dim if is_temporal else int(embed_dim * 2 ** (self.num_layers - i))
-            up   = nn.Identity() if is_temporal else PatchExpanding(
-                input_resolution=(res1, res2), dim=dim,
-            )
-            depth_idx = self.num_layers - 1 - i
-            self.layers.append(VMRNNCell(
-                hidden_dim=dim,
-                input_resolution=(res1, res2),
-                depth=depths_upsample[depth_idx],
-                drop=drop_rate,
-                attn_drop=attn_drop_rate,
-                drop_path=dpr[sum(depths_upsample[:depth_idx]):sum(depths_upsample[:depth_idx+1])],
-                norm_layer=norm_layer,
-                d_state=d_state,
-            ))
-            self.upsample.append(up)
-
-    def forward(self, x, states_up):
-        new_states = []
-        for layer, up, state in zip(
-            self.layers, self.upsample,
-            states_up if states_up is not None else [None] * self.num_layers,
-        ):
-            x, hidden_state = layer(x, state)
-            x = up(x)
-            new_states.append(hidden_state)
-        # Sigmoid only in spatial reconstruction mode
-        x = self.Unembed(x)
-        if not self.is_temporal:
-            x = torch.sigmoid(x)
-        return new_states, x
-
-
-# ── VMRNN ─────────────────────────────────────────────────────────────────
-
-class VMRNN(nn.Module):
-    """
-    Full VMRNN model.
-
-    In temporal mode (feature_resolution=(1,1)):
-        - Receives (B, T, C) — full visit sequence
-        - VMRNNCells process all T timesteps at once
-        - Returns (B, T, C)
-
-    In spatial mode (feature_resolution=(H,W)):
-        - Receives (B, L, C) where L=H*W
-        - Spatial U-Net with PatchMerging/Expanding
-        - Returns (B, L, C)
-    """
+class InputTokenProjection(nn.Module):
+    """Map a fused exam embedding into the base token grid expected by VMRNN."""
 
     def __init__(
         self,
-        embed_dim,
-        depths_downsample,
-        depths_upsample,
-        feature_resolution=(1, 1),
-        **kwargs,
-    ):
+        input_dim: int,
+        hidden_dim: int,
+        resolution: tuple[int, int],
+        dropout: float = 0.0,
+    ) -> None:
         super().__init__()
-        self.Downsample = DownSample(
-            embed_dim=embed_dim,
-            depths_downsample=depths_downsample,
-            feature_resolution=feature_resolution,
-            **kwargs,
-        )
-        self.Upsample = UpSample(
-            embed_dim=embed_dim,
-            depths_upsample=depths_upsample,
-            feature_resolution=feature_resolution,
-            **kwargs,
+        self.hidden_dim = hidden_dim
+        self.token_count = _num_tokens(resolution)
+        self.proj = nn.Linear(input_dim, self.token_count * hidden_dim)
+        self.norm = nn.LayerNorm(hidden_dim)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x_t: torch.Tensor) -> torch.Tensor:
+        tokens = self.proj(x_t).view(x_t.size(0), self.token_count, self.hidden_dim)
+        return self.dropout(self.norm(tokens))
+
+
+class TorchVSBBlock(nn.Module):
+    """Pure PyTorch fallback for VMamba VSB blocks."""
+
+    def __init__(
+        self,
+        hidden_dim: int,
+        input_resolution: tuple[int, int],
+        drop_path: float = 0.0,
+        attn_drop_rate: float = 0.0,
+        d_state: int = 16,
+    ) -> None:
+        super().__init__()
+        del drop_path, d_state
+        self.input_resolution = input_resolution
+
+        self.hidden_proj = nn.Linear(hidden_dim, hidden_dim)
+        self.norm1 = nn.LayerNorm(hidden_dim)
+        self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, padding=1, groups=hidden_dim)
+        self.pwconv1 = nn.Conv2d(hidden_dim, 2 * hidden_dim, kernel_size=1)
+        self.pwconv2 = nn.Conv2d(2 * hidden_dim, hidden_dim, kernel_size=1)
+        self.act = nn.SiLU()
+        self.dropout = nn.Dropout(attn_drop_rate)
+
+        self.norm2 = nn.LayerNorm(hidden_dim)
+        self.mlp = nn.Sequential(
+            nn.Linear(hidden_dim, 4 * hidden_dim),
+            nn.GELU(),
+            nn.Dropout(attn_drop_rate),
+            nn.Linear(4 * hidden_dim, hidden_dim),
+            nn.Dropout(attn_drop_rate),
         )
 
-    def forward(self, features, states_down=None, states_up=None, **kwargs):
-        """
-        features:    (B, T, C) in temporal mode  or  (B, L, C) in spatial mode
-        states_down: list of (Ht, Ct) per encoder level, or None
-        states_up:   list of (Ht, Ct) per decoder level, or None
-        Returns: output (B, T, C), states_down, states_up
-        """
-        B = features.shape[0]
-        if features.dim() == 3 and self.Downsample.is_temporal:
-            features = features.view(B, -1, features.size(-1))
-        states_down, x      = self.Downsample(features, states_down)
-        states_up,   output = self.Upsample(x, states_up)
-        return output, states_down, states_up
+    def forward(self, tokens: torch.Tensor, hidden_tokens: torch.Tensor | None = None) -> torch.Tensor:
+        residual = tokens
+        x = self.norm1(tokens)
+
+        if hidden_tokens is not None:
+            x = x + self.hidden_proj(hidden_tokens)
+
+        x_map = _tokens_to_map(x, self.input_resolution)
+        x_map = self.dwconv(x_map)
+        x_map = self.pwconv1(x_map)
+        x_map = self.act(x_map)
+        x_map = self.dropout(x_map)
+        x_map = self.pwconv2(x_map)
+
+        x = _map_to_tokens(x_map)
+        x = residual + self.dropout(x)
+        x = x + self.mlp(self.norm2(x))
+        return x
+
+
+def _build_vss_block(
+    backend: str,
+    *,
+    hidden_dim: int,
+    input_resolution: tuple[int, int],
+    drop_path: float,
+    attn_drop_rate: float,
+    d_state: int,
+) -> nn.Module:
+    if backend == "vmamba":
+        if VMambaVSBBlock is None:
+            raise RuntimeError("VMamba backend requested but VMambaVSBBlock could not be imported.")
+        return VMambaVSBBlock(
+            hidden_dim=hidden_dim,
+            input_resolution=input_resolution,
+            drop_path=drop_path,
+            attn_drop_rate=attn_drop_rate,
+            d_state=d_state,
+        )
+
+    return TorchVSBBlock(
+        hidden_dim=hidden_dim,
+        input_resolution=input_resolution,
+        drop_path=drop_path,
+        attn_drop_rate=attn_drop_rate,
+        d_state=d_state,
+    )
+
+
+class RecurrentStageCell(nn.Module):
+    """Per-scale recurrent VMRNN cell."""
+
+    def __init__(
+        self,
+        dim: int,
+        resolution: tuple[int, int],
+        depth: int,
+        dropout: float = 0.0,
+        vmamba_d_state: int = 16,
+        vmamba_drop_path: float = 0.0,
+        vss_backend: str = "auto",
+    ) -> None:
+        super().__init__()
+        self.blocks = nn.ModuleList(
+            _build_vss_block(
+                vss_backend,
+                hidden_dim=dim,
+                input_resolution=resolution,
+                drop_path=vmamba_drop_path,
+                attn_drop_rate=dropout,
+                d_state=vmamba_d_state,
+            )
+            for _ in range(max(depth, 1))
+        )
+
+    def forward(
+        self,
+        tokens: torch.Tensor,
+        state: tuple[torch.Tensor, torch.Tensor],
+    ) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
+        hidden_tokens, cell_tokens = state
+        outputs = []
+        for block_index, block in enumerate(self.blocks):
+            if block_index == 0:
+                outputs.append(block(tokens, hidden_tokens))
+            else:
+                outputs.append(block(outputs[-1], None))
+
+        stage_output = outputs[-1]
+        gate = torch.sigmoid(stage_output)
+        cell = torch.tanh(stage_output)
+        next_cell = gate * (cell_tokens + cell)
+        next_hidden = gate * torch.tanh(next_cell)
+        return next_hidden, (next_hidden, next_cell)
+
+
+class ReconstructionBlock(nn.Module):
+    def __init__(self, dim: int, resolution: tuple[int, int]) -> None:
+        super().__init__()
+        self.resolution = resolution
+        self.norm = nn.LayerNorm(dim)
+        self.depthwise = nn.Conv2d(dim, dim, kernel_size=3, padding=1, groups=dim)
+        self.pointwise = nn.Conv2d(dim, dim, kernel_size=1)
+        self.activation = nn.SiLU()
+
+    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+        feature_map = _tokens_to_map(self.norm(tokens), self.resolution)
+        reconstructed = self.pointwise(self.activation(self.depthwise(feature_map)))
+        return tokens + _map_to_tokens(reconstructed)
+
+
+class VMRNNEncoder(nn.Module):
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_dim: int = 128,
+        spatial_resolution: tuple[int, int] = (4, 4),
+        downsample_depths: Sequence[int] = (2, 6),
+        upsample_depths: Sequence[int] | None = (6, 2),
+        dropout: float = 0.1,
+        vss_backend: str = "auto",
+        vmamba_d_state: int = 16,
+        vmamba_drop_path: float = 0.0,
+        released_weight_path: str | Path | None = None,
+    ) -> None:
+        super().__init__()
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.spatial_resolution = spatial_resolution
+        self.vss_backend = resolve_vss_backend(vss_backend)
+        self.vmamba_kernel_backend = (
+            vmamba_kernel_backend_name() if self.vss_backend == "vmamba" else "torch"
+        )
+        self.vmamba_d_state = vmamba_d_state
+        self.vmamba_drop_path = vmamba_drop_path
+        self.downsample_depths = tuple(downsample_depths)
+        self.upsample_depths = tuple(upsample_depths if upsample_depths is not None else tuple(reversed(self.downsample_depths)))
+        if len(self.downsample_depths) != len(self.upsample_depths):
+            raise ValueError("Downsample and upsample depth lists must have the same number of stages.")
+
+        self.num_layers = len(self.downsample_depths)
+        _validate_multiscale_resolution(spatial_resolution, self.num_layers)
+
+        self.base_token_count = _num_tokens(spatial_resolution)
+        self.down_stage_resolutions = tuple(
+            _scale_resolution(spatial_resolution, 2 ** stage_index) for stage_index in range(self.num_layers)
+        )
+        self.down_stage_dims = tuple(hidden_dim * (2 ** stage_index) for stage_index in range(self.num_layers))
+        self.up_stage_resolutions = tuple(
+            _scale_resolution(spatial_resolution, 2 ** stage_index)
+            for stage_index in range(self.num_layers, 0, -1)
+        )
+        self.up_stage_dims = tuple(hidden_dim * (2 ** stage_index) for stage_index in range(self.num_layers, 0, -1))
+
+        self.input_projection = InputTokenProjection(
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            resolution=spatial_resolution,
+            dropout=dropout,
+        )
+
+        self.down_cells = nn.ModuleList(
+            RecurrentStageCell(
+                dim=self.down_stage_dims[stage_index],
+                resolution=self.down_stage_resolutions[stage_index],
+                depth=self.downsample_depths[stage_index],
+                dropout=dropout,
+                vmamba_d_state=self.vmamba_d_state,
+                vmamba_drop_path=self.vmamba_drop_path,
+                vss_backend=self.vss_backend,
+            )
+            for stage_index in range(self.num_layers)
+        )
+        self.downsamplers = nn.ModuleList(
+            PatchMerging(
+                input_resolution=self.down_stage_resolutions[stage_index],
+                dim=self.down_stage_dims[stage_index],
+            )
+            for stage_index in range(self.num_layers)
+        )
+
+        self.up_cells = nn.ModuleList(
+            RecurrentStageCell(
+                dim=self.up_stage_dims[stage_index],
+                resolution=self.up_stage_resolutions[stage_index],
+                depth=self.upsample_depths[self.num_layers - 1 - stage_index],
+                dropout=dropout,
+                vmamba_d_state=self.vmamba_d_state,
+                vmamba_drop_path=self.vmamba_drop_path,
+                vss_backend=self.vss_backend,
+            )
+            for stage_index in range(self.num_layers)
+        )
+        self.upsamplers = nn.ModuleList(
+            PatchExpanding(
+                input_resolution=self.up_stage_resolutions[stage_index],
+                dim=self.up_stage_dims[stage_index],
+            )
+            for stage_index in range(self.num_layers)
+        )
+
+        self.reconstruction = ReconstructionBlock(dim=hidden_dim, resolution=spatial_resolution)
+        self.history_projection = nn.Sequential(
+            nn.LayerNorm(hidden_dim),
+            nn.Linear(hidden_dim, hidden_dim),
+        )
+        self.reconstruction_projection = nn.Sequential(
+            nn.LayerNorm(hidden_dim),
+            nn.Linear(hidden_dim, input_dim),
+        )
+
+        self.released_weight_report: dict[str, object] | None = None
+        if released_weight_path is not None:
+            if self.vss_backend != "vmamba":
+                raise ValueError("released_weight_path is only supported with vss_backend='vmamba'.")
+            released_path = Path(released_weight_path)
+            if not released_path.exists():
+                raise FileNotFoundError(f"VMRNN released weights were requested but not found: {released_path}")
+            self.released_weight_report = self._load_released_weights(released_path)
+
+    def _load_released_weights(self, path: Path) -> dict[str, object]:
+        checkpoint = torch.load(path, map_location="cpu", weights_only=False)
+        raw_state = _extract_released_state_dict(checkpoint)
+        current_state = self.state_dict()
+        filtered_state: dict[str, torch.Tensor] = {}
+        for key, value in raw_state.items():
+            if not isinstance(value, torch.Tensor):
+                continue
+            mapped_key = _map_released_weight_key(key)
+            if mapped_key is None or mapped_key not in current_state:
+                continue
+            if current_state[mapped_key].shape != value.shape:
+                continue
+            filtered_state[mapped_key] = value
+
+        if not filtered_state:
+            raise RuntimeError(f"No compatible VMRNN weights could be loaded from released checkpoint: {path}")
+
+        incompatible = self.load_state_dict(filtered_state, strict=False)
+        return {
+            "path": str(path),
+            "loaded_tensors": len(filtered_state),
+            "missing_keys": list(incompatible.missing_keys),
+            "unexpected_keys": list(incompatible.unexpected_keys),
+        }
+
+    def _init_state_list(
+        self,
+        batch_size: int,
+        specs: Sequence[tuple[tuple[int, int], int]],
+        reference: torch.Tensor,
+    ) -> list[tuple[torch.Tensor, torch.Tensor]]:
+        states = []
+        for resolution, dim in specs:
+            token_count = _num_tokens(resolution)
+            zeros = reference.new_zeros(batch_size, token_count, dim)
+            states.append((zeros.clone(), zeros.clone()))
+        return states
+
+    def _blend_state_list(
+        self,
+        new_states: Sequence[tuple[torch.Tensor, torch.Tensor]],
+        old_states: Sequence[tuple[torch.Tensor, torch.Tensor]],
+        active: torch.Tensor,
+    ) -> list[tuple[torch.Tensor, torch.Tensor]]:
+        blended = []
+        for (new_hidden, new_cell), (old_hidden, old_cell) in zip(new_states, old_states, strict=True):
+            blended.append(
+                (
+                    new_hidden * active + old_hidden * (1.0 - active),
+                    new_cell * active + old_cell * (1.0 - active),
+                )
+            )
+        return blended
+
+    def _run_down_path(
+        self,
+        tokens: torch.Tensor,
+        states_down: Sequence[tuple[torch.Tensor, torch.Tensor]],
+    ) -> tuple[list[tuple[torch.Tensor, torch.Tensor]], torch.Tensor]:
+        next_states = []
+        for stage_index, cell in enumerate(self.down_cells):
+            tokens, state = cell(tokens, states_down[stage_index])
+            next_states.append(state)
+            tokens = self.downsamplers[stage_index](tokens)
+        return next_states, tokens
+
+    def _run_up_path(
+        self,
+        tokens: torch.Tensor,
+        states_up: Sequence[tuple[torch.Tensor, torch.Tensor]],
+    ) -> tuple[list[tuple[torch.Tensor, torch.Tensor]], torch.Tensor]:
+        next_states = []
+        for stage_index, cell in enumerate(self.up_cells):
+            tokens, state = cell(tokens, states_up[stage_index])
+            next_states.append(state)
+            tokens = self.upsamplers[stage_index](tokens)
+        return next_states, tokens
+
+    def _pool_tokens(self, tokens: torch.Tensor) -> torch.Tensor:
+        return tokens.mean(dim=1)
+
+    def forward(
+        self,
+        sequence: torch.Tensor,
+        exam_mask: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        batch_size, time_steps, _ = sequence.shape
+
+        down_specs = tuple(zip(self.down_stage_resolutions, self.down_stage_dims, strict=True))
+        up_specs = tuple(zip(self.up_stage_resolutions, self.up_stage_dims, strict=True))
+
+        states_down = self._init_state_list(batch_size, down_specs, sequence)
+        states_up = self._init_state_list(batch_size, up_specs, sequence)
+        summary_tokens = sequence.new_zeros(batch_size, self.base_token_count, self.hidden_dim)
+
+        pooled_states = []
+        pooled_reconstructions = []
+
+        for time_index in range(time_steps):
+            tokens = self.input_projection(sequence[:, time_index])
+            next_states_down, latent_tokens = self._run_down_path(tokens, states_down)
+            next_states_up, upsampled_tokens = self._run_up_path(latent_tokens, states_up)
+            reconstructed_tokens = self.reconstruction(upsampled_tokens)
+
+            active = exam_mask[:, time_index].view(batch_size, 1, 1).to(sequence.dtype)
+            states_down = self._blend_state_list(next_states_down, states_down, active)
+            states_up = self._blend_state_list(next_states_up, states_up, active)
+            summary_tokens = reconstructed_tokens * active + summary_tokens * (1.0 - active)
+
+            pooled_state = self.history_projection(self._pool_tokens(summary_tokens))
+            pooled_states.append(pooled_state)
+
+            pooled_reconstruction = self.reconstruction_projection(self._pool_tokens(reconstructed_tokens))
+            pooled_reconstructions.append(pooled_reconstruction * active.squeeze(-1))
+
+        state_tensor = torch.stack(pooled_states, dim=1)
+        reconstruction_tensor = torch.stack(pooled_reconstructions, dim=1)
+        last_indices = exam_mask.long().sum(dim=1).clamp(min=1) - 1
+        batch_index = torch.arange(batch_size, device=sequence.device)
+        history_embedding = state_tensor[batch_index, last_indices]
+
+        return history_embedding, state_tensor, reconstruction_tensor

@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from models.common_parts import extract_mirai_backbone
 from config.config import cfg
 
-from .vmrnn import VMRNN
+from .vmrnn import VMRNNEncoder
 from .sad import SpatialAsymmetryDetector
 from .lat import LongitudinalAsymmetryTracker
 from .visit_aggregator import VisitAggregator
@@ -57,11 +57,14 @@ class VMRAMaR(BaseRiskModel):
         # -------------------------
         # Longitudinal encoder
         # -------------------------
-        self.vmrnn = VMRNN(
-            embed_dim=self.args.embed_dim,
-            depths_downsample=self.args.depths_downsample,
+        vmrnn = VMRNNEncoder(
+            input_dim=512,
+            hidden_dim=128,
+            spatial_resolution=(1, 1),
+           depths_downsample=self.args.depths_downsample,
             depths_upsample=self.args.depths_upsample,
-            feature_resolution=(1, 1),
+            dropout=0.1,
+            vss_backend="auto",   # falls back to torch if VMamba is unavailable
         )
 
         # -------------------------
