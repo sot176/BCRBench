@@ -11,7 +11,7 @@ snapshot:
 freeze_image_encoder: false
 use_precomputed_hiddens: false
 state_dict_path: null
-
+image_repr_dim: 512
 # ----------------------------
 # Transformer architecture
 # ----------------------------

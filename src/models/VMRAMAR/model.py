@@ -12,7 +12,7 @@ from .visit_aggregator import VisitAggregator
 from models.common_parts import CumulativeProbabilityLayer
 from models.Mirai import onconet as _onconet
 from models.common_parts import BaseRiskModel
-from models.Mirai.onconet.models.factory import get_model_by_name, load_model
+from models.Mirai.onconet.models.pools import Simple_AttentionPool
 
 
 sys.modules.setdefault("onconet", _onconet)
@@ -34,6 +34,7 @@ class VMRAMaR(BaseRiskModel):
 
         if getattr(self.args, "freeze_image_encoder", True):
             self._freeze_encoder(self.image_encoder)
+        self.pool = Simple_AttentionPool(self.args, self.args.transformer_hidden_dim)
 
         # -------------------------
         # Multi-view exam encoder
@@ -41,8 +42,8 @@ class VMRAMaR(BaseRiskModel):
         self.cc_indices = getattr(self.args, "cc_indices", [0, 2])
         self.mlo_indices = getattr(self.args, "mlo_indices", [1, 3])
 
-        self.cc_fc = nn.Linear(self.image_repr_dim, self.embed_dim)
-        self.mlo_fc = nn.Linear(self.image_repr_dim, self.embed_dim)
+        self.cc_fc = nn.Linear(self.args.image_repr_dim, self.embed_dim)
+        self.mlo_fc = nn.Linear(self.args.image_repr_dim, self.embed_dim)
 
         self.exam_fusion = nn.Sequential(
             nn.Linear(2 * self.embed_dim, self.embed_dim),
@@ -101,23 +102,6 @@ class VMRAMaR(BaseRiskModel):
         denom = mask.sum(dim=2).clamp(min=1.0)
         return summed / denom
 
-    def _encode_images(self, images, batch):
-        """
-        images: (B, T, V, C, H, W)
-        returns:
-            pooled_feats: (B, T, V, C_feat)
-            feat_maps:    (B, T, V, C_feat, Hf, Wf)
-        """
-        B, T, V, C, H, W = images.size()
-
-        x_flat = images.view(B * T * V, C, H, W)
-        _, feat_maps, _ = self.image_encoder(x_flat, None, batch)
-
-        c_feat, hf, wf = feat_maps.shape[1:]
-        feat_maps = feat_maps.view(B, T, V, c_feat, hf, wf)
-        pooled_feats = feat_maps.mean(dim=(-2, -1))
-
-        return pooled_feats, feat_maps
 
     def _encode_exams(self, pooled_feats, view_mask, exam_mask):
         """
@@ -181,7 +165,12 @@ class VMRAMaR(BaseRiskModel):
         B = images.size(0)
 
         # 1. Image encoding
-        pooled_feats, feat_maps = self._encode_images(images, batch)
+        B, T, V, C, H, W = images.size()
+
+        x_flat = images.view(B * T * V, C, H, W)
+        _, feat_maps, _ = self.image_encoder(x_flat, None, batch)
+
+        _, pooled_feats = self.pool(feat_maps)
 
         # 2. Exam encoding
         exam_embeddings = self._encode_exams(pooled_feats, view_mask, exam_mask)
