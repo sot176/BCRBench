@@ -168,10 +168,10 @@ class VMRAMaR(BaseRiskModel):
         B, T, V, C, H, W = images.size()
 
         x_flat = images.view(B * T * V, C, H, W)
-        feat_maps = self.image_encoder(x_flat)
+        feat_maps = self.image_encoder(x_flat)  # (BTV, C_feat, Hf, Wf)
 
-        _, pooled_feats = self.pool(feat_maps)
-
+        _, pooled_feats = self.pool(feat_maps) # (BTV, C_feat)
+        pooled_feats = pooled_feats.view(B, T, V, -1)
         # 2. Exam encoding
         exam_embeddings = self._encode_exams(pooled_feats, view_mask, exam_mask)
 
