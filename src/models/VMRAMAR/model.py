@@ -187,6 +187,8 @@ class VMRAMaR(BaseRiskModel):
         r_aa = None
 
         if self.use_asymmetry and images.size(2) >= 2:
+            c_feat, hf, wf = feat_maps.shape[1:]
+            feat_maps = feat_maps.view(B, T, V, c_feat, hf, wf)
             r_aa, asymmetry_scores, coords, coord_valid = self._compute_asymmetry_feature(
                 feat_maps,
                 view_mask,
