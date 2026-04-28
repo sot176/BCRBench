@@ -62,7 +62,7 @@ class VMRAMaR(BaseRiskModel):
         self.vmrnn = VMRNNEncoder(
             input_dim=self.args.embed_dim,
             hidden_dim=128,
-            spatial_resolution=(4, 4),
+            spatial_resolution=(16, 16),
             downsample_depths=self.args.depths_downsample,
             upsample_depths=self.args.depths_upsample,
             dropout=0.1,
