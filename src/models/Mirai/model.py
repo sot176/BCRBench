@@ -75,14 +75,6 @@ class Mirai(nn.Module):
         logit, transformer_hidden, activ_dict = self.transformer(img_x, None, batch)
         return logit, transformer_hidden, activ_dict
 
-    
-    def forward(self, batch):
-
-        images = batch["images"]        # (B,4,C,H,W)
-
-        B,C,V,H,W = images.shape
-        assert V == 4
-
 
     # =================================================
     # Heads
