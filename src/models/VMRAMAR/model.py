@@ -168,7 +168,7 @@ class VMRAMaR(BaseRiskModel):
         B, T, V, C, H, W = images.size()
 
         x_flat = images.view(B * T * V, C, H, W)
-        _, feat_maps, _ = self.image_encoder(x_flat, None, batch)
+        _, feat_maps, _ = self.image_encoder(x_flat)
 
         _, pooled_feats = self.pool(feat_maps)
 
