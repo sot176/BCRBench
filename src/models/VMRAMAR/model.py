@@ -22,7 +22,6 @@ for _key in list(sys.modules.keys()):
             _key.replace("models.Mirai.onconet", "onconet"),
             sys.modules[_key]
         )
-
 class VMRAMaR(BaseRiskModel):
     def __init__(self, args):
         super().__init__(args)
@@ -57,12 +56,14 @@ class VMRAMaR(BaseRiskModel):
         # -------------------------
         # Longitudinal encoder
         # -------------------------
+        # Exam embeddings are already pooled to one vector per exam, so the
+        # VMRNN must operate on a single-token representation.
         self.vmrnn = VMRNNEncoder(
-            input_dim=512,
+            input_dim=self.args.embed_dim,
             hidden_dim=128,
             spatial_resolution=(1, 1),
-            downsample_depths=self.args.depths_downsample,
-            upsample_depths=self.args.depths_upsample,
+            downsample_depths=(),
+            upsample_depths=(),
             dropout=0.1,
             vss_backend="auto",   # falls back to torch if VMamba is unavailable
         )
@@ -84,7 +85,7 @@ class VMRAMaR(BaseRiskModel):
         # -------------------------
         # Risk head
         # -------------------------
-        final_dim = self.args.embed_dim + (1 if self.use_asymmetry else 0)
+        final_dim = 128 + (1 if self.use_asymmetry else 0)
         self.fusion_norm = nn.LayerNorm(final_dim)
         self.ahl = CumulativeProbabilityLayer(final_dim, max_followup=5)
 
@@ -104,7 +105,6 @@ class VMRAMaR(BaseRiskModel):
         summed = (x * mask).sum(dim=2)
         denom = mask.sum(dim=2).clamp(min=1.0)
         return summed / denom
-
 
     def _encode_exams(self, pooled_feats, view_mask, exam_mask):
         """
@@ -165,21 +165,20 @@ class VMRAMaR(BaseRiskModel):
         exam_mask = batch["exam_mask"] # (B, T)
         view_mask = batch["view_mask"] # (B, T, V)
 
-        B = images.size(0)
-
-        # 1. Image encoding
         B, T, V, C, H, W = images.size()
 
+        # 1. Image encoding
         x_flat = images.view(B * T * V, C, H, W)
         feat_maps = self.image_encoder(x_flat)  # (BTV, C_feat, Hf, Wf)
 
-        _, pooled_feats = self.pool(feat_maps) # (BTV, C_feat)
+        _, pooled_feats = self.pool(feat_maps)  # (BTV, C_feat)
         pooled_feats = pooled_feats.view(B, T, V, -1)
+
         # 2. Exam encoding
         exam_embeddings = self._encode_exams(pooled_feats, view_mask, exam_mask)
 
         # 3. Longitudinal encoding
-        history_embedding, states, reconstructions = self.vmrnn(exam_embeddings)
+        history_embedding, states, reconstructions = self.vmrnn(exam_embeddings, exam_mask)
 
         features = [history_embedding]
 
@@ -189,7 +188,7 @@ class VMRAMaR(BaseRiskModel):
         coord_valid = None
         r_aa = None
 
-        if self.use_asymmetry and images.size(2) >= 2:
+        if self.use_asymmetry and V >= 2:
             c_feat, hf, wf = feat_maps.shape[1:]
             feat_maps = feat_maps.view(B, T, V, c_feat, hf, wf)
             r_aa, asymmetry_scores, coords, coord_valid = self._compute_asymmetry_feature(
