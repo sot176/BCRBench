@@ -146,7 +146,7 @@ class Mirai(BaseRiskModel):
             img_x,
             None,
             transformer_batch
-        )
+        )  # pooled_hidden: (B, 4, 512)
         pooled_hidden = pooled_hidden.mean(dim=1) 
         logit = self.risk_head(pooled_hidden)
 
