@@ -137,6 +137,7 @@ class Mirai(BaseRiskModel):
         x = images.reshape(B*4, C, H, W)
 
         img_x = self.image_encoder(x)        # (B*4,D)
+        img_x = torch.mean(img_x, dim=(2,3))  
         img_x = img_x.reshape(B,4,-1)        # (B,4,D)
 
         transformer_batch = self._make_transformer_batch(B, images.device)
