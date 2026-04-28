@@ -51,7 +51,7 @@ class Mirai(nn.Module):
             args.precomputed_hidden_dim = self.image_repr_dim
             self.transformer = get_model_by_name("transformer", False, args)
 
-        args.img_only_dim = self.transformer.args.transfomer_hidden_dim
+        args.img_only_dim = self.transformer.args.transformer_hidden_dim
     
     def _get_img_repr_dim(self):
         if hasattr(self.image_encoder, "_model"):
