@@ -16,7 +16,7 @@ for _key in list(sys.modules.keys()):
         )
 
 from .onconet.models.factory import get_model_by_name, load_model
-
+from .onconet.models.pools import Simple_AttentionPool
 
 class Mirai(BaseRiskModel):
     """
@@ -33,7 +33,7 @@ class Mirai(BaseRiskModel):
         # Freeze encoder if requested
         if getattr(self.args, "freeze_image_encoder", True):
             self._freeze_encoder(self.image_encoder)
-
+        self.pool = Simple_AttentionPool(self.args, self.args.transformer_hidden_dim)
         # -------------------------
         # Transformer
         # -------------------------
@@ -72,8 +72,7 @@ class Mirai(BaseRiskModel):
 
         x = images.transpose(1,2).contiguous().view(B*N, C, H, W)
         img_x = self.image_encoder(x)
-        if img_x.dim() == 4:  # (B*N, C, H, W)
-            img_x = torch.nn.functional.adaptive_avg_pool2d(img_x, (1, 1)).flatten(1)
+        _, img_x = self.pool(img_x)
         img_x = img_x.view(B, N, -1)
         logit, transformer_hidden, activ_dict = self.transformer(img_x, risk_factors, batch)
         
