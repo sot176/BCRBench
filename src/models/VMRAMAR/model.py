@@ -63,8 +63,8 @@ class VMRAMaR(BaseRiskModel):
             input_dim=self.args.embed_dim,
             hidden_dim=128,
             spatial_resolution=(1, 1),
-            downsample_depths=(),
-            upsample_depths=(),
+            downsample_depths=self.args,
+            upsample_depths=self.args.depths_upsample,
             dropout=0.1,
             vss_backend="auto",   # falls back to torch if VMamba is unavailable
         )
