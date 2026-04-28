@@ -62,9 +62,9 @@ class VMRAMaR(BaseRiskModel):
         self.vmrnn = VMRNNEncoder(
             input_dim=self.args.embed_dim,
             hidden_dim=128,
-            spatial_resolution=(16, 16),
-            downsample_depths=self.args.depths_downsample,
-            upsample_depths=self.args.depths_upsample,
+            spatial_resolution=(4, 4),
+            downsample_depths=(2, 6),
+            upsample_depths=(6, 2),
             dropout=0.1,
             vss_backend="auto",   # falls back to torch if VMamba is unavailable
         )
