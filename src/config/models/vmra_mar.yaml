@@ -83,8 +83,8 @@ wrap_model: false
 # ----------------------------
 # VMRNN architecture
 # ----------------------------
-depths_downsample: [2, 2, 6, 2]
-depths_upsample: [2, 2, 6, 2]
+depths_downsample: (2, 2, 6, 2)
+depths_upsample: (2, 2, 6, 2)
 embed_dim: 512
 
 # ----------------------------
