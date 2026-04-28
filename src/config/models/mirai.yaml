@@ -68,7 +68,7 @@ max_followup: 5
 # ----------------------------
 # Misc / runtime settings
 # ----------------------------
-num_classes: 2
+num_classes: 5
 cuda: false
 num_gpus: 1
 num_shards: 1
