@@ -7,6 +7,7 @@ import sys
 from models.common_parts import BaseRiskModel
 from models.common_parts import extract_mirai_backbone
 from config.config import cfg
+from models.common_parts import CumulativeProbabilityLayer
 
 # ----------------------------------------------------
 # Register OncoNet aliases
@@ -69,10 +70,7 @@ class Mirai(BaseRiskModel):
         # ------------------------------------------------
         # Risk head
         # ------------------------------------------------
-        self.risk_head = nn.Linear(
-            self.hidden_dim,
-            self.num_years
-        )
+        self.risk_head =CumulativeProbabilityLayer(self.hidden_dim, max_followup=5)
 
     # =================================================
     # Helpers
@@ -130,87 +128,28 @@ class Mirai(BaseRiskModel):
     # Forward
     # =================================================
     def forward(self, batch):
-        """
-        images: (B,T,4,C,H,W)
-        view_mask: (B,T,4)
-        """
 
-        images = batch["images"]
-        view_mask = batch["view_mask"]
+        images = batch["images"]        # (B,4,C,H,W)
 
-        B, T, V, C, H, W = images.shape
+        B,V,C,H,W = images.shape
+        assert V == 4
 
-        assert V == 4, "Formal Mirai requires exactly 4 views"
+        x = images.reshape(B*4, C, H, W)
 
-        # ---------------------------------------------
-        # flatten all images
-        # ---------------------------------------------
-        x = images.reshape(B * T * V, C, H, W)
+        img_x = self.image_encoder(x)        # (B*4,D)
+        img_x = img_x.reshape(B,4,-1)        # (B,4,D)
 
-        # ---------------------------------------------
-        # encode all images independently
-        # ---------------------------------------------
-        img_x = self.image_encoder(x)
+        transformer_batch = self._make_transformer_batch(B, images.device)
 
-        # shape -> (B,T,4,D)
-        img_x = img_x.reshape(B, T, V, -1)
-
-        # ---------------------------------------------
-        # process each exam independently
-        # ---------------------------------------------
-        exam_embeddings = []
-
-        for t in range(T):
-
-            tokens = img_x[:, t]        # (B,4,D)
-            mask_t = view_mask[:, t]    # (B,4)
-
-            # require complete exams
-            valid_exam = mask_t.all(dim=1)
-
-            emb = torch.zeros(
-                B,
-                self.hidden_dim,
-                device=images.device
-            )
-
-            if valid_exam.any():
-
-                valid_tokens = tokens[valid_exam]
-
-                transformer_batch = self._make_transformer_batch(
-                    valid_tokens.size(0),
-                    images.device
-                )
-
-                # official transformer forward
-                _, pooled_hidden, _ = self.transformer(
-                    valid_tokens,
-                    None,
-                    transformer_batch
-                )
-
-                emb[valid_exam] = pooled_hidden
-
-            exam_embeddings.append(emb)
-
-        # (B,T,D)
-        exam_embeddings = torch.stack(
-            exam_embeddings,
-            dim=1
+        logit_hidden, pooled_hidden, activ = self.transformer(
+            img_x,
+            None,
+            transformer_batch
         )
 
-        # ---------------------------------------------
-        # use latest available exam
-        # ---------------------------------------------
-        patient_embedding = exam_embeddings[:, -1]
+        logit = self.risk_head(pooled_hidden)
 
-        # ---------------------------------------------
-        # multi-year risk logits
-        # ---------------------------------------------
-        logit = self.risk_head(patient_embedding)
-
-        return logit, patient_embedding, {}
+        return logit, pooled_hidden, activ
 
     # =================================================
     # Heads
