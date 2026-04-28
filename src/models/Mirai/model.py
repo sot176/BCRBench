@@ -131,7 +131,7 @@ class Mirai(BaseRiskModel):
 
         images = batch["images"]        # (B,4,C,H,W)
 
-        B,V,C,H,W = images.shape
+        B,C,V,H,W = images.shape
         assert V == 4
 
         x = images.reshape(B*4, C, H, W)
