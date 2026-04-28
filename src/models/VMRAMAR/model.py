@@ -57,12 +57,12 @@ class VMRAMaR(BaseRiskModel):
         # -------------------------
         # Longitudinal encoder
         # -------------------------
-        vmrnn = VMRNNEncoder(
+        self.vmrnn = VMRNNEncoder(
             input_dim=512,
             hidden_dim=128,
             spatial_resolution=(1, 1),
-           depths_downsample=self.args.depths_downsample,
-            depths_upsample=self.args.depths_upsample,
+            downsample_depths=self.args.depths_downsample,
+            upsample_depths=self.args.depths_upsample,
             dropout=0.1,
             vss_backend="auto",   # falls back to torch if VMamba is unavailable
         )
