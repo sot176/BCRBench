@@ -101,22 +101,46 @@ class Mirai(nn.Module):
             factor = factor.contiguous().view(-1, factor.size(-1))
             expanded.append(factor)
         return expanded
+    
+    def _model_args(self, model):
+        if hasattr(model, "_model"):
+            return model._model.args
+        return model.args
 
     def forward(self, batch):
-        x = batch["images"]  # expected: (B, N, C, H, W)
+        x = batch["images"]  # (B, N, C, H, W)
 
         bsz, num_imgs, channels, height, width = x.size()
-        risk_factors = self._zero_risk_factors(bsz, x.device, x.dtype)
-        risk_factors_per_img = self._expand_risk_factors_per_img(risk_factors, num_imgs)
+
+        image_encoder_args = self._model_args(self.image_encoder)
+
+        image_risk_factors = self._zero_risk_factors_for_args(
+            image_encoder_args,
+            bsz,
+            x.device,
+            x.dtype,
+        )
+        image_risk_factors_per_img = self._expand_risk_factors_per_img(
+            image_risk_factors,
+            num_imgs,
+        )
 
         x = x.contiguous().view(bsz * num_imgs, channels, height, width)
 
-        _, img_x, _ = self.image_encoder(x, risk_factors_per_img, batch)
+        _, img_x, _ = self.image_encoder(x, image_risk_factors_per_img, batch)
+
         img_x = img_x.view(bsz, num_imgs, -1)
         img_x = img_x[:, :, :self.image_repr_dim]
 
-        logit, transformer_hidden, activ_dict = self.transformer(img_x, risk_factors, batch)
+        transformer_risk_factors = self._zero_risk_factors(bsz, img_x.device, img_x.dtype)
+
+        logit, transformer_hidden, activ_dict = self.transformer(
+            img_x,
+            transformer_risk_factors,
+            batch,
+        )
         return logit, transformer_hidden, activ_dict
+
 
     def get_risk_heads(self, outputs, batch):
         logit, _, _ = outputs
