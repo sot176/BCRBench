@@ -2,17 +2,14 @@ import sys
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.common_parts import extract_mirai_backbone
-from config.config import cfg
 
 from .vmrnn import VMRNNEncoder
 from .sad import SpatialAsymmetryDetector
 from .lat import LongitudinalAsymmetryTracker
-from .visit_aggregator import VisitAggregator
 from models.common_parts import CumulativeProbabilityLayer
 from models.Mirai import onconet as _onconet
 from models.common_parts import BaseRiskModel
-from models.Mirai.onconet.models.pools import Simple_AttentionPool
+from models.Mirai.onconet.models.factory import get_model_by_name, load_model
 
 
 sys.modules.setdefault("onconet", _onconet)
@@ -27,32 +24,37 @@ class VMRAMaR(BaseRiskModel):
     def __init__(self, args):
         super().__init__(args)
 
-        # -------------------------
-        # Frozen image encoder
-        # -------------------------
-        self.image_encoder = extract_mirai_backbone(cfg["paths"]["mirai_path"])
+        if args.img_encoder_snapshot is not None:
+            self.image_encoder = load_model(
+                args.img_encoder_snapshot,
+                args,
+                do_wrap_model=False,
+            )
+        else:
+            self.image_encoder = get_model_by_name("custom_resnet", False, args)
 
-        if getattr(self.args, "freeze_image_encoder", True):
-            self._freeze_encoder(self.image_encoder)
-        self.pool = Simple_AttentionPool(self.args, self.args.transformer_hidden_dim)
+        if getattr(args, "freeze_image_encoder", False):
+            for param in self.image_encoder.parameters():
+                param.requires_grad = False
 
-        # -------------------------
-        # Multi-view exam encoder
-        # -------------------------
-        self.cc_indices = getattr(self.args, "cc_indices", [0, 2])
-        self.mlo_indices = getattr(self.args, "mlo_indices", [1, 3])
+        self.image_repr_dim = self._get_img_repr_dim()
 
-        self.cc_fc = nn.Linear(self.args.image_repr_dim, self.args.embed_dim)
-        self.mlo_fc = nn.Linear(self.args.image_repr_dim, self.args.embed_dim)
+        if args.transformer_snapshot is not None:
+            self.transformer = load_model(
+                args.transformer_snapshot,
+                args,
+                do_wrap_model=False,
+            )
+        else:
+            args.precomputed_hidden_dim = self.image_repr_dim
+            self.transformer = get_model_by_name("transformer", False, args)
 
-        self.exam_fusion = nn.Sequential(
-            nn.Linear(2 * self.args.embed_dim, self.args.embed_dim),
-            nn.GELU(),
-            nn.Dropout(getattr(self.args, "dropout", 0.1)),
-        )
-
-        self.temporal_projection = nn.Linear(self.args.embed_dim, self.args.embed_dim)
-        self.visit_aggregator = VisitAggregator(self.args)
+        if hasattr(self.transformer, "args"):
+            self.args.img_only_dim = getattr(
+                self.transformer.args,
+                "transformer_hidden_dim",
+                getattr(self.transformer.args, "transfomer_hidden_dim", self.image_repr_dim),
+            )
 
         # -------------------------
         # Longitudinal encoder
@@ -96,43 +98,61 @@ class VMRAMaR(BaseRiskModel):
             param.requires_grad = False
         encoder.eval()
         print("[INFO] Image encoder frozen.")
+    def _zero_risk_factors_for_args(
+        self,
+        args,
+        batch_size: int,
+        device: torch.device,
+        dtype: torch.dtype,
+    ):
+        if not bool(getattr(args, "use_risk_factors", False)):
+            return None
 
-    def _masked_mean(self, x, mask):
-        """
-        x:    (B, T, V, D)
-        mask: (B, T, V)
-        """
-        mask = mask.unsqueeze(-1).float()
-        summed = (x * mask).sum(dim=2)
-        denom = mask.sum(dim=2).clamp(min=1.0)
-        return summed / denom
+        key_to_dim = getattr(args, "risk_factor_key_to_num_class", None)
+        risk_factor_keys = list(getattr(args, "risk_factor_keys", []) or [])
 
-    def _encode_exams(self, pooled_feats, view_mask, exam_mask):
-        """
-        pooled_feats: (B, T, V, C_feat)
-        view_mask:    (B, T, V)
-        exam_mask:    (B, T)
-        returns:
-            exam_embeddings: (B, T, D)
-        """
-        cc_feats = pooled_feats[:, :, self.cc_indices, :]
-        mlo_feats = pooled_feats[:, :, self.mlo_indices, :]
+        if (not key_to_dim) and risk_factor_keys:
+            from onconet.utils.risk_factors import RiskFactorVectorizer
+            RiskFactorVectorizer(args)
+            key_to_dim = args.risk_factor_key_to_num_class
 
-        cc_mask = view_mask[:, :, self.cc_indices]
-        mlo_mask = view_mask[:, :, self.mlo_indices]
+        if key_to_dim and risk_factor_keys:
+            return [
+                torch.zeros(batch_size, int(key_to_dim[key]), device=device, dtype=dtype)
+                for key in risk_factor_keys
+            ]
 
-        cc_tokens = self.cc_fc(cc_feats)
-        mlo_tokens = self.mlo_fc(mlo_feats)
+        rf_dim = int(getattr(args, "rf_dim", 0) or 0)
+        if rf_dim > 0:
+            return [torch.zeros(batch_size, rf_dim, device=device, dtype=dtype)]
 
-        cc_exam = self._masked_mean(cc_tokens, cc_mask)
-        mlo_exam = self._masked_mean(mlo_tokens, mlo_mask)
+        return None
 
-        exam_embeddings = self.exam_fusion(torch.cat([cc_exam, mlo_exam], dim=-1))
-        exam_embeddings = self.temporal_projection(exam_embeddings)
-        exam_embeddings = self.visit_aggregator(exam_embeddings, exam_mask)
+    def _zero_risk_factors(self, batch_size, device, dtype):
+        return self._zero_risk_factors_for_args(self.args, batch_size, device, dtype)
 
-        return exam_embeddings
+    def _get_img_repr_dim(self):
+        if hasattr(self.image_encoder, "_model"):
+            return self.image_encoder._model.args.img_only_dim
+        return self.image_encoder.args.img_only_dim
 
+    def _expand_risk_factors_per_img(self, risk_factors, num_imgs):
+        if risk_factors is None:
+            return None
+
+        expanded = []
+        for factor in risk_factors:
+            factor = factor.unsqueeze(1).expand(-1, num_imgs, -1)
+            factor = factor.contiguous().view(-1, factor.size(-1))
+            expanded.append(factor)
+        return expanded
+    
+    def _model_args(self, model):
+        if hasattr(model, "_model"):
+            return model._model.args
+        return model.args
+
+     
     def _compute_asymmetry_feature(self, feat_maps, view_mask, exam_mask):
         """
         returns:
@@ -160,38 +180,132 @@ class VMRAMaR(BaseRiskModel):
             raise ValueError(f"Unexpected asymmetry feature shape: {r_aa.shape}")
 
         return r_aa, asymmetry_scores, coords, coord_valid
-
+    
     def forward(self, batch):
-        images = batch["images"]       # (B, T, V, C, H, W)
-        exam_mask = batch["exam_mask"] # (B, T)
-        view_mask = batch["view_mask"] # (B, T, V)
+        images = batch["images"]        # (B, T, V, C, H, W)
+        exam_mask = batch["exam_mask"]  # (B, T)
+        view_mask = batch["view_mask"]  # (B, T, V)
 
-        B, T, V, C, H, W = images.size()
+        B, T, V, C, H, W = images.shape
 
-        # 1. Image encoding
-        x_flat = images.view(B * T * V, C, H, W)
-        feat_maps = self.image_encoder(x_flat)  # (BTV, C_feat, Hf, Wf)
+        flat_exam_mask = view_mask.reshape(B * T, V)
+        partial_exam_mask = flat_exam_mask.any(dim=1) & ~flat_exam_mask.all(dim=1)
+        if partial_exam_mask.any():
+            raise RuntimeError("Formal Mirai fusion requires complete exams; partial exams are not supported.")
 
-        _, pooled_feats = self.pool(feat_maps)  # (BTV, C_feat)
-        pooled_feats = pooled_feats.view(B, T, V, -1)
+        total_views = B * T * V
+        flat_images = images.contiguous().view(total_views, C, H, W)
+        flat_view_mask = view_mask.reshape(total_views)
 
-        # 2. Exam encoding
-        exam_embeddings = self._encode_exams(pooled_feats, view_mask, exam_mask)
+        image_encoder_args = self._model_args(self.image_encoder)
+
+        # Risk factors are per exam/patient-timepoint, then expanded per image/view.
+        image_risk_factors = self._zero_risk_factors_for_args(
+            image_encoder_args,
+            B * T,
+            flat_images.device,
+            flat_images.dtype,
+        )
+        image_risk_factors_per_img = self._expand_risk_factors_per_img(
+            image_risk_factors,
+            V,
+        )
+
+        if flat_view_mask.any():
+            valid_images = flat_images[flat_view_mask]
+
+            valid_risk_factors = None
+            if image_risk_factors_per_img is not None:
+                valid_risk_factors = [
+                    rf[flat_view_mask] for rf in image_risk_factors_per_img
+                ]
+
+            _, valid_hidden, valid_activ_dict = self.image_encoder(
+                valid_images,
+                valid_risk_factors,
+                batch,
+            )
+
+            hidden = valid_hidden.new_zeros((total_views, valid_hidden.size(-1)))
+            hidden[flat_view_mask] = valid_hidden
+
+            # Adjust this key to whatever your Mirai image encoder returns.
+            valid_feat_maps = (
+                valid_activ_dict.get("feature_maps")
+                or valid_activ_dict.get("last_conv")
+                or valid_activ_dict.get("hidden")
+            )
+
+            if valid_feat_maps is None:
+                feat_maps = None
+            else:
+                feat_maps = valid_feat_maps.new_zeros(
+                    (total_views, *valid_feat_maps.shape[1:])
+                )
+                feat_maps[flat_view_mask] = valid_feat_maps
+        else:
+            hidden = flat_images.new_zeros((total_views, self.image_repr_dim))
+            feat_maps = None
+
+        hidden = hidden.view(B * T, V, -1)
+        hidden = hidden[:, :, :self.image_repr_dim]
+
+        exam_embeddings = hidden.new_zeros(B * T, self.transformer.args.transfomer_hidden_dim)
+        complete_exam_mask = flat_exam_mask.all(dim=1)
+
+        if complete_exam_mask.any():
+            exam_tokens = hidden[complete_exam_mask]  # (num_complete, V, D)
+
+            transformer_batch = self._transformer_batch(
+                int(complete_exam_mask.sum().item()),
+                hidden.device,
+            )
+
+            projected = self.transformer.projection_layer(exam_tokens)
+
+            encoded = self.transformer.transformer(
+                projected,
+                transformer_batch["time_seq"],
+                transformer_batch["view_seq"],
+                transformer_batch["side_seq"],
+            )
+
+            transformer_args = self._model_args(self.transformer)
+            transformer_risk_factors = self._zero_risk_factors_for_args(
+                transformer_args,
+                int(complete_exam_mask.sum().item()),
+                encoded.device,
+                encoded.dtype,
+            )
+
+            encoded_for_pool = encoded.transpose(1, 2).unsqueeze(-1)
+
+            if transformer_risk_factors is None:
+                _, pooled_hidden = self.transformer.aggregate_and_classify(encoded_for_pool)
+            else:
+                _, pooled_hidden = self.transformer.aggregate_and_classify(
+                    encoded_for_pool,
+                    transformer_risk_factors,
+                )
+
+            exam_embeddings[complete_exam_mask] = pooled_hidden
+
+        exam_embeddings = exam_embeddings.view(B, T, -1)
 
         # 3. Longitudinal encoding
         history_embedding, states, reconstructions = self.vmrnn(exam_embeddings, exam_mask)
 
         features = [history_embedding]
 
-        # 4. Asymmetry feature
         asymmetry_scores = None
         coords = None
         coord_valid = None
         r_aa = None
 
-        if self.use_asymmetry and V >= 2:
+        if self.use_asymmetry and V >= 2 and feat_maps is not None:
             c_feat, hf, wf = feat_maps.shape[1:]
             feat_maps = feat_maps.view(B, T, V, c_feat, hf, wf)
+
             r_aa, asymmetry_scores, coords, coord_valid = self._compute_asymmetry_feature(
                 feat_maps,
                 view_mask,
@@ -201,11 +315,8 @@ class VMRAMaR(BaseRiskModel):
 
         for i, f in enumerate(features):
             if f.dim() != 2 or f.size(0) != B:
-                raise ValueError(
-                    f"Feature {i} has invalid shape {f.shape}, expected (B, D)"
-                )
+                raise ValueError(f"Feature {i} has invalid shape {f.shape}, expected (B, D)")
 
-        # 5. Risk prediction
         combined = torch.cat(features, dim=-1)
         combined = self.fusion_norm(combined)
 
