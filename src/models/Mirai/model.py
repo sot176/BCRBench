@@ -111,7 +111,7 @@ class Mirai(nn.Module):
 
         x = x.contiguous().view(bsz * num_imgs, channels, height, width)
 
-        _, img_x, _ = self.image_encoder(x, risk_factors_per_img, batch)
+        _, img_x, _ = self.image_encoder(x, risk_factors, batch)
         img_x = img_x.view(bsz, num_imgs, -1)
         img_x = img_x[:, :, :self.image_repr_dim]
 
