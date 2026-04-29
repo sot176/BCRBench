@@ -72,12 +72,11 @@ class ResNet(nn.Module):
 
         last_block = layers[-1][-1]
         
-        pool_name = 'GlobalMaxPool'
-        #if getattr(self.args, "use_risk_factors", False):
-        #    pool_name = 'DeepRiskFactorPool' if self.args.deep_risk_factor_pool else 'RiskFactorPool'
-       
+        pool_name = args.pool_name
+        if args.use_risk_factors:
+            pool_name = 'DeepRiskFactorPool' if self.args.deep_risk_factor_pool else 'RiskFactorPool'
         self.pool = get_pool(pool_name)(args, args.hidden_dim)
-
+        
         if not self.pool.replaces_fc():
             # Cannot not placed on self.all_blocks since requires intermediate op
             self.relu = nn.ReLU(inplace=True)
