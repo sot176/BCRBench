@@ -199,7 +199,7 @@ class ResNet(nn.Module):
             for name in layers:
                 layer = self._modules[name]
                 x = layer(x)
-        logit, hidden = self.aggregate_and_classify(x)
+        logit, hidden = self.aggregate_and_classify(x, risk_factors)
         activ_dict = {'activ':x}
         if self.args.use_region_annotation:
             activ_dict['region_logit'] = self.region_fc(x)
@@ -212,9 +212,12 @@ class ResNet(nn.Module):
             return logit, hidden, activ_dict
 
 
-    def aggregate_and_classify(self, x):
+    def aggregate_and_classify(self, x, risk_factors=None):
         # Pooling layer
-        logit, hidden = self.pool(x)
+        if self.args.use_risk_factors:
+            logit, hidden = self.pool(x, risk_factors)
+        else:
+            logit, hidden = self.pool(x)
 
         if not self.pool.replaces_fc():
             # self.fc is always on last gpu, so direct call of fc(x) is safe
@@ -229,7 +232,6 @@ class ResNet(nn.Module):
         if self.args.survival_analysis_setup:
             logit = self.prob_of_failure_layer(hidden)
         return logit, hidden
-
 
 
     def cuda(self, device=None):
