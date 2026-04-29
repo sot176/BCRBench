@@ -42,10 +42,17 @@ class VMRAMaR(BaseRiskModel):
         else:
             self.image_encoder = get_model_by_name("custom_resnet", False, args)
 
-        if getattr(args, "freeze_image_encoder", False):
+        self.freeze_image_encoder = bool(getattr(args, "freeze_image_encoder", False))
+        if self.freeze_image_encoder:
             for param in self.image_encoder.parameters():
                 param.requires_grad = False
 
+        self.image_backbone = self._extract_backbone(
+            cutoff_layer=getattr(args, "backbone_cutoff_layer", "layer4_1")
+        )
+
+
+        
         self.image_repr_dim = self._get_img_repr_dim()
 
         if args.transformer_snapshot is not None:
@@ -107,6 +114,19 @@ class VMRAMaR(BaseRiskModel):
             param.requires_grad = False
         encoder.eval()
         print("[INFO] Image encoder frozen.")
+    
+    def _extract_backbone(self, cutoff_layer: str = "layer4") -> nn.Module:
+        model = self.image_encoder._model if hasattr(self.image_encoder, "_model") else self.image_encoder
+
+        modules = []
+        for name, module in model.named_children():
+            modules.append(module)
+            if name == cutoff_layer:
+                break
+
+        return nn.Sequential(*modules)
+
+
     def _zero_risk_factors_for_args(
         self,
         args,
@@ -207,18 +227,26 @@ class VMRAMaR(BaseRiskModel):
 
         B, T, V, C, H, W = images.shape
 
-        flat_exam_mask = view_mask.reshape(B * T, V)
+        if V != len(FORMAL_VIEW_SEQUENCE):
+            raise ValueError(f"Expected {len(FORMAL_VIEW_SEQUENCE)} formal views, got {V}.")
+
+        if self.freeze_image_encoder:
+            self.image_encoder.eval()
+            self.image_backbone.eval()
+
+        flat_exam_mask = view_mask.reshape(B * T, V).bool()
+        flat_valid_exam_mask = exam_mask.reshape(B * T).bool()
+
         partial_exam_mask = flat_exam_mask.any(dim=1) & ~flat_exam_mask.all(dim=1)
         if partial_exam_mask.any():
             raise RuntimeError("Formal Mirai fusion requires complete exams; partial exams are not supported.")
 
         total_views = B * T * V
         flat_images = images.contiguous().view(total_views, C, H, W)
-        flat_view_mask = view_mask.reshape(total_views)
+        flat_view_mask = view_mask.reshape(total_views).bool()
 
         image_encoder_args = self._model_args(self.image_encoder)
 
-        # Risk factors are per exam/patient-timepoint, then expanded per image/view.
         image_risk_factors = self._zero_risk_factors_for_args(
             image_encoder_args,
             B * T,
@@ -239,21 +267,20 @@ class VMRAMaR(BaseRiskModel):
                     rf[flat_view_mask] for rf in image_risk_factors_per_img
                 ]
 
-            _, valid_hidden, valid_activ_dict = self.image_encoder(
-                valid_images,
-                valid_risk_factors,
-                batch,
-            )
+            with torch.set_grad_enabled(not self.freeze_image_encoder):
+                _, valid_hidden, _ = self.image_encoder(
+                    valid_images,
+                    valid_risk_factors,
+                    batch,
+                )
+
+                if self.use_asymmetry:
+                    valid_feat_maps = self.image_backbone(valid_images)
+                else:
+                    valid_feat_maps = None
 
             hidden = valid_hidden.new_zeros((total_views, valid_hidden.size(-1)))
             hidden[flat_view_mask] = valid_hidden
-
-            # Adjust this key to whatever your Mirai image encoder returns.
-            valid_feat_maps = (
-                valid_activ_dict.get("feature_maps")
-                or valid_activ_dict.get("last_conv")
-                or valid_activ_dict.get("hidden")
-            )
 
             if valid_feat_maps is None:
                 feat_maps = None
@@ -269,11 +296,19 @@ class VMRAMaR(BaseRiskModel):
         hidden = hidden.view(B * T, V, -1)
         hidden = hidden[:, :, :self.image_repr_dim]
 
-        exam_embeddings = hidden.new_zeros(B * T, self.transformer.args.transformer_hidden_dim)
-        complete_exam_mask = flat_exam_mask.all(dim=1)
+        transformer_dim = int(
+            getattr(
+                self.transformer.args,
+                "transformer_hidden_dim",
+                getattr(self.transformer.args, "transfomer_hidden_dim", self.image_repr_dim),
+            )
+        )
+
+        exam_embeddings = hidden.new_zeros(B * T, transformer_dim)
+        complete_exam_mask = flat_valid_exam_mask & flat_exam_mask.all(dim=1)
 
         if complete_exam_mask.any():
-            exam_tokens = hidden[complete_exam_mask]  # (num_complete, V, D)
+            exam_tokens = hidden[complete_exam_mask]
 
             transformer_batch = self._transformer_batch(
                 int(complete_exam_mask.sum().item()),
@@ -311,7 +346,6 @@ class VMRAMaR(BaseRiskModel):
 
         exam_embeddings = exam_embeddings.view(B, T, -1)
 
-        # 3. Longitudinal encoding
         history_embedding, states, reconstructions = self.vmrnn(exam_embeddings, exam_mask)
 
         features = [history_embedding]
@@ -321,7 +355,7 @@ class VMRAMaR(BaseRiskModel):
         coord_valid = None
         r_aa = history_embedding.new_zeros(B, 1)
 
-        if self.use_asymmetry and V >= 2 and feat_maps is not None:
+        if self.use_asymmetry and feat_maps is not None:
             c_feat, hf, wf = feat_maps.shape[1:]
             feat_maps = feat_maps.view(B, T, V, c_feat, hf, wf)
 
@@ -334,7 +368,8 @@ class VMRAMaR(BaseRiskModel):
             if r_aa.dim() == 1:
                 r_aa = r_aa.unsqueeze(-1)
 
-        features.append(r_aa)
+        if self.use_asymmetry:
+            features.append(r_aa)
 
         for i, f in enumerate(features):
             if f.dim() != 2 or f.size(0) != B:
@@ -358,6 +393,7 @@ class VMRAMaR(BaseRiskModel):
             "coord_valid": coord_valid,
             "r_aa": r_aa,
         }
+
 
     def get_risk_heads(self, outputs, batch):
         return {
