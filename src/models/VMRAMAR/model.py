@@ -19,7 +19,7 @@ for _key in list(sys.modules.keys()):
             _key.replace("models.Mirai.onconet", "onconet"),
             sys.modules[_key]
         )
-        
+
 MAX_FOLLOWUP = 5
 FORMAL_VIEW_SEQUENCE = (
     ("LCC", 0, 1),
@@ -319,7 +319,7 @@ class VMRAMaR(BaseRiskModel):
         asymmetry_scores = None
         coords = None
         coord_valid = None
-        r_aa = None
+        r_aa = history_embedding.new_zeros(B, 1)
 
         if self.use_asymmetry and V >= 2 and feat_maps is not None:
             c_feat, hf, wf = feat_maps.shape[1:]
@@ -330,7 +330,11 @@ class VMRAMaR(BaseRiskModel):
                 view_mask,
                 exam_mask,
             )
-            features.append(r_aa)
+
+            if r_aa.dim() == 1:
+                r_aa = r_aa.unsqueeze(-1)
+
+        features.append(r_aa)
 
         for i, f in enumerate(features):
             if f.dim() != 2 or f.size(0) != B:
