@@ -53,7 +53,7 @@ class VMRAMaR(BaseRiskModel):
             self.args.img_only_dim = getattr(
                 self.transformer.args,
                 "transformer_hidden_dim",
-                getattr(self.transformer.args, "transfomer_hidden_dim", self.image_repr_dim),
+                getattr(self.transformer.args, "transformer_hidden_dim", self.image_repr_dim),
             )
 
         # -------------------------
@@ -112,7 +112,7 @@ class VMRAMaR(BaseRiskModel):
         risk_factor_keys = list(getattr(args, "risk_factor_keys", []) or [])
 
         if (not key_to_dim) and risk_factor_keys:
-            from onconet.utils.risk_factors import RiskFactorVectorizer
+            from models.Mirai.onconet.utils.risk_factors import RiskFactorVectorizer
             RiskFactorVectorizer(args)
             key_to_dim = args.risk_factor_key_to_num_class
 
@@ -250,7 +250,7 @@ class VMRAMaR(BaseRiskModel):
         hidden = hidden.view(B * T, V, -1)
         hidden = hidden[:, :, :self.image_repr_dim]
 
-        exam_embeddings = hidden.new_zeros(B * T, self.transformer.args.transfomer_hidden_dim)
+        exam_embeddings = hidden.new_zeros(B * T, self.transformer.args.transformer_hidden_dim)
         complete_exam_mask = flat_exam_mask.all(dim=1)
 
         if complete_exam_mask.any():
