@@ -19,6 +19,15 @@ for _key in list(sys.modules.keys()):
             _key.replace("models.Mirai.onconet", "onconet"),
             sys.modules[_key]
         )
+        
+MAX_FOLLOWUP = 5
+FORMAL_VIEW_SEQUENCE = (
+    ("LCC", 0, 1),
+    ("RCC", 0, 0),
+    ("LMLO", 1, 1),
+    ("RMLO", 1, 0),
+)
+
 
 class VMRAMaR(BaseRiskModel):
     def __init__(self, args):
@@ -151,6 +160,16 @@ class VMRAMaR(BaseRiskModel):
         if hasattr(model, "_model"):
             return model._model.args
         return model.args
+    
+    def _transformer_batch(self, batch_size: int, device: torch.device) -> dict[str, torch.Tensor]:
+        view_seq = torch.tensor([view for _, view, _ in FORMAL_VIEW_SEQUENCE], device=device, dtype=torch.long)
+        side_seq = torch.tensor([side for _, _, side in FORMAL_VIEW_SEQUENCE], device=device, dtype=torch.long)
+
+        return {
+            "time_seq": torch.zeros(batch_size, len(FORMAL_VIEW_SEQUENCE), device=device, dtype=torch.long),
+            "view_seq": view_seq.unsqueeze(0).expand(batch_size, -1),
+            "side_seq": side_seq.unsqueeze(0).expand(batch_size, -1),
+        }
 
      
     def _compute_asymmetry_feature(self, feat_maps, view_mask, exam_mask):
