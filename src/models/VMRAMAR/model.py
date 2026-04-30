@@ -71,23 +71,22 @@ class VMRAMaR(BaseRiskModel):
                 getattr(self.transformer.args, "transformer_hidden_dim", self.image_repr_dim),
             )
         self.vmrnn_hidden_dim = 128
-        self.temporal_projection = nn.Linear(self.args.transformer_hidden_dim, self.vmrnn_hidden_dim)
 
-        # -------------------------
-        # Longitudinal encoder
-        # -------------------------
-        # Exam embeddings are already pooled to one vector per exam, so the
-        # VMRNN must operate on a single-token representation.
-        
+        self.temporal_projection = nn.Linear(
+            self.args.transformer_hidden_dim,
+            self.vmrnn_hidden_dim,
+        )
+
         self.vmrnn = VMRNNEncoder(
-            input_dim=self.args.embed_dim,
+            input_dim=self.vmrnn_hidden_dim,
             hidden_dim=self.vmrnn_hidden_dim,
             spatial_resolution=(4, 4),
             downsample_depths=(2, 6),
             upsample_depths=(6, 2),
             dropout=0.1,
-            vss_backend="auto",   # falls back to torch if VMamba is unavailable
+            vss_backend="auto",
         )
+
 
         # -------------------------
         # Asymmetry branch
