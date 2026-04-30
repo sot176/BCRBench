@@ -52,7 +52,6 @@ class VMRAMaR(BaseRiskModel):
         )
 
 
-        
         self.image_repr_dim = self._get_img_repr_dim()
 
         if args.transformer_snapshot is not None:
@@ -71,15 +70,18 @@ class VMRAMaR(BaseRiskModel):
                 "transformer_hidden_dim",
                 getattr(self.transformer.args, "transformer_hidden_dim", self.image_repr_dim),
             )
+        self.vmrnn_hidden_dim = 128
+        self.temporal_projection = nn.Linear(self.transformer_dim, self.vmrnn_hidden_dim)
 
         # -------------------------
         # Longitudinal encoder
         # -------------------------
         # Exam embeddings are already pooled to one vector per exam, so the
         # VMRNN must operate on a single-token representation.
+        
         self.vmrnn = VMRNNEncoder(
             input_dim=self.args.embed_dim,
-            hidden_dim=128,
+            hidden_dim=self.vmrnn_hidden_dim,
             spatial_resolution=(4, 4),
             downsample_depths=(2, 6),
             upsample_depths=(6, 2),
@@ -104,7 +106,7 @@ class VMRAMaR(BaseRiskModel):
         # -------------------------
         # Risk head
         # -------------------------
-        final_dim = 128 + (1 if self.use_asymmetry else 0)
+        final_dim =  self.vmrnn_hidden_dim + (1 if self.use_asymmetry else 0)
         self.fusion_norm = nn.LayerNorm(final_dim)
         self.ahl = CumulativeProbabilityLayer(final_dim, max_followup=5)
 
@@ -345,8 +347,10 @@ class VMRAMaR(BaseRiskModel):
             exam_embeddings[complete_exam_mask] = pooled_hidden
 
         exam_embeddings = exam_embeddings.view(B, T, -1)
+        exam_embeddings = self.temporal_projection(exam_embeddings)
 
         history_embedding, states, reconstructions = self.vmrnn(exam_embeddings, exam_mask)
+
 
         features = [history_embedding]
 
