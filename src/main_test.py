@@ -16,20 +16,39 @@ def parse_test_args():
     parser = argparse.ArgumentParser()
 
     # ---------------- General CLI args ----------------
-    parser.add_argument("--csv_file", type=str, required=True)
-    parser.add_argument("--data_root", type=str, required=True)
-    parser.add_argument("--path_out_dir", type=str, required=True)
-    parser.add_argument("--id_training", type=int, required=True)
-    parser.add_argument("--path_test_folder", type=str, required=True)
+    parser.add_argument("--csv_file", type=str, required=True,
+                        help="Path to the input CSV file containing dataset metadata or labels.")
+
+    parser.add_argument("--data_root", type=str, required=True,
+                        help="Root directory containing the dataset files/images.")
+
+    parser.add_argument("--path_out_dir", type=str, required=True,
+                        help="Directory where outputs, logs, and results will be saved.")
+
+    parser.add_argument("--id_training", type=int, required=True,
+                        help="Training run ID used to identify the experiment.")
+
+    parser.add_argument("--path_test_folder", type=str, required=True,
+                        help="Path to the folder containing test data or checkpoints for evaluation.")
 
     # ---------------- Basic dataset & model options ----------------
-    parser.add_argument("--batch_size", type=int, default=20)
-    parser.add_argument("--num_workers", type=int, default=4)
-    parser.add_argument("--shuffle", type=bool, default=False)
-    parser.add_argument("--pin_memory", type=bool, default=True)
-    parser.add_argument("--model", type=str, required=True, 
-                        help="Model name (mirai, ImgFeatAlign, VMRA-MaR, OA-BreaCR, LMV-Net, etc.)")
-    parser.add_argument("--dataset", type=str, required=True, help="Dataset to use (EMBED, CSAW-CC, etc.)")
+    parser.add_argument("--batch_size", type=int, default=20,
+                        help="Number of samples processed in each batch.")
+
+    parser.add_argument("--num_workers", type=int, default=4,
+                        help="Number of worker processes used for data loading.")
+
+    parser.add_argument("--shuffle", type=bool, default=False,
+                        help="Whether to shuffle the dataset during loading.")
+
+    parser.add_argument("--pin_memory", type=bool, default=True,
+                        help="Whether to enable pinned memory for faster GPU data transfer.")
+
+    parser.add_argument("--model", type=str, required=True,
+                        help="Model name (mirai, ImgFeatAlign, VMRA-MaR, OA-BreaCR, LMV-Net, etc.).")
+
+    parser.add_argument("--dataset", type=str, required=True,
+                        help="Dataset to use (EMBED, CSAW-CC, etc.).")
 
     # ---------------- Temporary parse ----------------
     temp_args, _ = parser.parse_known_args()

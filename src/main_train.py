@@ -117,15 +117,32 @@ def parse_cli_args() -> argparse.Namespace:
     parser.add_argument("--dataset", type=str, required=True, help="Dataset name (e.g., 'EMBED', 'CSAW')")
 
     # ========== Optional hyperparameters ==========
-    parser.add_argument("--batch_size", type=int, default=12)
-    parser.add_argument("--learning_rate", type=float, default=5e-5)
-    parser.add_argument("--weight_decay", type=float, default=1e-4)
-    parser.add_argument("--num_epochs", type=int, default=100)
-    parser.add_argument("--num_workers", type=int, default=7)
-    parser.add_argument("--lr_decay", type=float, default=0.5)
-    parser.add_argument("--warmup_steps", type=int, default=5000)
-    parser.add_argument("--patience_lr_scheduler", type=int, default=5)
-    parser.add_argument("--patience", type=int, default=15)
+    parser.add_argument("--batch_size", type=int, default=12,
+                        help="Number of samples processed in each training batch.")
+
+    parser.add_argument("--learning_rate", type=float, default=5e-5,
+                        help="Initial learning rate for the optimizer.")
+
+    parser.add_argument("--weight_decay", type=float, default=1e-4,
+                        help="Weight decay (L2 regularization) applied to optimizer weights.")
+
+    parser.add_argument("--num_epochs", type=int, default=100,
+                        help="Maximum number of training epochs.")
+
+    parser.add_argument("--num_workers", type=int, default=7,
+                        help="Number of worker processes for data loading.")
+
+    parser.add_argument("--lr_decay", type=float, default=0.5,
+                        help="Factor to reduce learning rate when scheduler is triggered.")
+
+    parser.add_argument("--warmup_steps", type=int, default=5000,
+                        help="Number of warmup steps to gradually increase learning rate.")
+
+    parser.add_argument("--patience_lr_scheduler", type=int, default=5,
+                        help="Number of epochs with no improvement before reducing learning rate.")
+
+    parser.add_argument("--patience", type=int, default=15,
+                        help="Number of epochs with no improvement before early stopping.")
 
     # ========== Optional flags ==========
     parser.add_argument("--augmentations", action="store_true", help="Enable data augmentation")
