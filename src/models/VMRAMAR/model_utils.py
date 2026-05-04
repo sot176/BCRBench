@@ -26,8 +26,6 @@ def register_onconet_alias(onconet_module) -> None:
             )
 
 
-
-
 def freeze_encoder(encoder: nn.Module) -> None:
     for param in encoder.parameters():
         param.requires_grad = False
