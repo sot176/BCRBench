@@ -1,4 +1,7 @@
+from logging import root
+from pyexpat import features
 import sys
+from unicodedata import name
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -22,10 +25,10 @@ for _key in list(sys.modules.keys()):
 
 MAX_FOLLOWUP = 5
 FORMAL_VIEW_SEQUENCE = (
-    ("LCC", 0, 1),
     ("RCC", 0, 0),
-    ("LMLO", 1, 1),
     ("RMLO", 1, 0),
+    ("LCC", 0, 1),
+    ("LMLO", 1, 1),
 )
 
 
@@ -42,15 +45,10 @@ class VMRAMaR(BaseRiskModel):
         else:
             self.image_encoder = get_model_by_name("custom_resnet", False, args)
 
-        self.freeze_image_encoder = bool(getattr(args, "freeze_image_encoder", False))
+        self.freeze_image_encoder = bool(getattr(args, "freeze_image_encoder", True))
         if self.freeze_image_encoder:
             for param in self.image_encoder.parameters():
                 param.requires_grad = False
-
-        self.image_backbone = self._extract_backbone(
-            cutoff_layer=getattr(args, "backbone_cutoff_layer", "layer4_1")
-        )
-
 
         self.image_repr_dim = self._get_img_repr_dim()
 
@@ -93,6 +91,8 @@ class VMRAMaR(BaseRiskModel):
         # -------------------------
         self.use_asymmetry = getattr(self.args, "use_asymmetry", True)
         if self.use_asymmetry:
+            self._setup_feature_map_hook(args)
+
             self.sad = SpatialAsymmetryDetector(
                 latent_h=int(self.args.latent_h),
                 latent_w=int(self.args.latent_w),
@@ -106,8 +106,41 @@ class VMRAMaR(BaseRiskModel):
         # Risk head
         # -------------------------
         final_dim =  self.vmrnn_hidden_dim + (1 if self.use_asymmetry else 0)
-        self.fusion_norm = nn.LayerNorm(final_dim)
         self.ahl = CumulativeProbabilityLayer(final_dim, max_followup=5)
+    
+    def _resolve_module(self, root: nn.Module, name: str) -> nn.Module:
+        modules = dict(root.named_modules())
+        if name not in modules:
+            matches = [key for key in modules if name in key]
+            raise ValueError(
+                f"Feature map layer {name!r} not found. "
+                f"Close matches: {matches[:20]}"
+            )
+        return modules[name]
+
+
+    def _setup_feature_map_hook(self, args) -> None:
+        self.feature_map_layer_name = getattr(args, "feature_map_layer", "layer4_1")
+        self._captured_feature_map = None
+
+        encoder_model = (
+            self.image_encoder._model
+            if hasattr(self.image_encoder, "_model")
+            else self.image_encoder
+        )
+
+        self.feature_map_layer = self._resolve_module(
+            encoder_model,
+            self.feature_map_layer_name,
+        )
+
+        def capture_feature_map(module, inputs, output):
+            self._captured_feature_map = output
+
+        self.feature_map_hook = self.feature_map_layer.register_forward_hook(
+            capture_feature_map
+        )
+
 
     @staticmethod
     def _freeze_encoder(encoder):
@@ -116,18 +149,7 @@ class VMRAMaR(BaseRiskModel):
         encoder.eval()
         print("[INFO] Image encoder frozen.")
     
-    def _extract_backbone(self, cutoff_layer: str = "layer4") -> nn.Module:
-        model = self.image_encoder._model if hasattr(self.image_encoder, "_model") else self.image_encoder
-
-        modules = []
-        for name, module in model.named_children():
-            modules.append(module)
-            if name == cutoff_layer:
-                break
-
-        return nn.Sequential(*modules)
-
-
+    
     def _zero_risk_factors_for_args(
         self,
         args,
@@ -226,14 +248,14 @@ class VMRAMaR(BaseRiskModel):
         exam_mask = batch["exam_mask"]  # (B, T)
         view_mask = batch["view_mask"]  # (B, T, V)
 
+        if self.freeze_image_encoder:
+            self.image_encoder.eval()
+
         B, T, V, C, H, W = images.shape
 
         if V != len(FORMAL_VIEW_SEQUENCE):
             raise ValueError(f"Expected {len(FORMAL_VIEW_SEQUENCE)} formal views, got {V}.")
 
-        if self.freeze_image_encoder:
-            self.image_encoder.eval()
-            self.image_backbone.eval()
 
         flat_exam_mask = view_mask.reshape(B * T, V).bool()
         flat_valid_exam_mask = exam_mask.reshape(B * T).bool()
@@ -268,6 +290,9 @@ class VMRAMaR(BaseRiskModel):
                     rf[flat_view_mask] for rf in image_risk_factors_per_img
                 ]
 
+            if self.use_asymmetry:
+                self._captured_feature_map = None
+
             with torch.set_grad_enabled(not self.freeze_image_encoder):
                 _, valid_hidden, _ = self.image_encoder(
                     valid_images,
@@ -275,10 +300,13 @@ class VMRAMaR(BaseRiskModel):
                     batch,
                 )
 
-                if self.use_asymmetry:
-                    valid_feat_maps = self.image_backbone(valid_images)
-                else:
-                    valid_feat_maps = None
+            valid_feat_maps = None
+            if self.use_asymmetry:
+                valid_feat_maps = self._captured_feature_map
+                if valid_feat_maps is None:
+                    raise RuntimeError(
+                        f"Feature hook did not capture layer {self.feature_map_layer_name!r}."
+                    )
 
             hidden = valid_hidden.new_zeros((total_views, valid_hidden.size(-1)))
             hidden[flat_view_mask] = valid_hidden
@@ -379,8 +407,6 @@ class VMRAMaR(BaseRiskModel):
                 raise ValueError(f"Feature {i} has invalid shape {f.shape}, expected (B, D)")
 
         combined = torch.cat(features, dim=-1)
-        combined = self.fusion_norm(combined)
-
         logits = self.ahl(combined)
         probs = torch.sigmoid(logits)
 
