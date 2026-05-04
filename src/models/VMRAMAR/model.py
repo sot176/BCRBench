@@ -1,8 +1,6 @@
 
-import sys
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from .vmrnn import VMRNNEncoder
 from .sad import SpatialAsymmetryDetector
@@ -13,7 +11,6 @@ from models.common_parts import BaseRiskModel
 from models.Mirai.onconet.models.factory import get_model_by_name, load_model
 from .model_utils import (
     FORMAL_VIEW_SEQUENCE,
-    MAX_FOLLOWUP,
     compute_asymmetry_feature,
     expand_risk_factors_per_img,
     register_onconet_alias,

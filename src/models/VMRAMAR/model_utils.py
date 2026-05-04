@@ -6,16 +6,13 @@ import sys
 
 
 
-
 MAX_FOLLOWUP = 5
-
 FORMAL_VIEW_SEQUENCE = (
     ("RCC", 0, 0),
     ("RMLO", 1, 0),
     ("LCC", 0, 1),
     ("LMLO", 1, 1),
 )
-
 
 
 def register_onconet_alias(onconet_module) -> None:
