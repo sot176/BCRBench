@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import torch
 from torch import nn
+import sys
+
+
 
 
 MAX_FOLLOWUP = 5
@@ -12,6 +15,20 @@ FORMAL_VIEW_SEQUENCE = (
     ("LCC", 0, 1),
     ("LMLO", 1, 1),
 )
+
+
+
+def register_onconet_alias(onconet_module) -> None:
+    sys.modules.setdefault("onconet", onconet_module)
+
+    for key in list(sys.modules.keys()):
+        if key.startswith("models.Mirai.onconet"):
+            sys.modules.setdefault(
+                key.replace("models.Mirai.onconet", "onconet"),
+                sys.modules[key],
+            )
+
+
 
 
 def freeze_encoder(encoder: nn.Module) -> None:

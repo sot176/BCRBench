@@ -16,7 +16,7 @@ from .model_utils import (
     MAX_FOLLOWUP,
     compute_asymmetry_feature,
     expand_risk_factors_per_img,
-    freeze_encoder,
+    register_onconet_alias,
     get_img_repr_dim,
     make_transformer_batch,
     model_args,
@@ -24,14 +24,7 @@ from .model_utils import (
     zero_risk_factors_for_args,
 )
 
-
-sys.modules.setdefault("onconet", _onconet)
-for _key in list(sys.modules.keys()):
-    if _key.startswith("models.Mirai.onconet"):
-        sys.modules.setdefault(
-            _key.replace("models.Mirai.onconet", "onconet"),
-            sys.modules[_key]
-        )
+register_onconet_alias(_onconet)
 
 
 class VMRAMaR(BaseRiskModel):
