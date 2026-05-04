@@ -39,7 +39,7 @@ class TestModelFactory:
     
     def test_get_model_mirai(self):
         """Test building Mirai model."""
-        from models.model_factory import get_model
+        from src.models.model_factory import get_model
         
         try:
             # This will require proper model imports, might raise ImportError
@@ -52,14 +52,14 @@ class TestModelFactory:
     
     def test_get_model_invalid_name(self):
         """Test that invalid model names raise ValueError."""
-        from models.model_factory import get_model
+        from src.models.model_factory import get_model
         
         with pytest.raises(ValueError, match="Unknown model"):
             get_model("InvalidModelName")
     
     def test_get_model_vmra_mar(self):
         """Test building VMRA-MaR model."""
-        from models.model_factory import get_model
+        from src.models.model_factory import get_model
         
         try:
             model = get_model("VMRA-MaR")
@@ -69,7 +69,7 @@ class TestModelFactory:
     
     def test_get_model_oa_breacr(self):
         """Test building OA-BreaCR model."""
-        from models.model_factory import get_model
+        from src.models.model_factory import get_model
         
         try:
             model = get_model("OA-BreaCR")
@@ -84,14 +84,14 @@ class TestRegistrationModels:
     
     def test_imgfeatalign_requires_reg_model(self):
         """Test that ImgFeatAlign requires MammoRegNet."""
-        from models.model_factory import get_model
+        from src.models.model_factory import get_model
         
         with pytest.raises(ValueError, match="requires a MammoRegNet checkpoint"):
             get_model("ImgFeatAlign", path_saved_reg_model=None)
     
     def test_lmvnet_requires_reg_model(self):
         """Test that LMV-Net requires MammoRegNet."""
-        from models.model_factory import get_model
+        from src.models.model_factory import get_model
         
         with pytest.raises(ValueError, match="requires a MammoRegNet checkpoint"):
             get_model("LMV-Net", path_saved_reg_model=None)
@@ -102,7 +102,7 @@ class TestRegistrationModels:
         mock_reg_net = MagicMock()
         mock_build_reg.return_value = mock_reg_net
         
-        from models.model_factory import get_model
+        from src.models.model_factory import get_model
         
         try:
             model = get_model("ImgFeatAlign", path_saved_reg_model="/path/to/model.pth")
@@ -118,7 +118,7 @@ class TestBuildMammoRegNet:
     @patch('torch.load')
     def test_build_mammo_reg_net_success(self, mock_load, temp_dir):
         """Test successful MammoRegNet building."""
-        from models.model_factory import build_mammo_reg_net
+        from src.models.model_factory import build_mammo_reg_net
         
         # Mock checkpoint
         mock_checkpoint = {"module.layer1.weight": torch.randn(64, 64, 3, 3)}
@@ -133,7 +133,7 @@ class TestBuildMammoRegNet:
     
     def test_build_mammo_reg_net_invalid_path(self):
         """Test MammoRegNet with invalid path."""
-        from models.model_factory import build_mammo_reg_net
+        from src.models.model_factory import build_mammo_reg_net
         
         with pytest.raises((FileNotFoundError, RuntimeError)):
             build_mammo_reg_net("/nonexistent/path/model.pth")
@@ -168,7 +168,7 @@ class TestModelKwargs:
     
     def test_build_model_with_args(self, mock_args):
         """Test building model with args object."""
-        from models.model_factory import _build_model
+        from src.models.model_factory import _build_model
         
         mock_model_class = MagicMock()
         _build_model(mock_model_class, args=mock_args)
@@ -178,7 +178,7 @@ class TestModelKwargs:
     
     def test_build_model_filters_kwargs(self):
         """Test that _build_model filters kwargs based on __init__ signature."""
-        from models.model_factory import _build_model
+        from src.models.model_factory import _build_model
         
         class DummyModel:
             def __init__(self, param1):
@@ -196,7 +196,7 @@ class TestModelRegistry:
     
     def test_all_supported_models_can_be_accessed(self):
         """Test that all model names can be queried."""
-        from models.model_factory import get_model
+        from src.models.model_factory import get_model
         
         supported_models = ["Mirai", "ImgFeatAlign", "LMV-Net", "VMRA-MaR", "OA-BreaCR"]
         
