@@ -1,7 +1,5 @@
-from logging import root
-from pyexpat import features
+
 import sys
-from unicodedata import name
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,6 +11,18 @@ from models.common_parts import CumulativeProbabilityLayer
 from models.Mirai import onconet as _onconet
 from models.common_parts import BaseRiskModel
 from models.Mirai.onconet.models.factory import get_model_by_name, load_model
+from .model_utils import (
+    FORMAL_VIEW_SEQUENCE,
+    MAX_FOLLOWUP,
+    compute_asymmetry_feature,
+    expand_risk_factors_per_img,
+    freeze_encoder,
+    get_img_repr_dim,
+    make_transformer_batch,
+    model_args,
+    setup_feature_map_hook,
+    zero_risk_factors_for_args,
+)
 
 
 sys.modules.setdefault("onconet", _onconet)
@@ -22,14 +32,6 @@ for _key in list(sys.modules.keys()):
             _key.replace("models.Mirai.onconet", "onconet"),
             sys.modules[_key]
         )
-
-MAX_FOLLOWUP = 5
-FORMAL_VIEW_SEQUENCE = (
-    ("RCC", 0, 0),
-    ("RMLO", 1, 0),
-    ("LCC", 0, 1),
-    ("LMLO", 1, 1),
-)
 
 
 class VMRAMaR(BaseRiskModel):
@@ -50,7 +52,7 @@ class VMRAMaR(BaseRiskModel):
             for param in self.image_encoder.parameters():
                 param.requires_grad = False
 
-        self.image_repr_dim = self._get_img_repr_dim()
+        self.image_repr_dim = get_img_repr_dim(self.image_encoder)
 
         if args.transformer_snapshot is not None:
             self.transformer = load_model(
@@ -85,13 +87,12 @@ class VMRAMaR(BaseRiskModel):
             vss_backend="transformer",  # AMD-safe
         )
 
-
         # -------------------------
         # Asymmetry branch
         # -------------------------
         self.use_asymmetry = getattr(self.args, "use_asymmetry", True)
         if self.use_asymmetry:
-            self._setup_feature_map_hook(args)
+            setup_feature_map_hook(self, args)
 
             self.sad = SpatialAsymmetryDetector(
                 latent_h=int(self.args.latent_h),
@@ -106,142 +107,8 @@ class VMRAMaR(BaseRiskModel):
         # Risk head
         # -------------------------
         final_dim =  self.vmrnn_hidden_dim + (1 if self.use_asymmetry else 0)
-        self.ahl = CumulativeProbabilityLayer(final_dim, max_followup=5)
+        self.ahl = CumulativeProbabilityLayer(final_dim, max_followup=self.args.max_followup)
     
-    def _resolve_module(self, root: nn.Module, name: str) -> nn.Module:
-        modules = dict(root.named_modules())
-        if name not in modules:
-            matches = [key for key in modules if name in key]
-            raise ValueError(
-                f"Feature map layer {name!r} not found. "
-                f"Close matches: {matches[:20]}"
-            )
-        return modules[name]
-
-
-    def _setup_feature_map_hook(self, args) -> None:
-        self.feature_map_layer_name = getattr(args, "feature_map_layer", "layer4_1")
-        self._captured_feature_map = None
-
-        encoder_model = (
-            self.image_encoder._model
-            if hasattr(self.image_encoder, "_model")
-            else self.image_encoder
-        )
-
-        self.feature_map_layer = self._resolve_module(
-            encoder_model,
-            self.feature_map_layer_name,
-        )
-
-        def capture_feature_map(module, inputs, output):
-            self._captured_feature_map = output
-
-        self.feature_map_hook = self.feature_map_layer.register_forward_hook(
-            capture_feature_map
-        )
-
-
-    @staticmethod
-    def _freeze_encoder(encoder):
-        for param in encoder.parameters():
-            param.requires_grad = False
-        encoder.eval()
-        print("[INFO] Image encoder frozen.")
-    
-    
-    def _zero_risk_factors_for_args(
-        self,
-        args,
-        batch_size: int,
-        device: torch.device,
-        dtype: torch.dtype,
-    ):
-        if not bool(getattr(args, "use_risk_factors", False)):
-            return None
-
-        key_to_dim = getattr(args, "risk_factor_key_to_num_class", None)
-        risk_factor_keys = list(getattr(args, "risk_factor_keys", []) or [])
-
-        if (not key_to_dim) and risk_factor_keys:
-            from models.Mirai.onconet.utils.risk_factors import RiskFactorVectorizer
-            RiskFactorVectorizer(args)
-            key_to_dim = args.risk_factor_key_to_num_class
-
-        if key_to_dim and risk_factor_keys:
-            return [
-                torch.zeros(batch_size, int(key_to_dim[key]), device=device, dtype=dtype)
-                for key in risk_factor_keys
-            ]
-
-        rf_dim = int(getattr(args, "rf_dim", 0) or 0)
-        if rf_dim > 0:
-            return [torch.zeros(batch_size, rf_dim, device=device, dtype=dtype)]
-
-        return None
-
-    def _zero_risk_factors(self, batch_size, device, dtype):
-        return self._zero_risk_factors_for_args(self.args, batch_size, device, dtype)
-
-    def _get_img_repr_dim(self):
-        if hasattr(self.image_encoder, "_model"):
-            return self.image_encoder._model.args.img_only_dim
-        return self.image_encoder.args.img_only_dim
-
-    def _expand_risk_factors_per_img(self, risk_factors, num_imgs):
-        if risk_factors is None:
-            return None
-
-        expanded = []
-        for factor in risk_factors:
-            factor = factor.unsqueeze(1).expand(-1, num_imgs, -1)
-            factor = factor.contiguous().view(-1, factor.size(-1))
-            expanded.append(factor)
-        return expanded
-    
-    def _model_args(self, model):
-        if hasattr(model, "_model"):
-            return model._model.args
-        return model.args
-    
-    def _transformer_batch(self, batch_size: int, device: torch.device) -> dict[str, torch.Tensor]:
-        view_seq = torch.tensor([view for _, view, _ in FORMAL_VIEW_SEQUENCE], device=device, dtype=torch.long)
-        side_seq = torch.tensor([side for _, _, side in FORMAL_VIEW_SEQUENCE], device=device, dtype=torch.long)
-
-        return {
-            "time_seq": torch.zeros(batch_size, len(FORMAL_VIEW_SEQUENCE), device=device, dtype=torch.long),
-            "view_seq": view_seq.unsqueeze(0).expand(batch_size, -1),
-            "side_seq": side_seq.unsqueeze(0).expand(batch_size, -1),
-        }
-
-     
-    def _compute_asymmetry_feature(self, feat_maps, view_mask, exam_mask):
-        """
-        returns:
-            r_aa: (B, 1)
-            asymmetry_scores, coords, coord_valid
-        """
-        asymmetry_scores, coords, coord_valid = self.sad(feat_maps, view_mask)
-
-        window_size = max(
-            int(self.sad.latent_h),
-            int(self.sad.latent_w),
-        )
-
-        r_aa = self.lat(
-            asymmetry_scores,
-            coords,
-            coord_valid,
-            exam_mask,
-            window_size=window_size,
-        )
-
-        if r_aa.dim() == 1:
-            r_aa = r_aa.unsqueeze(-1)
-        elif r_aa.dim() != 2:
-            raise ValueError(f"Unexpected asymmetry feature shape: {r_aa.shape}")
-
-        return r_aa, asymmetry_scores, coords, coord_valid
     
     def forward(self, batch):
         images = batch["images"]        # (B, T, V, C, H, W)
@@ -268,15 +135,15 @@ class VMRAMaR(BaseRiskModel):
         flat_images = images.contiguous().view(total_views, C, H, W)
         flat_view_mask = view_mask.reshape(total_views).bool()
 
-        image_encoder_args = self._model_args(self.image_encoder)
+        image_encoder_args = model_args(self.image_encoder)
 
-        image_risk_factors = self._zero_risk_factors_for_args(
+        image_risk_factors = zero_risk_factors_for_args(
             image_encoder_args,
             B * T,
             flat_images.device,
             flat_images.dtype,
         )
-        image_risk_factors_per_img = self._expand_risk_factors_per_img(
+        image_risk_factors_per_img = expand_risk_factors_per_img(
             image_risk_factors,
             V,
         )
@@ -339,7 +206,7 @@ class VMRAMaR(BaseRiskModel):
         if complete_exam_mask.any():
             exam_tokens = hidden[complete_exam_mask]
 
-            transformer_batch = self._transformer_batch(
+            transformer_batch = make_transformer_batch(
                 int(complete_exam_mask.sum().item()),
                 hidden.device,
             )
@@ -353,8 +220,8 @@ class VMRAMaR(BaseRiskModel):
                 transformer_batch["side_seq"],
             )
 
-            transformer_args = self._model_args(self.transformer)
-            transformer_risk_factors = self._zero_risk_factors_for_args(
+            transformer_args = model_args(self.transformer)
+            transformer_risk_factors = zero_risk_factors_for_args(
                 transformer_args,
                 int(complete_exam_mask.sum().item()),
                 encoded.device,
@@ -390,7 +257,9 @@ class VMRAMaR(BaseRiskModel):
             c_feat, hf, wf = feat_maps.shape[1:]
             feat_maps = feat_maps.view(B, T, V, c_feat, hf, wf)
 
-            r_aa, asymmetry_scores, coords, coord_valid = self._compute_asymmetry_feature(
+            r_aa, asymmetry_scores, coords, coord_valid = compute_asymmetry_feature(
+                self.sad,
+                self.lat,
                 feat_maps,
                 view_mask,
                 exam_mask,
