@@ -79,10 +79,10 @@ class VMRAMaR(BaseRiskModel):
             input_dim=self.vmrnn_hidden_dim,
             hidden_dim=self.vmrnn_hidden_dim,
             spatial_resolution=(4, 4),
-            downsample_depths=(2, 6),
-            upsample_depths=(6, 2),
+            downsample_depths=(1, 2),
+            upsample_depths=(2, 1),
             dropout=0.1,
-            vss_backend="auto",
+            vss_backend="transformer",  # AMD-safe
         )
 
 

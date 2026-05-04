@@ -1,4 +1,4 @@
-"""Formal multi-scale VMRNN blocks with optional VMamba or pure PyTorch VSS cells."""
+"""Formal multi-scale VMRNN blocks with optional VMamba or PyTorch fallback VSS cells."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from pathlib import Path
 
 import torch
 from torch import nn
+
 
 try:
     from vmra_mar.modeling.vmamba_runtime import (
@@ -22,7 +23,7 @@ except Exception as exc:
         return False
 
     def vmamba_kernel_backend_name() -> str:
-        return "none"
+        return "unavailable"
 
     def vmamba_unavailable_reason() -> str:
         return str(exc)
@@ -57,27 +58,29 @@ def _validate_multiscale_resolution(resolution: tuple[int, int], num_layers: int
     height, width = resolution
     if height % divisor != 0 or width % divisor != 0:
         raise ValueError(
-            f"Resolution {resolution} must be divisible by {divisor} to support {num_layers} downsampling stages."
+            f"Resolution {resolution} must be divisible by {divisor} "
+            f"to support {num_layers} downsampling stages."
         )
 
 
 def resolve_vss_backend(requested: str) -> str:
     normalized = requested.lower()
-    if normalized not in {"auto", "formal", "vmamba", "torch", "fallback"}:
+
+    if normalized not in {"auto", "formal", "vmamba", "transformer"}:
         raise ValueError(f"Unsupported VSS backend: {requested}")
 
-    if normalized in {"torch", "fallback"}:
-        return "torch"
-
-    if is_vmamba_kernel_available():
+    if normalized in {"vmamba", "formal"}:
+        if not is_vmamba_kernel_available():
+            raise RuntimeError(
+                f"VMamba was explicitly requested but is unavailable: "
+                f"{vmamba_unavailable_reason()}"
+            )
         return "vmamba"
 
     if normalized == "auto":
-        return "torch"
+        return "vmamba" if is_vmamba_kernel_available() else "transformer"
 
-    raise RuntimeError(
-        f"VMamba backend requested but unavailable: {vmamba_unavailable_reason()}"
-    )
+    return "transformer"
 
 
 def _extract_released_state_dict(checkpoint: object) -> dict[str, torch.Tensor]:
@@ -105,6 +108,54 @@ def _map_released_weight_key(key: str) -> str | None:
     if normalized.startswith(("down_cells.", "up_cells.", "downsamplers.", "upsamplers.")):
         return normalized
     return None
+
+
+class TransformerVSBBlock(nn.Module):
+    """Pure PyTorch fallback for VMambaVSBBlock."""
+
+    def __init__(
+        self,
+        hidden_dim: int,
+        input_resolution: tuple[int, int],
+        dropout: float = 0.0,
+        num_heads: int = 4,
+    ) -> None:
+        super().__init__()
+        del input_resolution
+
+        heads = min(num_heads, hidden_dim)
+        while heads > 1 and hidden_dim % heads != 0:
+            heads -= 1
+
+        self.norm1 = nn.LayerNorm(hidden_dim)
+        self.attn = nn.MultiheadAttention(
+            embed_dim=hidden_dim,
+            num_heads=heads,
+            dropout=dropout,
+            batch_first=True,
+        )
+        self.norm2 = nn.LayerNorm(hidden_dim)
+        self.mlp = nn.Sequential(
+            nn.Linear(hidden_dim, 4 * hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(4 * hidden_dim, hidden_dim),
+            nn.Dropout(dropout),
+        )
+
+    def forward(
+        self,
+        tokens: torch.Tensor,
+        hidden_tokens: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        if hidden_tokens is not None:
+            tokens = tokens + hidden_tokens
+
+        x = self.norm1(tokens)
+        attn_out, _ = self.attn(x, x, x, need_weights=False)
+        tokens = tokens + attn_out
+        tokens = tokens + self.mlp(self.norm2(tokens))
+        return tokens
 
 
 class PatchMerging(nn.Module):
@@ -155,14 +206,17 @@ class PatchExpanding(nn.Module):
 
         feature_map = tokens.view(batch_size, height, width, channels)
         feature_map = feature_map.reshape(batch_size, height, width, 2, 2, channels // 4)
-        feature_map = feature_map.permute(0, 1, 3, 2, 4, 5).reshape(batch_size, height * 2, width * 2, channels // 4)
+        feature_map = feature_map.permute(0, 1, 3, 2, 4, 5).reshape(
+            batch_size,
+            height * 2,
+            width * 2,
+            channels // 4,
+        )
         tokens = feature_map.view(batch_size, -1, channels // 4)
         return self.norm(tokens)
 
 
 class InputTokenProjection(nn.Module):
-    """Map a fused exam embedding into the base token grid expected by VMRNN."""
-
     def __init__(
         self,
         input_dim: int,
@@ -182,90 +236,7 @@ class InputTokenProjection(nn.Module):
         return self.dropout(self.norm(tokens))
 
 
-class TorchVSBBlock(nn.Module):
-    """Pure PyTorch fallback for VMamba VSB blocks."""
-
-    def __init__(
-        self,
-        hidden_dim: int,
-        input_resolution: tuple[int, int],
-        drop_path: float = 0.0,
-        attn_drop_rate: float = 0.0,
-        d_state: int = 16,
-    ) -> None:
-        super().__init__()
-        del drop_path, d_state
-        self.input_resolution = input_resolution
-
-        self.hidden_proj = nn.Linear(hidden_dim, hidden_dim)
-        self.norm1 = nn.LayerNorm(hidden_dim)
-        self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, padding=1, groups=hidden_dim)
-        self.pwconv1 = nn.Conv2d(hidden_dim, 2 * hidden_dim, kernel_size=1)
-        self.pwconv2 = nn.Conv2d(2 * hidden_dim, hidden_dim, kernel_size=1)
-        self.act = nn.SiLU()
-        self.dropout = nn.Dropout(attn_drop_rate)
-
-        self.norm2 = nn.LayerNorm(hidden_dim)
-        self.mlp = nn.Sequential(
-            nn.Linear(hidden_dim, 4 * hidden_dim),
-            nn.GELU(),
-            nn.Dropout(attn_drop_rate),
-            nn.Linear(4 * hidden_dim, hidden_dim),
-            nn.Dropout(attn_drop_rate),
-        )
-
-    def forward(self, tokens: torch.Tensor, hidden_tokens: torch.Tensor | None = None) -> torch.Tensor:
-        residual = tokens
-        x = self.norm1(tokens)
-
-        if hidden_tokens is not None:
-            x = x + self.hidden_proj(hidden_tokens)
-
-        x_map = _tokens_to_map(x, self.input_resolution)
-        x_map = self.dwconv(x_map)
-        x_map = self.pwconv1(x_map)
-        x_map = self.act(x_map)
-        x_map = self.dropout(x_map)
-        x_map = self.pwconv2(x_map)
-
-        x = _map_to_tokens(x_map)
-        x = residual + self.dropout(x)
-        x = x + self.mlp(self.norm2(x))
-        return x
-
-
-def _build_vss_block(
-    backend: str,
-    *,
-    hidden_dim: int,
-    input_resolution: tuple[int, int],
-    drop_path: float,
-    attn_drop_rate: float,
-    d_state: int,
-) -> nn.Module:
-    if backend == "vmamba":
-        if VMambaVSBBlock is None:
-            raise RuntimeError("VMamba backend requested but VMambaVSBBlock could not be imported.")
-        return VMambaVSBBlock(
-            hidden_dim=hidden_dim,
-            input_resolution=input_resolution,
-            drop_path=drop_path,
-            attn_drop_rate=attn_drop_rate,
-            d_state=d_state,
-        )
-
-    return TorchVSBBlock(
-        hidden_dim=hidden_dim,
-        input_resolution=input_resolution,
-        drop_path=drop_path,
-        attn_drop_rate=attn_drop_rate,
-        d_state=d_state,
-    )
-
-
 class RecurrentStageCell(nn.Module):
-    """Per-scale recurrent VMRNN cell."""
-
     def __init__(
         self,
         dim: int,
@@ -274,20 +245,36 @@ class RecurrentStageCell(nn.Module):
         dropout: float = 0.0,
         vmamba_d_state: int = 16,
         vmamba_drop_path: float = 0.0,
-        vss_backend: str = "auto",
+        vss_backend: str = "transformer",
     ) -> None:
         super().__init__()
-        self.blocks = nn.ModuleList(
-            _build_vss_block(
-                vss_backend,
-                hidden_dim=dim,
-                input_resolution=resolution,
-                drop_path=vmamba_drop_path,
-                attn_drop_rate=dropout,
-                d_state=vmamba_d_state,
-            )
-            for _ in range(max(depth, 1))
-        )
+
+        blocks = []
+        for _ in range(max(depth, 1)):
+            if vss_backend == "vmamba":
+                if VMambaVSBBlock is None:
+                    raise RuntimeError(f"VMamba block unavailable: {vmamba_unavailable_reason()}")
+                blocks.append(
+                    VMambaVSBBlock(
+                        hidden_dim=dim,
+                        input_resolution=resolution,
+                        drop_path=vmamba_drop_path,
+                        attn_drop_rate=dropout,
+                        d_state=vmamba_d_state,
+                    )
+                )
+            elif vss_backend == "transformer":
+                blocks.append(
+                    TransformerVSBBlock(
+                        hidden_dim=dim,
+                        input_resolution=resolution,
+                        dropout=dropout,
+                    )
+                )
+            else:
+                raise ValueError(f"Unsupported VSS backend: {vss_backend}")
+
+        self.blocks = nn.ModuleList(blocks)
 
     def forward(
         self,
@@ -295,12 +282,12 @@ class RecurrentStageCell(nn.Module):
         state: tuple[torch.Tensor, torch.Tensor],
     ) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         hidden_tokens, cell_tokens = state
+
         outputs = []
         for block_index, block in enumerate(self.blocks):
-            if block_index == 0:
-                outputs.append(block(tokens, hidden_tokens))
-            else:
-                outputs.append(block(outputs[-1], None))
+            block_input = tokens if block_index == 0 else outputs[-1]
+            recurrent_input = hidden_tokens if block_index == 0 else None
+            outputs.append(block(block_input, recurrent_input))
 
         stage_output = outputs[-1]
         gate = torch.sigmoid(stage_output)
@@ -344,13 +331,14 @@ class VMRNNEncoder(nn.Module):
         self.hidden_dim = hidden_dim
         self.spatial_resolution = spatial_resolution
         self.vss_backend = resolve_vss_backend(vss_backend)
-        self.vmamba_kernel_backend = (
-            vmamba_kernel_backend_name() if self.vss_backend == "vmamba" else "torch"
-        )
+        self.vmamba_kernel_backend = vmamba_kernel_backend_name()
         self.vmamba_d_state = vmamba_d_state
         self.vmamba_drop_path = vmamba_drop_path
+
         self.downsample_depths = tuple(downsample_depths)
-        self.upsample_depths = tuple(upsample_depths if upsample_depths is not None else tuple(reversed(self.downsample_depths)))
+        self.upsample_depths = tuple(
+            upsample_depths if upsample_depths is not None else tuple(reversed(self.downsample_depths))
+        )
         if len(self.downsample_depths) != len(self.upsample_depths):
             raise ValueError("Downsample and upsample depth lists must have the same number of stages.")
 
@@ -359,14 +347,21 @@ class VMRNNEncoder(nn.Module):
 
         self.base_token_count = _num_tokens(spatial_resolution)
         self.down_stage_resolutions = tuple(
-            _scale_resolution(spatial_resolution, 2 ** stage_index) for stage_index in range(self.num_layers)
+            _scale_resolution(spatial_resolution, 2 ** stage_index)
+            for stage_index in range(self.num_layers)
         )
-        self.down_stage_dims = tuple(hidden_dim * (2 ** stage_index) for stage_index in range(self.num_layers))
+        self.down_stage_dims = tuple(
+            hidden_dim * (2 ** stage_index)
+            for stage_index in range(self.num_layers)
+        )
         self.up_stage_resolutions = tuple(
             _scale_resolution(spatial_resolution, 2 ** stage_index)
             for stage_index in range(self.num_layers, 0, -1)
         )
-        self.up_stage_dims = tuple(hidden_dim * (2 ** stage_index) for stage_index in range(self.num_layers, 0, -1))
+        self.up_stage_dims = tuple(
+            hidden_dim * (2 ** stage_index)
+            for stage_index in range(self.num_layers, 0, -1)
+        )
 
         self.input_projection = InputTokenProjection(
             input_dim=input_dim,
@@ -387,6 +382,7 @@ class VMRNNEncoder(nn.Module):
             )
             for stage_index in range(self.num_layers)
         )
+
         self.downsamplers = nn.ModuleList(
             PatchMerging(
                 input_resolution=self.down_stage_resolutions[stage_index],
@@ -407,6 +403,7 @@ class VMRNNEncoder(nn.Module):
             )
             for stage_index in range(self.num_layers)
         )
+
         self.upsamplers = nn.ModuleList(
             PatchExpanding(
                 input_resolution=self.up_stage_resolutions[stage_index],
@@ -428,7 +425,10 @@ class VMRNNEncoder(nn.Module):
         self.released_weight_report: dict[str, object] | None = None
         if released_weight_path is not None:
             if self.vss_backend != "vmamba":
-                raise ValueError("released_weight_path is only supported with vss_backend='vmamba'.")
+                raise RuntimeError(
+                    "Released VMRNN weights are only compatible with the VMamba backend. "
+                    f"Current backend is {self.vss_backend!r}."
+                )
             released_path = Path(released_weight_path)
             if not released_path.exists():
                 raise FileNotFoundError(f"VMRNN released weights were requested but not found: {released_path}")
@@ -439,6 +439,7 @@ class VMRNNEncoder(nn.Module):
         raw_state = _extract_released_state_dict(checkpoint)
         current_state = self.state_dict()
         filtered_state: dict[str, torch.Tensor] = {}
+
         for key, value in raw_state.items():
             if not isinstance(value, torch.Tensor):
                 continue
@@ -535,11 +536,13 @@ class VMRNNEncoder(nn.Module):
 
         for time_index in range(time_steps):
             tokens = self.input_projection(sequence[:, time_index])
+
             next_states_down, latent_tokens = self._run_down_path(tokens, states_down)
             next_states_up, upsampled_tokens = self._run_up_path(latent_tokens, states_up)
             reconstructed_tokens = self.reconstruction(upsampled_tokens)
 
             active = exam_mask[:, time_index].view(batch_size, 1, 1).to(sequence.dtype)
+
             states_down = self._blend_state_list(next_states_down, states_down, active)
             states_up = self._blend_state_list(next_states_up, states_up, active)
             summary_tokens = reconstructed_tokens * active + summary_tokens * (1.0 - active)
@@ -552,6 +555,7 @@ class VMRNNEncoder(nn.Module):
 
         state_tensor = torch.stack(pooled_states, dim=1)
         reconstruction_tensor = torch.stack(pooled_reconstructions, dim=1)
+
         last_indices = exam_mask.long().sum(dim=1).clamp(min=1) - 1
         batch_index = torch.arange(batch_size, device=sequence.device)
         history_embedding = state_tensor[batch_index, last_indices]
