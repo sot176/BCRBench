@@ -1,8 +1,6 @@
-
 import torch
 import torch.nn as nn
 
-from .vmrnn import VMRNNEncoder
 from .sad import SpatialAsymmetryDetector
 from .lat import LongitudinalAsymmetryTracker
 from models.common_parts import CumulativeProbabilityLayer
@@ -15,7 +13,6 @@ from .model_utils import (
     expand_risk_factors_per_img,
     register_onconet_alias,
     get_img_repr_dim,
-    make_transformer_batch,
     model_args,
     setup_feature_map_hook,
     zero_risk_factors_for_args,
@@ -44,42 +41,6 @@ class VMRAMaR(BaseRiskModel):
 
         self.image_repr_dim = get_img_repr_dim(self.image_encoder)
 
-        if args.transformer_snapshot is not None:
-            self.transformer = load_model(
-                args.transformer_snapshot,
-                args,
-                do_wrap_model=False,
-            )
-        else:
-            args.precomputed_hidden_dim = self.image_repr_dim
-            self.transformer = get_model_by_name("transformer", False, args)
-
-        if hasattr(self.transformer, "args"):
-            self.args.img_only_dim = getattr(
-                self.transformer.args,
-                "transformer_hidden_dim",
-                getattr(self.transformer.args, "transformer_hidden_dim", self.image_repr_dim),
-            )
-        self.vmrnn_hidden_dim = 128
-
-        self.temporal_projection = nn.Linear(
-            self.args.transformer_hidden_dim,
-            self.vmrnn_hidden_dim,
-        )
-
-        self.vmrnn = VMRNNEncoder(
-            input_dim=self.vmrnn_hidden_dim,
-            hidden_dim=self.vmrnn_hidden_dim,
-            spatial_resolution=(4, 4),
-            downsample_depths=(1, 2),
-            upsample_depths=(2, 1),
-            dropout=0.1,
-            vss_backend="transformer",  # AMD-safe
-        )
-
-        # -------------------------
-        # Asymmetry branch
-        # -------------------------
         self.use_asymmetry = getattr(self.args, "use_asymmetry", True)
         if self.use_asymmetry:
             setup_feature_map_hook(self, args)
@@ -93,13 +54,12 @@ class VMRAMaR(BaseRiskModel):
                 persistent_weight=float(getattr(self.args, "persistent_weight", 1.0)),
             )
 
-        # -------------------------
-        # Risk head
-        # -------------------------
-        final_dim =  self.vmrnn_hidden_dim + (1 if self.use_asymmetry else 0)
-        self.ahl = CumulativeProbabilityLayer(final_dim, max_followup=self.args.max_followup)
-    
-    
+        final_dim = self.image_repr_dim + (1 if self.use_asymmetry else 0)
+        self.ahl = CumulativeProbabilityLayer(
+            final_dim,
+            max_followup=self.args.max_followup,
+        )
+
     def forward(self, batch):
         images = batch["images"]        # (B, T, V, C, H, W)
         exam_mask = batch["exam_mask"]  # (B, T)
@@ -111,15 +71,17 @@ class VMRAMaR(BaseRiskModel):
         B, T, V, C, H, W = images.shape
 
         if V != len(FORMAL_VIEW_SEQUENCE):
-            raise ValueError(f"Expected {len(FORMAL_VIEW_SEQUENCE)} formal views, got {V}.")
-
+            raise ValueError(
+                f"Expected {len(FORMAL_VIEW_SEQUENCE)} formal views, got {V}."
+            )
 
         flat_exam_mask = view_mask.reshape(B * T, V).bool()
-        flat_valid_exam_mask = exam_mask.reshape(B * T).bool()
 
         partial_exam_mask = flat_exam_mask.any(dim=1) & ~flat_exam_mask.all(dim=1)
         if partial_exam_mask.any():
-            raise RuntimeError("Formal Mirai fusion requires complete exams; partial exams are not supported.")
+            raise RuntimeError(
+                "Formal Mirai fusion requires complete exams; partial exams are not supported."
+            )
 
         total_views = B * T * V
         flat_images = images.contiguous().view(total_views, C, H, W)
@@ -133,6 +95,7 @@ class VMRAMaR(BaseRiskModel):
             flat_images.device,
             flat_images.dtype,
         )
+
         image_risk_factors_per_img = expand_risk_factors_per_img(
             image_risk_factors,
             V,
@@ -175,74 +138,42 @@ class VMRAMaR(BaseRiskModel):
                     (total_views, *valid_feat_maps.shape[1:])
                 )
                 feat_maps[flat_view_mask] = valid_feat_maps
+
         else:
             hidden = flat_images.new_zeros((total_views, self.image_repr_dim))
             feat_maps = None
 
-        hidden = hidden.view(B * T, V, -1)
-        hidden = hidden[:, :, :self.image_repr_dim]
+        hidden = hidden.view(B, T, V, -1)
+        hidden = hidden[:, :, :, :self.image_repr_dim]
 
-        transformer_dim = int(
-            getattr(
-                self.transformer.args,
-                "transformer_hidden_dim",
-                getattr(self.transformer.args, "transfomer_hidden_dim", self.image_repr_dim),
-            )
-        )
+        # -------------------------
+        # Fuse views per exam
+        # -------------------------
+        view_mask_f = view_mask.float().unsqueeze(-1)  # (B, T, V, 1)
+        n_valid_views = view_mask_f.sum(dim=2).clamp(min=1.0)
 
-        exam_embeddings = hidden.new_zeros(B * T, transformer_dim)
-        complete_exam_mask = flat_valid_exam_mask & flat_exam_mask.all(dim=1)
+        fused_feats = (hidden * view_mask_f).sum(dim=2) / n_valid_views  # (B, T, D)
 
-        if complete_exam_mask.any():
-            exam_tokens = hidden[complete_exam_mask]
+        # -------------------------
+        # Temporal pooling
+        # -------------------------
+        exam_mask_f = exam_mask.float().unsqueeze(-1)  # (B, T, 1)
+        n_valid_exams = exam_mask_f.sum(dim=1).clamp(min=1.0)
 
-            transformer_batch = make_transformer_batch(
-                int(complete_exam_mask.sum().item()),
-                hidden.device,
-            )
+        temporal_feature = (
+            fused_feats * exam_mask_f
+        ).sum(dim=1) / n_valid_exams  # (B, D)
 
-            projected = self.transformer.projection_layer(exam_tokens)
-
-            encoded = self.transformer.transformer(
-                projected,
-                transformer_batch["time_seq"],
-                transformer_batch["view_seq"],
-                transformer_batch["side_seq"],
-            )
-
-            transformer_args = model_args(self.transformer)
-            transformer_risk_factors = zero_risk_factors_for_args(
-                transformer_args,
-                int(complete_exam_mask.sum().item()),
-                encoded.device,
-                encoded.dtype,
-            )
-
-            encoded_for_pool = encoded.transpose(1, 2).unsqueeze(-1)
-
-            if transformer_risk_factors is None:
-                _, pooled_hidden = self.transformer.aggregate_and_classify(encoded_for_pool)
-            else:
-                _, pooled_hidden = self.transformer.aggregate_and_classify(
-                    encoded_for_pool,
-                    transformer_risk_factors,
-                )
-
-            exam_embeddings[complete_exam_mask] = pooled_hidden
-
-        exam_embeddings = exam_embeddings.view(B, T, -1)
-        exam_embeddings = self.temporal_projection(exam_embeddings)
-
-        history_embedding, states, reconstructions = self.vmrnn(exam_embeddings, exam_mask)
-
-
-        features = [history_embedding]
+        features = [temporal_feature]
 
         asymmetry_scores = None
         coords = None
         coord_valid = None
-        r_aa = history_embedding.new_zeros(B, 1)
+        r_aa = temporal_feature.new_zeros(B, 1)
 
+        # -------------------------
+        # Asymmetry branch
+        # -------------------------
         if self.use_asymmetry and feat_maps is not None:
             c_feat, hf, wf = feat_maps.shape[1:]
             feat_maps = feat_maps.view(B, T, V, c_feat, hf, wf)
@@ -258,29 +189,24 @@ class VMRAMaR(BaseRiskModel):
             if r_aa.dim() == 1:
                 r_aa = r_aa.unsqueeze(-1)
 
-        if self.use_asymmetry:
             features.append(r_aa)
 
-        for i, f in enumerate(features):
-            if f.dim() != 2 or f.size(0) != B:
-                raise ValueError(f"Feature {i} has invalid shape {f.shape}, expected (B, D)")
-
         combined = torch.cat(features, dim=-1)
+
         logits = self.ahl(combined)
         probs = torch.sigmoid(logits)
 
         return {
             "logit": logits,
             "probs": probs,
-            "history_embedding": history_embedding,
-            "exam_embeddings": exam_embeddings,
-            "states": states,
-            "vmrnn_reconstruction": reconstructions,
+            "temporal_feature": temporal_feature,
+            "exam_embeddings": fused_feats,
             "exam_asymmetry": asymmetry_scores,
             "coords": coords,
             "coord_valid": coord_valid,
             "r_aa": r_aa,
         }
+
 
 
     def get_risk_heads(self, outputs, batch):
