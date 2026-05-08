@@ -50,6 +50,7 @@ def parse_test_args():
     parser.add_argument("--dataset", type=str, required=True,
                         help="Dataset to use (EMBED, CSAW-CC, etc.).")
     parser.add_argument("--seed", type=int, default=2023, help="Random seed for reproducibility")
+    parser.add_argument("--best_model", type=str, default="False")
 
     # ---------------- Temporary parse ----------------
     temp_args, _ = parser.parse_known_args()
