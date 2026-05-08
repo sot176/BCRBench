@@ -1,8 +1,8 @@
 #!/bin/bash -l
 
 #SBATCH --job-name=Test_Mirai_ImgFeatAlign2         # Job name
-#SBATCH --output=/scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/error_output_files/embed/%x-%j.out  # Output file with job name and ID
-#SBATCH --error=/scratch/project_465002309/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/error_output_files/embed/%x-%j.err   # Error file with job name and ID
+#SBATCH --output=/scratch/project_465002861/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/error_output_files/embed/%x-%j.out  # Output file with job name and ID
+#SBATCH --error=/scratch/project_465002861/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/error_output_files/embed/%x-%j.err   # Error file with job name and ID
 #SBATCH --partition=standard-g
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=8
@@ -10,7 +10,7 @@
 #SBATCH --cpus-per-task=56
 #SBATCH --mem=480G
 #SBATCH --time=03:59:00               # Run time (hh:mm:ss)
-#SBATCH --account=project_465002309     # Project for billing
+#SBATCH --account=project_465002861     # Project for billing
 
 # Directories for data and output
 export WORKING_DIR=/scratch/project_465002309/thrunsol/BreastCancerRiskBenchmark/src
@@ -44,7 +44,7 @@ mkdir -p  /scratch/project_465002861/thrunsol/LMV_Risk_prediction_test_results_1
 accelerate launch  main_test.py \
   --csv_file /scratch/project_465002861/thrunsol/csawcc_datasets/metadata_csawcc_dcm_path_density_new.csv \
   --data_root /scratch/project_465002861/thrunsol/csawcc_datasets/Risk_dataset_train_val_test_1664_2048_new \
-  --path_out_dir /scratch/project_465002309/thrunsol/Risk_prediction_training_results_1664_2048_Mirai_attention_layer_augmentations_New_journal_paper/csaw/TrainRisk_pred_CSAW_ImgFeatAlign-11369575  \
+  --path_out_dir /scratch/project_465002861/thrunsol/Risk_prediction_training_results_1664_2048_Mirai_attention_layer_augmentations_New_journal_paper/csaw/TrainRisk_pred_CSAW_ImgFeatAlign-11369575  \
   --path_test_folder  /scratch/project_465002861/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/csaw/ImgFeatAlign_frozen_encoder_pr_auc \
   --model "ImgFeatAlign" \
   --id_training 1 \
