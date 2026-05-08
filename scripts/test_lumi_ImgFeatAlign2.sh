@@ -47,7 +47,7 @@ accelerate launch  main_test.py \
   --path_out_dir /scratch/project_465002861/thrunsol/Risk_prediction_training_results_1664_2048_Mirai_attention_layer_augmentations_New_journal_paper/csaw/TrainRisk_pred_CSAW_ImgFeatAlign-11369575  \
   --path_test_folder  /scratch/project_465002861/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/csaw/ImgFeatAlign_frozen_encoder_pr_auc \
   --model "ImgFeatAlign" \
-  --id_training 1 \
+  --id_training 4 \
   --batch_size 1 \
   --num_workers 7 \
   --best_model "True" \
