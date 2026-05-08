@@ -5,7 +5,7 @@ from tqdm import tqdm
 from accelerate import Accelerator
 
 from .test_utils import load_model, gather_tensor
-from utils import (
+from utils.utils_pr_auc import (
     create_logger,
     save_model_results_to_file,
     bootstrap_c_index,
