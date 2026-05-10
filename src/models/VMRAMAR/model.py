@@ -218,22 +218,24 @@ class VMRAMaR(BaseRiskModel):
             x = images.permute(0, 1, 3, 2, 4, 5).contiguous()
 
         x_flat = x.view(B * T * V, C, H, W)
+
         image_encoder_args = model_args(self.image_encoder)
 
         image_risk_factors = zero_risk_factors_for_args(
             image_encoder_args,
-            B,
-            x.device,
-            x.dtype,
+            B * T,
+            x_flat.device,
+            x_flat.dtype,
         )
-        image_risk_factors_per_img = expand_risk_factors_per_img(
+
+        risk_factors_per_img = expand_risk_factors_per_img(
             image_risk_factors,
             V,
         )
 
         _, img_feats, _ = self.image_encoder(
             x_flat,
-            image_risk_factors_per_img,
+            risk_factors_per_img,
             batch,
         )
 
