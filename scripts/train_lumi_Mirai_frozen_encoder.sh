@@ -51,7 +51,7 @@ accelerate launch  main_train.py \
             --batch_size 6 \
             --augmentations \
             --num_workers 7 \
-            --learning_rate 1e-4 \
+            --learning_rate 1e-5 \
             --weight_decay 1e-4 \
             --model "Mirai" \
             --lr_decay 0.5 \
