@@ -12,15 +12,14 @@ freeze_image_encoder: true
 use_precomputed_hiddens: false
 state_dict_path: null
 image_repr_dim: 512
-use_asymmetry: true
 
 # ----------------------------
 # Transformer architecture
 # ----------------------------
 transformer_hidden_dim: 512
 num_layers: 1
-num_heads: 8
-dropout: 0.0
+num_heads: 4
+dropout: 0.1
 max_visits: 2
 
 # ----------------------------
@@ -86,14 +85,18 @@ wrap_model: false
 # ----------------------------
 # VMRNN architecture
 # ----------------------------
-depths_downsample: (1, 2)
-depths_upsample: (2, 1)
-embed_dim: 512
+vss_backend: transformer
+vmrnn_hidden_dim: 512
+vmrnn_spatial_resolution: [4, 4]
+vmrnn_downsample_depths: [1, 2]
+vmrnn_upsample_depths: [2, 1]
+vmrnn_dropout: 0.1
+vmrnn_released_weight_path: null
 
 # ----------------------------
 # Asymmetry module
 # ----------------------------
-use_asymmetry: true
+use_asymmetry: false
 latent_h: 5
 latent_w: 5
 use_sad_bias: false

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-
+from .vmrnn import VMRNNEncoder
 from .sad import SpatialAsymmetryDetector
 from .lat import LongitudinalAsymmetryTracker
 from models.common_parts import CumulativeProbabilityLayer
@@ -19,7 +19,6 @@ from .model_utils import (
 )
 
 register_onconet_alias(_onconet)
-
 
 class VMRAMaR(BaseRiskModel):
     def __init__(self, args):
@@ -41,7 +40,9 @@ class VMRAMaR(BaseRiskModel):
 
         self.image_repr_dim = get_img_repr_dim(self.image_encoder)
 
-        self.use_asymmetry = getattr(self.args, "use_asymmetry", True)
+        self.use_asymmetry =(getattr(self.args, "use_asymmetry", False))
+        print(f"[VMRAMaR] use_asymmetry = {self.use_asymmetry}")
+
         if self.use_asymmetry:
             setup_feature_map_hook(self, args)
 
@@ -54,7 +55,35 @@ class VMRAMaR(BaseRiskModel):
                 persistent_weight=float(getattr(self.args, "persistent_weight", 1.0)),
             )
 
-        final_dim = self.image_repr_dim + (1 if self.use_asymmetry else 0)
+        self.vmrnn_hidden_dim = int(getattr(self.args, "vmrnn_hidden_dim", 128))
+
+        self.view_attention = nn.Sequential(
+            nn.Linear(self.image_repr_dim, self.image_repr_dim),
+            nn.Tanh(),
+            nn.Linear(self.image_repr_dim, 1),
+        )
+
+        self.vmrnn = VMRNNEncoder(
+            input_dim=self.image_repr_dim,
+            hidden_dim=self.vmrnn_hidden_dim,
+            spatial_resolution=(
+                getattr(self.args, "vmrnn_spatial_resolution", None),
+                (4, 4),
+            ),
+            downsample_depths=(
+                getattr(self.args, "vmrnn_downsample_depths", None),
+                (1, 2),
+            ),
+            upsample_depths=(
+                getattr(self.args, "vmrnn_upsample_depths", None),
+                (2, 1),
+            ),
+            dropout=float(getattr(self.args, "vmrnn_dropout", 0.1)),
+            vss_backend=getattr(self.args, "vss_backend", "transformer"),
+            released_weight_path=getattr(self.args, "vmrnn_released_weight_path", None),
+        )
+
+        final_dim = self.vmrnn_hidden_dim + (1 if self.use_asymmetry else 0)
         self.ahl = CumulativeProbabilityLayer(
             final_dim,
             max_followup=self.args.max_followup,
@@ -76,8 +105,8 @@ class VMRAMaR(BaseRiskModel):
             )
 
         flat_exam_mask = view_mask.reshape(B * T, V).bool()
-
         partial_exam_mask = flat_exam_mask.any(dim=1) & ~flat_exam_mask.all(dim=1)
+
         if partial_exam_mask.any():
             raise RuntimeError(
                 "Formal Mirai fusion requires complete exams; partial exams are not supported."
@@ -100,6 +129,8 @@ class VMRAMaR(BaseRiskModel):
             image_risk_factors,
             V,
         )
+
+        feat_maps = None
 
         if flat_view_mask.any():
             valid_images = flat_images[flat_view_mask]
@@ -131,9 +162,7 @@ class VMRAMaR(BaseRiskModel):
             hidden = valid_hidden.new_zeros((total_views, valid_hidden.size(-1)))
             hidden[flat_view_mask] = valid_hidden
 
-            if valid_feat_maps is None:
-                feat_maps = None
-            else:
+            if valid_feat_maps is not None:
                 feat_maps = valid_feat_maps.new_zeros(
                     (total_views, *valid_feat_maps.shape[1:])
                 )
@@ -141,28 +170,24 @@ class VMRAMaR(BaseRiskModel):
 
         else:
             hidden = flat_images.new_zeros((total_views, self.image_repr_dim))
-            feat_maps = None
 
         hidden = hidden.view(B, T, V, -1)
-        hidden = hidden[:, :, :, :self.image_repr_dim]
+        hidden = hidden[:, :, :, : self.image_repr_dim]
 
-        # -------------------------
-        # Fuse views per exam
-        # -------------------------
-        view_mask_f = view_mask.float().unsqueeze(-1)  # (B, T, V, 1)
-        n_valid_views = view_mask_f.sum(dim=2).clamp(min=1.0)
+        view_mask_bool = view_mask.bool()
+        attn_logits = self.view_attention(hidden).squeeze(-1)
+        attn_logits = attn_logits.masked_fill(~view_mask_bool, -1e9)
 
-        fused_feats = (hidden * view_mask_f).sum(dim=2) / n_valid_views  # (B, T, D)
+        attn_weights = torch.softmax(attn_logits, dim=2).unsqueeze(-1)
+        fused_feats = (hidden * attn_weights).sum(dim=2)
 
-        # -------------------------
-        # Temporal pooling
-        # -------------------------
-        exam_mask_f = exam_mask.float().unsqueeze(-1)  # (B, T, 1)
-        n_valid_exams = exam_mask_f.sum(dim=1).clamp(min=1.0)
+        empty_exam = ~view_mask_bool.any(dim=2)
+        fused_feats = fused_feats.masked_fill(empty_exam.unsqueeze(-1), 0.0)
 
-        temporal_feature = (
-            fused_feats * exam_mask_f
-        ).sum(dim=1) / n_valid_exams  # (B, D)
+        temporal_feature, temporal_sequence, reconstruction_sequence = self.vmrnn(
+            fused_feats,
+            exam_mask.bool(),
+        )
 
         features = [temporal_feature]
 
@@ -171,9 +196,6 @@ class VMRAMaR(BaseRiskModel):
         coord_valid = None
         r_aa = temporal_feature.new_zeros(B, 1)
 
-        # -------------------------
-        # Asymmetry branch
-        # -------------------------
         if self.use_asymmetry and feat_maps is not None:
             c_feat, hf, wf = feat_maps.shape[1:]
             feat_maps = feat_maps.view(B, T, V, c_feat, hf, wf)
@@ -200,13 +222,15 @@ class VMRAMaR(BaseRiskModel):
             "logit": logits,
             "probs": probs,
             "temporal_feature": temporal_feature,
+            "temporal_sequence": temporal_sequence,
+            "reconstruction_sequence": reconstruction_sequence,
             "exam_embeddings": fused_feats,
+            "view_attention": attn_weights.squeeze(-1),
             "exam_asymmetry": asymmetry_scores,
             "coords": coords,
             "coord_valid": coord_valid,
             "r_aa": r_aa,
         }
-
 
 
     def get_risk_heads(self, outputs, batch):
