@@ -212,31 +212,27 @@ class VMRAMaR(BaseRiskModel):
 
         x_flat = x.view(B * T * V, C, H, W)
 
-        image_encoder_args = model_args(self.image_encoder)
-
-        image_risk_factors = zero_risk_factors_for_args(
-            image_encoder_args,
-            B * T,
-            x_flat.device,
-            x_flat.dtype,
+        img_feats = self.image_encoder(
+            x_flat
         )
 
-        risk_factors_per_img = expand_risk_factors_per_img(
-            image_risk_factors,
-            V,
-        )
+       # img_feats is expected as (B*T*V, C, 64, 52)
+        if img_feats.dim() == 4:
+            C_feat, H_feat, W_feat = img_feats.shape[1:]
+            img_maps = img_feats.reshape(B, T, V, C_feat, H_feat, W_feat)
 
-        _, img_feats, _ = self.image_encoder(
-            x_flat,
-            risk_factors_per_img,
-            batch,
-        )
+            # Vector embeddings for temporal VMRNN
+            img_vecs = img_maps.mean(dim=(-1, -2))  # (B, T, V, C)
 
-        img_feats = img_feats.view(B, T, V, -1)
-        img_feats = img_feats[:, :, :, : self.image_repr_dim]
+            self.image_repr_dim = C_feat
+        else:
+            img_maps = None
+            img_vecs = img_feats.reshape(B, T, V, -1)
+            img_vecs = img_vecs[:, :, :, : self.image_repr_dim]
 
-        fused_feats = img_feats.mean(dim=2)
+        fused_feats = img_vecs.mean(dim=2)
         fused_feats = self.temporal_projection(fused_feats)
+
 
         vmrnn_outputs = self.vmrnn(fused_feats, None, batch)
 
