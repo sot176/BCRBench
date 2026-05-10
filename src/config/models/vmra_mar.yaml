@@ -81,7 +81,7 @@ model_parallel: false
 wrap_model: false
 
 
-vmrnn_params: '{"depths_downsample": "2,2,6,2", "depths_upsample": "2,2,6,2", "num_heads": "8", "patch_size": 32, "window_size": 64, "embed_dim": 512, "feature_resolution": [1, 2]}'
+vmrnn_params: '{"depths_downsample": "2", "depths_upsample": "2", "num_heads": "8", "patch_size": 32, "window_size": 64, "embed_dim": 512, "feature_resolution": [1, 2]}'
 
 asymmetry_params: '{"use_asymmetry": true, "latent_h": 52, "latent_w": 64, "use_sad_bias": true, "use_lat_bn": true, "lat_dropout": 0.1, "initial_asym_mean": 2000, "initial_asym_std": 300}'
 
