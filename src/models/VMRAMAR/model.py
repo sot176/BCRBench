@@ -234,7 +234,7 @@ class VMRAMaR(BaseRiskModel):
         fused_feats = self.temporal_projection(fused_feats)
 
 
-        vmrnn_outputs = self.vmrnn(fused_feats, None, batch)
+        vmrnn_outputs = self.vmrnn(fused_feats)
 
         if isinstance(vmrnn_outputs, tuple):
             temporal_output = vmrnn_outputs[0]
