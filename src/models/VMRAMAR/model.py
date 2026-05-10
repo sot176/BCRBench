@@ -70,12 +70,12 @@ class VMRAMaR(BaseRiskModel):
         # ----------------------------
         self.image_encoder = extract_mirai_backbone(cfg["paths"]["mirai_path"])
 
-
-        if str2bool(getattr(args, "freeze_image_encoder", False)):
+        if getattr(args, "freeze_image_encoder", False):
+            print("Freezing image encoder parameters.")
             freeze_encoder(self.image_encoder)
 
         self.image_repr_dim = int(
-            getattr(args, "image_repr_dim", get_img_repr_dim(self.image_encoder))
+            getattr(args, "image_repr_dim")
         )
 
         # ----------------------------

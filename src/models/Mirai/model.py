@@ -10,6 +10,9 @@ from .model_utils import (
     register_onconet_alias,
     zero_risk_factors_for_args,
 )
+from onconet.models.pools.attention_pool import Simple_AttentionPool
+from models.common_parts import extract_mirai_backbone
+from config.config import cfg
 
 register_onconet_alias(_onconet)
 
@@ -21,19 +24,17 @@ class Mirai(nn.Module):
         super().__init__()
         self.args = args
 
-        if args.img_encoder_snapshot is not None:
-            self.image_encoder = load_model(
-                args.img_encoder_snapshot,
-                args,
-                do_wrap_model=False,
-            )
-        else:
-            self.image_encoder = get_model_by_name("custom_resnet", False, args)
+        self.image_encoder = extract_mirai_backbone(cfg["paths"]["mirai_path"])
 
         if getattr(args, "freeze_image_encoder", False):
+            print("Freezing image encoder parameters.")
             freeze_encoder(self.image_encoder)
-
-        self.image_repr_dim = get_img_repr_dim(self.image_encoder)
+        
+        self.image_repr_dim = int(
+                getattr(args, "image_repr_dim")
+            )
+        
+        self.spatial_pool = Simple_AttentionPool(args, self.image_repr_dim)
 
         if args.transformer_snapshot is not None:
             self.transformer = load_model(
@@ -59,30 +60,13 @@ class Mirai(nn.Module):
     def forward(self, batch):
         x = batch["images"]  # (B, N, C, H, W)
         bsz, num_imgs, channels, height, width = x.size()
-
-        image_encoder_args = model_args(self.image_encoder)
-
-        image_risk_factors = zero_risk_factors_for_args(
-            image_encoder_args,
-            bsz,
-            x.device,
-            x.dtype,
-        )
-        image_risk_factors_per_img = expand_risk_factors_per_img(
-            image_risk_factors,
-            num_imgs,
-        )
-
+        
         x = x.contiguous().view(bsz * num_imgs, channels, height, width)
 
-        _, img_x, _ = self.image_encoder(
-            x,
-            image_risk_factors_per_img,
-            batch,
-        )
+        img_x = self.image_encoder(x)
 
-        img_x = img_x.view(bsz, num_imgs, -1)
-        img_x = img_x[:, :, :self.image_repr_dim]
+        feat_map = img_x.view(bsz, num_imgs, -1)
+        _, img_x = self.spatial_pool(feat_map)
 
         transformer_risk_factors = zero_risk_factors_for_args(
             self.args,

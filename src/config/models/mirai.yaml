@@ -43,6 +43,7 @@ pretrained_on_imagenet: false
 pretrained_imagenet_model_name: resnet18
 make_fc: false
 replace_bn_with_gn: false
+image_repr_dim: 512
 
 # ----------------------------
 # Risk factors
