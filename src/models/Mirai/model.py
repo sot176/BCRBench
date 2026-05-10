@@ -56,17 +56,21 @@ class Mirai(nn.Module):
                     self.image_repr_dim,
                 ),
             )
-
     def forward(self, batch):
         x = batch["images"]  # (B, N, C, H, W)
         bsz, num_imgs, channels, height, width = x.size()
-        
+
         x = x.contiguous().view(bsz * num_imgs, channels, height, width)
 
-        img_x = self.image_encoder(x)
+        feat_map = self.image_encoder(x)
 
-        feat_map = img_x.view(bsz, num_imgs, -1)
-        _, img_x = self.spatial_pool(feat_map)
+        if feat_map.dim() == 4:
+            _, img_x = self.spatial_pool(feat_map)
+        else:
+            img_x = feat_map
+
+        img_x = img_x.view(bsz, num_imgs, -1)
+        img_x = img_x[:, :, :self.image_repr_dim]
 
         transformer_risk_factors = zero_risk_factors_for_args(
             self.args,
@@ -82,6 +86,7 @@ class Mirai(nn.Module):
         )
 
         return logit, transformer_hidden, activ_dict
+
 
 
 
