@@ -1,563 +1,296 @@
-"""Formal multi-scale VMRNN blocks with optional VMamba or PyTorch fallback VSS cells."""
-
-from __future__ import annotations
-
-from collections.abc import Sequence
-from pathlib import Path
-
 import torch
-from torch import nn
+import torch.nn as nn
+from einops import rearrange
+from timm.models.swin_transformer import PatchMerging  # patch merging is still used for downsampling
+from timm.models.layers import DropPath, to_2tuple, trunc_normal_
+from onconet.models.vmamba import VSSBlock, SS2D  # ensure correct import of VSSBlock and SS2D
+from typing import Optional, Callable
+from functools import partial
+from onconet.models.factory import load_model, RegisterModel, get_model_by_name
 
 
-try:
-    from vmra_mar.modeling.vmamba_runtime import (
-        VMambaVSBBlock,
-        is_vmamba_kernel_available,
-        vmamba_kernel_backend_name,
-        vmamba_unavailable_reason,
-    )
-except Exception as exc:
-    VMambaVSBBlock = None
-
-    def is_vmamba_kernel_available() -> bool:
-        return False
-
-    def vmamba_kernel_backend_name() -> str:
-        return "unavailable"
-
-    def vmamba_unavailable_reason() -> str:
-        return str(exc)
-
-
-def _num_tokens(resolution: tuple[int, int]) -> int:
-    return resolution[0] * resolution[1]
-
-
-def _scale_resolution(resolution: tuple[int, int], factor: int) -> tuple[int, int]:
-    return resolution[0] // factor, resolution[1] // factor
-
-
-def _tokens_to_map(tokens: torch.Tensor, resolution: tuple[int, int]) -> torch.Tensor:
-    height, width = resolution
-    batch_size, token_count, channels = tokens.shape
-    if token_count != height * width:
-        raise ValueError(f"Expected {height * width} tokens for resolution {resolution}, got {token_count}.")
-    return tokens.view(batch_size, height, width, channels).permute(0, 3, 1, 2).contiguous()
-
-
-def _map_to_tokens(feature_map: torch.Tensor) -> torch.Tensor:
-    batch_size, channels, height, width = feature_map.shape
-    return feature_map.permute(0, 2, 3, 1).reshape(batch_size, height * width, channels)
-
-
-def _validate_multiscale_resolution(resolution: tuple[int, int], num_layers: int) -> None:
-    if num_layers < 1:
-        raise ValueError("VMRNN requires at least one recurrent scale.")
-
-    divisor = 2 ** num_layers
-    height, width = resolution
-    if height % divisor != 0 or width % divisor != 0:
-        raise ValueError(
-            f"Resolution {resolution} must be divisible by {divisor} "
-            f"to support {num_layers} downsampling stages."
-        )
-
-
-def resolve_vss_backend(requested: str) -> str:
-    normalized = requested.lower()
-
-    if normalized not in {"auto", "formal", "vmamba", "transformer"}:
-        raise ValueError(f"Unsupported VSS backend: {requested}")
-
-    if normalized in {"vmamba", "formal"}:
-        if not is_vmamba_kernel_available():
-            raise RuntimeError(
-                f"VMamba was explicitly requested but is unavailable: "
-                f"{vmamba_unavailable_reason()}"
-            )
-        return "vmamba"
-
-    if normalized == "auto":
-        return "vmamba" if is_vmamba_kernel_available() else "transformer"
-
-    return "transformer"
-
-
-def _extract_released_state_dict(checkpoint: object) -> dict[str, torch.Tensor]:
-    if isinstance(checkpoint, dict):
-        if "state_dict" in checkpoint and isinstance(checkpoint["state_dict"], dict):
-            checkpoint = checkpoint["state_dict"]
-        elif "model_state_dict" in checkpoint and isinstance(checkpoint["model_state_dict"], dict):
-            checkpoint = checkpoint["model_state_dict"]
-    if not isinstance(checkpoint, dict):
-        raise TypeError(f"Expected a state-dict like checkpoint, found {type(checkpoint)!r}.")
-    return checkpoint
-
-
-def _map_released_weight_key(key: str) -> str | None:
-    normalized = key.removeprefix("module.")
-    replacements = (
-        ("Downsample.layers.", "down_cells."),
-        ("Downsample.downsample.", "downsamplers."),
-        ("Upsample.layers.", "up_cells."),
-        ("Upsample.upsample.", "upsamplers."),
-        (".VSBs.", ".blocks."),
-    )
-    for source, target in replacements:
-        normalized = normalized.replace(source, target)
-    if normalized.startswith(("down_cells.", "up_cells.", "downsamplers.", "upsamplers.")):
-        return normalized
-    return None
-
-
-class TransformerVSBBlock(nn.Module):
-    """Pure PyTorch fallback for VMambaVSBBlock."""
-
+class VSB(VSSBlock):
     def __init__(
         self,
-        hidden_dim: int,
-        input_resolution: tuple[int, int],
-        dropout: float = 0.0,
-        num_heads: int = 4,
-    ) -> None:
-        super().__init__()
-        del input_resolution
-
-        heads = min(num_heads, hidden_dim)
-        while heads > 1 and hidden_dim % heads != 0:
-            heads -= 1
-
-        self.norm1 = nn.LayerNorm(hidden_dim)
-        self.attn = nn.MultiheadAttention(
-            embed_dim=hidden_dim,
-            num_heads=heads,
-            dropout=dropout,
-            batch_first=True,
+        hidden_dim: int = 0,
+        input_resolution: tuple = (224, 224), 
+        drop_path: float = 0,
+        norm_layer: Callable[..., nn.Module] = partial(nn.LayerNorm, eps=1e-6),
+        attn_drop_rate: float = 0,
+        d_state: int = 16,
+        **kwargs
+    ):
+        super().__init__(
+            hidden_dim=hidden_dim,
+            input_resolution=input_resolution,
+            drop_path=drop_path,
+            norm_layer=norm_layer,
+            attn_drop_rate=attn_drop_rate,
+            d_state=d_state,
+            **kwargs
         )
-        self.norm2 = nn.LayerNorm(hidden_dim)
-        self.mlp = nn.Sequential(
-            nn.Linear(hidden_dim, 4 * hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(4 * hidden_dim, hidden_dim),
-            nn.Dropout(dropout),
-        )
-
-    def forward(
-        self,
-        tokens: torch.Tensor,
-        hidden_tokens: torch.Tensor | None = None,
-    ) -> torch.Tensor:
-        if hidden_tokens is not None:
-            tokens = tokens + hidden_tokens
-
-        x = self.norm1(tokens)
-        attn_out, _ = self.attn(x, x, x, need_weights=False)
-        tokens = tokens + attn_out
-        tokens = tokens + self.mlp(self.norm2(tokens))
-        return tokens
-
-
-class PatchMerging(nn.Module):
-    def __init__(self, input_resolution: tuple[int, int], dim: int, norm_layer: type[nn.Module] = nn.LayerNorm) -> None:
-        super().__init__()
+        self.linear = nn.Linear(hidden_dim * 2, hidden_dim)
         self.input_resolution = input_resolution
-        self.reduction = nn.Linear(4 * dim, 2 * dim, bias=False)
-        self.norm = norm_layer(4 * dim)
 
-    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
-        height, width = self.input_resolution
-        batch_size, token_count, channels = tokens.shape
-        if token_count != height * width:
-            raise ValueError(f"Expected {height * width} tokens for resolution {self.input_resolution}, got {token_count}.")
-        if height % 2 != 0 or width % 2 != 0:
-            raise ValueError(f"PatchMerging expects even resolutions, got {self.input_resolution}.")
+    def forward(self, x, hx=None):
+        print("input resolution", self.input_resolution)
+        print(" x resolution", x.shape)
+        H, W = self.input_resolution
+        B, L, C = x.shape
+        if not (H == 1 or W == 1):
+            assert L == H * W, f"Input feature has wrong size. Got L={L}, expected {H * W}."
 
-        feature_map = tokens.view(batch_size, height, width, channels)
-        x0 = feature_map[:, 0::2, 0::2, :]
-        x1 = feature_map[:, 1::2, 0::2, :]
-        x2 = feature_map[:, 0::2, 1::2, :]
-        x3 = feature_map[:, 1::2, 1::2, :]
-        merged = torch.cat([x0, x1, x2, x3], dim=-1)
-        merged = merged.view(batch_size, -1, 4 * channels)
-        merged = self.norm(merged)
-        return self.reduction(merged)
+        shortcut = x
+        x = self.ln_1(x)
+
+        if hx is not None:
+            hx = self.ln_1(hx)
+            x = torch.cat((x, hx), dim=-1)
+            x = self.linear(x)
+        x = x.view(B, H, W, C)
+        x = self.drop_path(self.self_attention(x))
+        x = x.view(B, H * W, C)
+        x = shortcut + x
+
+        return x
 
 
 class PatchExpanding(nn.Module):
-    def __init__(
-        self,
-        input_resolution: tuple[int, int],
-        dim: int,
-        dim_scale: int = 2,
-        norm_layer: type[nn.Module] = nn.LayerNorm,
-    ) -> None:
-        super().__init__()
+    r""" Patch Expanding Layer.
+    """
+    def __init__(self, input_resolution, dim, dim_scale=2, norm_layer=nn.LayerNorm):
+        super(PatchExpanding, self).__init__()
         self.input_resolution = input_resolution
-        self.expand = nn.Linear(dim, dim_scale * dim, bias=False) if dim_scale == 2 else nn.Identity()
+        self.dim = dim
+        self.expand = nn.Linear(dim, 2 * dim, bias=False) if dim_scale == 2 else nn.Identity()
         self.norm = norm_layer(dim // dim_scale)
 
-    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
-        height, width = self.input_resolution
-        tokens = self.expand(tokens)
-        batch_size, token_count, channels = tokens.shape
-        if token_count != height * width:
-            raise ValueError(f"Expected {height * width} tokens for resolution {self.input_resolution}, got {token_count}.")
+    def forward(self, x):
+        H, W = self.input_resolution
+        x = self.expand(x)
+        B, L, C = x.shape
+        assert L == H * W, "Input feature has wrong size."
+        x = x.view(B, H, W, C)
+        x = rearrange(x, 'b h w (p1 p2 c)-> b (h p1) (w p2) c', p1=2, p2=2, c=C // 4)
+        x = x.view(B, -1, C // 4)
+        x = self.norm(x)
+        return x
 
-        feature_map = tokens.view(batch_size, height, width, channels)
-        feature_map = feature_map.reshape(batch_size, height, width, 2, 2, channels // 4)
-        feature_map = feature_map.permute(0, 1, 3, 2, 4, 5).reshape(
-            batch_size,
-            height * 2,
-            width * 2,
-            channels // 4,
+class PatchInflated(nn.Module):
+    r""" Patch Inflating Layer.
+    """
+    def __init__(self, in_chans, embed_dim, input_resolution, stride=2, padding=1, output_padding=1):
+        super(PatchInflated, self).__init__()
+        stride = to_2tuple(stride)
+        padding = to_2tuple(padding)
+        output_padding = to_2tuple(output_padding)
+        self.input_resolution = input_resolution
+        self.Conv = nn.ConvTranspose2d(in_channels=embed_dim, out_channels=in_chans, 
+                                       kernel_size=(3, 3),
+                                       stride=stride, padding=padding, output_padding=output_padding)
+
+    def forward(self, x):
+        H, W = self.input_resolution
+        B, L, C = x.shape
+        assert L == H * W, "Input feature has wrong size."
+        x = x.view(B, H, W, C)
+        x = x.permute(0, 3, 1, 2)
+        x = self.Conv(x)
+        return x
+
+
+class VMRNNCell(nn.Module):
+    def __init__(self, hidden_dim, input_resolution, depth,
+                 drop=0., attn_drop=0., drop_path=0., norm_layer=nn.LayerNorm, d_state=16, **kwargs):
+        """
+        Args:
+            hidden_dim: Dimension of the hidden state.
+            input_resolution: Tuple (H, W) of the spatial resolution.
+            depth: Number of VSB layers in the cell.
+        """
+        super(VMRNNCell, self).__init__()
+
+        self.VSBs = nn.ModuleList(
+            VSB(hidden_dim=hidden_dim, input_resolution=input_resolution,
+                drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path, 
+                norm_layer=norm_layer, attn_drop_rate=attn_drop,
+                d_state=d_state, **kwargs)
+            for i in range(depth)
         )
-        tokens = feature_map.view(batch_size, -1, channels // 4)
-        return self.norm(tokens)
 
-
-class InputTokenProjection(nn.Module):
-    def __init__(
-        self,
-        input_dim: int,
-        hidden_dim: int,
-        resolution: tuple[int, int],
-        dropout: float = 0.0,
-    ) -> None:
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        self.token_count = _num_tokens(resolution)
-        self.proj = nn.Linear(input_dim, self.token_count * hidden_dim)
-        self.norm = nn.LayerNorm(hidden_dim)
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(self, x_t: torch.Tensor) -> torch.Tensor:
-        tokens = self.proj(x_t).view(x_t.size(0), self.token_count, self.hidden_dim)
-        return self.dropout(self.norm(tokens))
-
-
-class RecurrentStageCell(nn.Module):
-    def __init__(
-        self,
-        dim: int,
-        resolution: tuple[int, int],
-        depth: int,
-        dropout: float = 0.0,
-        vmamba_d_state: int = 16,
-        vmamba_drop_path: float = 0.0,
-        vss_backend: str = "transformer",
-    ) -> None:
-        super().__init__()
-
-        blocks = []
-        for _ in range(max(depth, 1)):
-            if vss_backend == "vmamba":
-                if VMambaVSBBlock is None:
-                    raise RuntimeError(f"VMamba block unavailable: {vmamba_unavailable_reason()}")
-                blocks.append(
-                    VMambaVSBBlock(
-                        hidden_dim=dim,
-                        input_resolution=resolution,
-                        drop_path=vmamba_drop_path,
-                        attn_drop_rate=dropout,
-                        d_state=vmamba_d_state,
-                    )
-                )
-            elif vss_backend == "transformer":
-                blocks.append(
-                    TransformerVSBBlock(
-                        hidden_dim=dim,
-                        input_resolution=resolution,
-                        dropout=dropout,
-                    )
-                )
-            else:
-                raise ValueError(f"Unsupported VSS backend: {vss_backend}")
-
-        self.blocks = nn.ModuleList(blocks)
-
-    def forward(
-        self,
-        tokens: torch.Tensor,
-        state: tuple[torch.Tensor, torch.Tensor],
-    ) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
-        hidden_tokens, cell_tokens = state
-
+    def forward(self, xt, hidden_states):
+        if hidden_states is None:
+            B, L, C = xt.shape
+            hx = torch.zeros(B, L, C).to(xt.device)
+            cx = torch.zeros(B, L, C).to(xt.device)
+        else:
+            hx, cx = hidden_states
+        
         outputs = []
-        for block_index, block in enumerate(self.blocks):
-            block_input = tokens if block_index == 0 else outputs[-1]
-            recurrent_input = hidden_tokens if block_index == 0 else None
-            outputs.append(block(block_input, recurrent_input))
-
-        stage_output = outputs[-1]
-        gate = torch.sigmoid(stage_output)
-        cell = torch.tanh(stage_output)
-        next_cell = gate * (cell_tokens + cell)
-        next_hidden = gate * torch.tanh(next_cell)
-        return next_hidden, (next_hidden, next_cell)
-
-
-class ReconstructionBlock(nn.Module):
-    def __init__(self, dim: int, resolution: tuple[int, int]) -> None:
-        super().__init__()
-        self.resolution = resolution
-        self.norm = nn.LayerNorm(dim)
-        self.depthwise = nn.Conv2d(dim, dim, kernel_size=3, padding=1, groups=dim)
-        self.pointwise = nn.Conv2d(dim, dim, kernel_size=1)
-        self.activation = nn.SiLU()
-
-    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
-        feature_map = _tokens_to_map(self.norm(tokens), self.resolution)
-        reconstructed = self.pointwise(self.activation(self.depthwise(feature_map)))
-        return tokens + _map_to_tokens(reconstructed)
+        for index, layer in enumerate(self.VSBs):
+            if index == 0:
+                x = layer(xt, hx)
+                outputs.append(x)
+            else:
+                x = layer(outputs[-1], None)  # Subsequent layers use only the previous output
+                outputs.append(x)
+                
+        o_t = outputs[-1]
+        Ft = torch.sigmoid(o_t)
+        cell = torch.tanh(o_t)
+        Ct = Ft * (cx + cell)
+        Ht = Ft * torch.tanh(Ct)
+        return Ht, (Ht, Ct)
 
 
-class VMRNNEncoder(nn.Module):
-    def __init__(
-        self,
-        input_dim: int,
-        hidden_dim: int = 128,
-        spatial_resolution: tuple[int, int] = (4, 4),
-        downsample_depths: Sequence[int] = (2, 6),
-        upsample_depths: Sequence[int] | None = (6, 2),
-        dropout: float = 0.1,
-        vss_backend: str = "auto",
-        vmamba_d_state: int = 16,
-        vmamba_drop_path: float = 0.0,
-        released_weight_path: str | Path | None = None,
-    ) -> None:
-        super().__init__()
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.spatial_resolution = spatial_resolution
-        self.vss_backend = resolve_vss_backend(vss_backend)
-        self.vmamba_kernel_backend = vmamba_kernel_backend_name()
-        self.vmamba_d_state = vmamba_d_state
-        self.vmamba_drop_path = vmamba_drop_path
+class DownSample(nn.Module):
+    def __init__(self, embed_dim, depths_downsample, 
+                 drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1, 
+                 norm_layer=nn.LayerNorm, d_state=16, flag=1, 
+                 feature_resolution: tuple = (1,1)):
+        """
+        Args:
+            embed_dim: Dimension of input features.
+            depths_downsample: List indicating the depth (# of VMRNNCell layers) at each stage.
+            feature_resolution: Tuple (H, W) that describes the spatial resolution of the input feature map.
+        """
+        super(DownSample, self).__init__()
+        self.num_layers = len(depths_downsample)
+        self.embed_dim = embed_dim
+        # Since features are pre-extracted, we bypass patch embedding.
+        self.patch_embed = nn.Identity()
+        # Use provided feature_resolution rather than computing it from images.
+        patches_resolution = feature_resolution
 
-        self.downsample_depths = tuple(downsample_depths)
-        self.upsample_depths = tuple(
-            upsample_depths if upsample_depths is not None else tuple(reversed(self.downsample_depths))
-        )
-        if len(self.downsample_depths) != len(self.upsample_depths):
-            raise ValueError("Downsample and upsample depth lists must have the same number of stages.")
+        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths_downsample))]
+        self.layers = nn.ModuleList()
+        self.downsample = nn.ModuleList()
+        is_temporal = feature_resolution[0] == 1 or feature_resolution[1] == 1
+        self.is_temporal = is_temporal
 
-        self.num_layers = len(self.downsample_depths)
-        _validate_multiscale_resolution(spatial_resolution, self.num_layers)
-
-        self.base_token_count = _num_tokens(spatial_resolution)
-        self.down_stage_resolutions = tuple(
-            _scale_resolution(spatial_resolution, 2 ** stage_index)
-            for stage_index in range(self.num_layers)
-        )
-        self.down_stage_dims = tuple(
-            hidden_dim * (2 ** stage_index)
-            for stage_index in range(self.num_layers)
-        )
-        self.up_stage_resolutions = tuple(
-            _scale_resolution(spatial_resolution, 2 ** stage_index)
-            for stage_index in range(self.num_layers, 0, -1)
-        )
-        self.up_stage_dims = tuple(
-            hidden_dim * (2 ** stage_index)
-            for stage_index in range(self.num_layers, 0, -1)
-        )
-
-        self.input_projection = InputTokenProjection(
-            input_dim=input_dim,
-            hidden_dim=hidden_dim,
-            resolution=spatial_resolution,
-            dropout=dropout,
-        )
-
-        self.down_cells = nn.ModuleList(
-            RecurrentStageCell(
-                dim=self.down_stage_dims[stage_index],
-                resolution=self.down_stage_resolutions[stage_index],
-                depth=self.downsample_depths[stage_index],
-                dropout=dropout,
-                vmamba_d_state=self.vmamba_d_state,
-                vmamba_drop_path=self.vmamba_drop_path,
-                vss_backend=self.vss_backend,
-            )
-            for stage_index in range(self.num_layers)
-        )
-
-        self.downsamplers = nn.ModuleList(
-            PatchMerging(
-                input_resolution=self.down_stage_resolutions[stage_index],
-                dim=self.down_stage_dims[stage_index],
-            )
-            for stage_index in range(self.num_layers)
-        )
-
-        self.up_cells = nn.ModuleList(
-            RecurrentStageCell(
-                dim=self.up_stage_dims[stage_index],
-                resolution=self.up_stage_resolutions[stage_index],
-                depth=self.upsample_depths[self.num_layers - 1 - stage_index],
-                dropout=dropout,
-                vmamba_d_state=self.vmamba_d_state,
-                vmamba_drop_path=self.vmamba_drop_path,
-                vss_backend=self.vss_backend,
-            )
-            for stage_index in range(self.num_layers)
-        )
-
-        self.upsamplers = nn.ModuleList(
-            PatchExpanding(
-                input_resolution=self.up_stage_resolutions[stage_index],
-                dim=self.up_stage_dims[stage_index],
-            )
-            for stage_index in range(self.num_layers)
-        )
-
-        self.reconstruction = ReconstructionBlock(dim=hidden_dim, resolution=spatial_resolution)
-        self.history_projection = nn.Sequential(
-            nn.LayerNorm(hidden_dim),
-            nn.Linear(hidden_dim, hidden_dim),
-        )
-        self.reconstruction_projection = nn.Sequential(
-            nn.LayerNorm(hidden_dim),
-            nn.Linear(hidden_dim, input_dim),
-        )
-
-        self.released_weight_report: dict[str, object] | None = None
-        if released_weight_path is not None:
-            if self.vss_backend != "vmamba":
-                raise RuntimeError(
-                    "Released VMRNN weights are only compatible with the VMamba backend. "
-                    f"Current backend is {self.vss_backend!r}."
+        for i_layer in range(self.num_layers):
+            # Downsample using PatchMerging if desired; otherwise, you could use another strategy.
+            if is_temporal:
+                downsample = nn.Identity()
+            else:
+                downsample = PatchMerging(
+                    input_resolution=(patches_resolution[0] // (2 ** i_layer),
+                                      patches_resolution[1] // (2 ** i_layer)),
+                    dim=int(embed_dim * 2 ** i_layer)
                 )
-            released_path = Path(released_weight_path)
-            if not released_path.exists():
-                raise FileNotFoundError(f"VMRNN released weights were requested but not found: {released_path}")
-            self.released_weight_report = self._load_released_weights(released_path)
 
-    def _load_released_weights(self, path: Path) -> dict[str, object]:
-        checkpoint = torch.load(path, map_location="cpu", weights_only=False)
-        raw_state = _extract_released_state_dict(checkpoint)
-        current_state = self.state_dict()
-        filtered_state: dict[str, torch.Tensor] = {}
+            layer = VMRNNCell(hidden_dim=int(embed_dim * 2 ** i_layer),
+                              input_resolution=(patches_resolution[0] // (2 ** i_layer),
+                                                  patches_resolution[1] // (2 ** i_layer)),
+                              depth=depths_downsample[i_layer],
+                              drop=drop_rate,
+                              attn_drop=attn_drop_rate, 
+                              drop_path=dpr[sum(depths_downsample[:i_layer]):sum(depths_downsample[:i_layer + 1])],
+                              norm_layer=norm_layer, d_state=d_state, flag=flag)
+            self.layers.append(layer)
+            self.downsample.append(downsample)
 
-        for key, value in raw_state.items():
-            if not isinstance(value, torch.Tensor):
-                continue
-            mapped_key = _map_released_weight_key(key)
-            if mapped_key is None or mapped_key not in current_state:
-                continue
-            if current_state[mapped_key].shape != value.shape:
-                continue
-            filtered_state[mapped_key] = value
+    def forward(self, x, states_down):
+        # x is assumed to be already pre-embedded with shape (B, L, C)
+        x = self.patch_embed(x)  # Identity in this case.
+        hidden_states_down = []
+        for index, layer in enumerate(self.layers):
+            x, hidden_state = layer(x, states_down[index] if states_down is not None else None)
+            x = self.downsample[index](x)
+            hidden_states_down.append(hidden_state)
+        return hidden_states_down, x
 
-        if not filtered_state:
-            raise RuntimeError(f"No compatible VMRNN weights could be loaded from released checkpoint: {path}")
+class UpSample(nn.Module):
+    def __init__(self, embed_dim, depths_upsample, 
+                 drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1, 
+                 norm_layer=nn.LayerNorm, d_state=16, flag=0, 
+                 feature_resolution: tuple = (1,1), out_chans: int = None):
+        """
+        Args:
+            embed_dim: Dimension of input features.
+            depths_upsample: List indicating the depth (# of VMRNNCell layers) at each stage.
+            feature_resolution: Tuple (H, W) of the low-resolution feature map.
+            out_chans: Number of output channels; if provided, used for final reconstruction.
+        """
+        super(UpSample, self).__init__()
+        self.num_layers = len(depths_upsample)
+        self.embed_dim = embed_dim
+        # In the upsampling branch, we assume features are already embedded.
+        self.patch_embed = nn.Identity()
+        patches_resolution = feature_resolution
+        is_temporal = feature_resolution[0] == 1 or feature_resolution[1] == 1
+        self.is_temporal = is_temporal
+        # Optionally, if you need to reconstruct image-like output, you can use a patch inflating layer.
+        if is_temporal:
+            self.Unembed = nn.Identity()
+        else:
+            self.Unembed = PatchInflated(in_chans=out_chans if out_chans is not None else embed_dim,
+                                         embed_dim=embed_dim, input_resolution=patches_resolution)
 
-        incompatible = self.load_state_dict(filtered_state, strict=False)
-        return {
-            "path": str(path),
-            "loaded_tensors": len(filtered_state),
-            "missing_keys": list(incompatible.missing_keys),
-            "unexpected_keys": list(incompatible.unexpected_keys),
-        }
+        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths_upsample))]
+        self.layers = nn.ModuleList()
+        self.upsample = nn.ModuleList()
 
-    def _init_state_list(
-        self,
-        batch_size: int,
-        specs: Sequence[tuple[tuple[int, int], int]],
-        reference: torch.Tensor,
-    ) -> list[tuple[torch.Tensor, torch.Tensor]]:
-        states = []
-        for resolution, dim in specs:
-            token_count = _num_tokens(resolution)
-            zeros = reference.new_zeros(batch_size, token_count, dim)
-            states.append((zeros.clone(), zeros.clone()))
-        return states
 
-    def _blend_state_list(
-        self,
-        new_states: Sequence[tuple[torch.Tensor, torch.Tensor]],
-        old_states: Sequence[tuple[torch.Tensor, torch.Tensor]],
-        active: torch.Tensor,
-    ) -> list[tuple[torch.Tensor, torch.Tensor]]:
-        blended = []
-        for (new_hidden, new_cell), (old_hidden, old_cell) in zip(new_states, old_states, strict=True):
-            blended.append(
-                (
-                    new_hidden * active + old_hidden * (1.0 - active),
-                    new_cell * active + old_cell * (1.0 - active),
-                )
-            )
-        return blended
+        for i_layer in range(self.num_layers):
+            resolution1 = (patches_resolution[0] // (2 ** (self.num_layers - i_layer)))
+            resolution2 = (patches_resolution[1] // (2 ** (self.num_layers - i_layer)))
+            dimension = int(embed_dim * 2 ** (self.num_layers - i_layer))
+            # Use PatchExpanding for upsampling
+            if is_temporal:
+                upsample = nn.Identity()
+            else:
+                upsample = PatchExpanding(input_resolution=(resolution1, resolution2), dim=dimension)
+            layer = VMRNNCell(hidden_dim=dimension, input_resolution=(resolution1, resolution2),
+                              depth=depths_upsample[(self.num_layers - 1 - i_layer)],
+                              drop=drop_rate, attn_drop=attn_drop_rate, 
+                              drop_path=dpr[sum(depths_upsample[:(self.num_layers - 1 - i_layer)]):
+                                             sum(depths_upsample[:(self.num_layers - 1 - i_layer) + 1])],
+                              norm_layer=norm_layer, d_state=d_state, flag=flag)
+            self.layers.append(layer)
+            self.upsample.append(upsample)
 
-    def _run_down_path(
-        self,
-        tokens: torch.Tensor,
-        states_down: Sequence[tuple[torch.Tensor, torch.Tensor]],
-    ) -> tuple[list[tuple[torch.Tensor, torch.Tensor]], torch.Tensor]:
-        next_states = []
-        for stage_index, cell in enumerate(self.down_cells):
-            tokens, state = cell(tokens, states_down[stage_index])
-            next_states.append(state)
-            tokens = self.downsamplers[stage_index](tokens)
-        return next_states, tokens
+    def forward(self, x, states_up):
+        hidden_states_up = []
+        for index, layer in enumerate(self.layers):
+            x, hidden_state = layer(x, states_up[index] if states_up is not None else None)
+            x = self.upsample[index](x)
+            hidden_states_up.append(hidden_state)
+        x = torch.sigmoid(self.Unembed(x))
+        return hidden_states_up, x
 
-    def _run_up_path(
-        self,
-        tokens: torch.Tensor,
-        states_up: Sequence[tuple[torch.Tensor, torch.Tensor]],
-    ) -> tuple[list[tuple[torch.Tensor, torch.Tensor]], torch.Tensor]:
-        next_states = []
-        for stage_index, cell in enumerate(self.up_cells):
-            tokens, state = cell(tokens, states_up[stage_index])
-            next_states.append(state)
-            tokens = self.upsamplers[stage_index](tokens)
-        return next_states, tokens
 
-    def _pool_tokens(self, tokens: torch.Tensor) -> torch.Tensor:
-        return tokens.mean(dim=1)
+@RegisterModel("vmrnn")
+class VMRNN(nn.Module):
+    def __init__(self, embed_dim, depths_downsample, depths_upsample, 
+                 feature_resolution: tuple, **kwargs):
+        """
+        Args:
+            embed_dim: Input feature dimension.
+            depths_downsample: List of depths for the downsampling VMRNN cells.
+            depths_upsample: List of depths for the upsampling VMRNN cells.
+            feature_resolution: Spatial resolution (H, W) of the input feature map.
+        """
+        super(VMRNN, self).__init__()
+        self.Downsample = DownSample(embed_dim=embed_dim, depths_downsample=depths_downsample,
+                                     feature_resolution=feature_resolution, **kwargs)
+        self.Upsample = UpSample(embed_dim=embed_dim, depths_upsample=depths_upsample,
+                                 feature_resolution=feature_resolution, **kwargs)
 
-    def forward(
-        self,
-        sequence: torch.Tensor,
-        exam_mask: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        batch_size, time_steps, _ = sequence.shape
-
-        down_specs = tuple(zip(self.down_stage_resolutions, self.down_stage_dims, strict=True))
-        up_specs = tuple(zip(self.up_stage_resolutions, self.up_stage_dims, strict=True))
-
-        states_down = self._init_state_list(batch_size, down_specs, sequence)
-        states_up = self._init_state_list(batch_size, up_specs, sequence)
-        summary_tokens = sequence.new_zeros(batch_size, self.base_token_count, self.hidden_dim)
-
-        pooled_states = []
-        pooled_reconstructions = []
-
-        for time_index in range(time_steps):
-            tokens = self.input_projection(sequence[:, time_index])
-
-            next_states_down, latent_tokens = self._run_down_path(tokens, states_down)
-            next_states_up, upsampled_tokens = self._run_up_path(latent_tokens, states_up)
-            reconstructed_tokens = self.reconstruction(upsampled_tokens)
-
-            active = exam_mask[:, time_index].view(batch_size, 1, 1).to(sequence.dtype)
-
-            states_down = self._blend_state_list(next_states_down, states_down, active)
-            states_up = self._blend_state_list(next_states_up, states_up, active)
-            summary_tokens = reconstructed_tokens * active + summary_tokens * (1.0 - active)
-
-            pooled_state = self.history_projection(self._pool_tokens(summary_tokens))
-            pooled_states.append(pooled_state)
-
-            pooled_reconstruction = self.reconstruction_projection(self._pool_tokens(reconstructed_tokens))
-            pooled_reconstructions.append(pooled_reconstruction * active.squeeze(-1))
-
-        state_tensor = torch.stack(pooled_states, dim=1)
-        reconstruction_tensor = torch.stack(pooled_reconstructions, dim=1)
-
-        last_indices = exam_mask.long().sum(dim=1).clamp(min=1) - 1
-        batch_index = torch.arange(batch_size, device=sequence.device)
-        history_embedding = state_tensor[batch_index, last_indices]
-
-        return history_embedding, state_tensor, reconstruction_tensor
+    def forward(self, features, states_down=None, states_up=None, **kwargs):
+        """
+        Args:
+            features: Pre-extracted features from Mirai's image encoder with shape (B, L, C),
+                      where L = H * W and H, W are provided via feature_resolution.
+        Returns:
+            output: The reconstructed output after the VMRNN processing.
+            states_down: Downsampling hidden states.
+            states_up: Upsampling hidden states.
+        """
+        B = features.shape[0]
+        if features.dim() == 3 and self.Downsample.is_temporal:
+            # Treat time as sequence length
+            features = features.view(B, -1, features.size(-1))
+        states_down, x = self.Downsample(features, states_down)
+        states_up, output = self.Upsample(x, states_up)
+        return output, states_down, states_up
