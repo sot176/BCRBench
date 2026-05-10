@@ -49,6 +49,7 @@ accelerate launch  main_test.py \
   --path_test_folder  /scratch/project_465002861/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/csaw/ImgFeatAlign_frozen_encoder_pr_auc \
   --model "ImgFeatAlign" \
   --id_training 1 \
+  --best_model "True" \
   --batch_size 1 \
   --num_workers 7 \
   --dataset "CSAW" \
