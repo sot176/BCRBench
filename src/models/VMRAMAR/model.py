@@ -20,6 +20,39 @@ from .model_utils import (
 
 register_onconet_alias(_onconet)
 
+
+def parse_int_tuple_arg(value, default):
+    import ast
+
+    if value is None:
+        value = default
+
+    if isinstance(value, str):
+        value = value.strip()
+
+        # Handles "[4, 4]" or "(4, 4)"
+        if value.startswith("[") or value.startswith("("):
+            value = ast.literal_eval(value)
+        # Handles "4,4" or "4, 4"
+        elif "," in value:
+            value = value.split(",")
+        # Handles "4"
+        else:
+            value = (value,)
+
+    if isinstance(value, int):
+        value = (value,)
+
+    if isinstance(value, list):
+        value = tuple(value)
+
+    if not isinstance(value, tuple):
+        raise TypeError(f"Expected tuple/list/string, got {type(value)}: {value}")
+
+    return tuple(int(v) for v in value)
+
+
+
 class VMRAMaR(BaseRiskModel):
     def __init__(self, args):
         super().__init__(args)
@@ -74,15 +107,15 @@ class VMRAMaR(BaseRiskModel):
         self.vmrnn = VMRNNEncoder(
             input_dim=self.vmrnn_hidden_dim,
             hidden_dim=self.vmrnn_hidden_dim,
-            spatial_resolution=(
+            spatial_resolution = parse_int_tuple_arg(
                 getattr(self.args, "vmrnn_spatial_resolution", None),
                 (4, 4),
             ),
-            downsample_depths=(
+            downsample_depths = parse_int_tuple_arg(
                 getattr(self.args, "vmrnn_downsample_depths", None),
                 (1, 2),
             ),
-            upsample_depths=(
+            upsample_depths = parse_int_tuple_arg(
                 getattr(self.args, "vmrnn_upsample_depths", None),
                 (2, 1),
             ),
