@@ -40,7 +40,7 @@ class VMRAMaR(BaseRiskModel):
 
         self.image_repr_dim = get_img_repr_dim(self.image_encoder)
 
-        self.use_asymmetry =(getattr(self.args, "use_asymmetry", False))
+        self.use_asymmetry = (getattr(self.args, "use_asymmetry", False))
         print(f"[VMRAMaR] use_asymmetry = {self.use_asymmetry}")
 
         if self.use_asymmetry:
@@ -55,6 +55,8 @@ class VMRAMaR(BaseRiskModel):
                 persistent_weight=float(getattr(self.args, "persistent_weight", 1.0)),
             )
 
+        # Cleaned repo default: exam_hidden_dim=512, vmrnn_hidden_dim=128.
+        # Here image_repr_dim is the view-fused exam feature dim.
         self.vmrnn_hidden_dim = int(getattr(self.args, "vmrnn_hidden_dim", 128))
 
         self.view_attention = nn.Sequential(
@@ -63,8 +65,14 @@ class VMRAMaR(BaseRiskModel):
             nn.Linear(self.image_repr_dim, 1),
         )
 
+        self.temporal_projection = nn.Sequential(
+            nn.LayerNorm(self.image_repr_dim),
+            nn.Linear(self.image_repr_dim, self.vmrnn_hidden_dim),
+            nn.Dropout(float(getattr(self.args, "vmrnn_projection_dropout", 0.1))),
+        )
+
         self.vmrnn = VMRNNEncoder(
-            input_dim=self.image_repr_dim,
+            input_dim=self.vmrnn_hidden_dim,
             hidden_dim=self.vmrnn_hidden_dim,
             spatial_resolution=(
                 getattr(self.args, "vmrnn_spatial_resolution", None),
@@ -80,6 +88,8 @@ class VMRAMaR(BaseRiskModel):
             ),
             dropout=float(getattr(self.args, "vmrnn_dropout", 0.1)),
             vss_backend=getattr(self.args, "vss_backend", "transformer"),
+            vmamba_d_state=int(getattr(self.args, "vmamba_d_state", 16)),
+            vmamba_drop_path=float(getattr(self.args, "vmamba_drop_path", 0.0)),
             released_weight_path=getattr(self.args, "vmrnn_released_weight_path", None),
         )
 
@@ -174,6 +184,9 @@ class VMRAMaR(BaseRiskModel):
         hidden = hidden.view(B, T, V, -1)
         hidden = hidden[:, :, :, : self.image_repr_dim]
 
+        # -------------------------
+        # Exam encoding / view fusion
+        # -------------------------
         view_mask_bool = view_mask.bool()
         attn_logits = self.view_attention(hidden).squeeze(-1)
         attn_logits = attn_logits.masked_fill(~view_mask_bool, -1e9)
@@ -184,8 +197,14 @@ class VMRAMaR(BaseRiskModel):
         empty_exam = ~view_mask_bool.any(dim=2)
         fused_feats = fused_feats.masked_fill(empty_exam.unsqueeze(-1), 0.0)
 
+        # -------------------------
+        # Cleaned repo style:
+        # exam embedding -> temporal projection -> VMRNN
+        # -------------------------
+        exam_embeddings = self.temporal_projection(fused_feats)
+
         temporal_feature, temporal_sequence, reconstruction_sequence = self.vmrnn(
-            fused_feats,
+            exam_embeddings,
             exam_mask.bool(),
         )
 
@@ -224,7 +243,8 @@ class VMRAMaR(BaseRiskModel):
             "temporal_feature": temporal_feature,
             "temporal_sequence": temporal_sequence,
             "reconstruction_sequence": reconstruction_sequence,
-            "exam_embeddings": fused_feats,
+            "exam_embeddings": exam_embeddings,
+            "pre_projection_exam_embeddings": fused_feats,
             "view_attention": attn_weights.squeeze(-1),
             "exam_asymmetry": asymmetry_scores,
             "coords": coords,
