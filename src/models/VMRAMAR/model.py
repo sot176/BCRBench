@@ -15,9 +15,9 @@ from models.Mirai.onconet.models.factory import get_model_by_name, load_model
 from .model_utils import (
     freeze_encoder,
     get_img_repr_dim,
-    register_onconet_alias,
+    register_onconet_alias,zero_risk_factors_for_args, expand_risk_factors_per_img, model_args
 )
-
+ 
 register_onconet_alias(_onconet)
 
 
@@ -218,10 +218,22 @@ class VMRAMaR(BaseRiskModel):
             x = images.permute(0, 1, 3, 2, 4, 5).contiguous()
 
         x_flat = x.view(B * T * V, C, H, W)
+        image_encoder_args = model_args(self.image_encoder)
+
+        image_risk_factors = zero_risk_factors_for_args(
+            image_encoder_args,
+            B,
+            x.device,
+            x.dtype,
+        )
+        image_risk_factors_per_img = expand_risk_factors_per_img(
+            image_risk_factors,
+            V,
+        )
 
         _, img_feats, _ = self.image_encoder(
             x_flat,
-            None,
+            image_risk_factors_per_img,
             batch,
         )
 
