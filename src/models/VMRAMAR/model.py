@@ -252,17 +252,22 @@ class VMRAMaR(BaseRiskModel):
 
         r_aa = None
         if self.use_asymmetry:
-            left_feats = img_feats[:, :, 0, :]
-            right_feats = img_feats[:, :, 1, :]
+            if img_maps is None:
+                raise RuntimeError("Asymmetry requires spatial feature maps, but encoder returned vectors.")
 
-            aligned_right_feats = self.sad(right_feats)
-            asym_feats = torch.abs(left_feats - aligned_right_feats)
-            r_aa = self.lat(asym_feats)
+            r_aa, asymmetry_scores, coords, coord_valid = compute_asymmetry_feature(
+                self.sad,
+                self.lat,
+                img_maps,
+                None,  # or view_mask if available
+                batch.get("exam_mask", torch.ones(B, T, device=images.device, dtype=torch.bool)),
+            )
 
             if r_aa.dim() == 1:
                 r_aa = r_aa.unsqueeze(-1)
 
             features.append(r_aa)
+
 
         combined_feats = torch.cat(features, dim=1)
 
