@@ -3,7 +3,8 @@ from types import SimpleNamespace
 
 import torch
 import torch.nn as nn
-
+from config.config import cfg
+from models.common_parts import extract_mirai_backbone
 from .sad import SpatialAsymmetryDetector
 from .lat import LongitudinalAsymmetryTracker
 from .vmrnn import VMRNN
@@ -67,16 +68,8 @@ class VMRAMaR(BaseRiskModel):
         # ----------------------------
         # Image encoder
         # ----------------------------
-        img_encoder_snapshot = getattr(args, "img_encoder_snapshot", None)
+        self.image_encoder = extract_mirai_backbone(cfg["paths"]["mirai_path"])
 
-        if img_encoder_snapshot is not None:
-            self.image_encoder = load_model(
-                img_encoder_snapshot,
-                args,
-                do_wrap_model=False,
-            )
-        else:
-            self.image_encoder = get_model_by_name("custom_resnet", False, args)
 
         if str2bool(getattr(args, "freeze_image_encoder", False)):
             freeze_encoder(self.image_encoder)
