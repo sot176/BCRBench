@@ -168,26 +168,38 @@ class DownSample(nn.Module):
         self.is_temporal = is_temporal
 
         for i_layer in range(self.num_layers):
-            # Downsample using PatchMerging if desired; otherwise, you could use another strategy.
             if is_temporal:
+                stage_resolution = patches_resolution
+                stage_dim = embed_dim
                 downsample = nn.Identity()
             else:
+                stage_resolution = (
+                    patches_resolution[0] // (2 ** i_layer),
+                    patches_resolution[1] // (2 ** i_layer),
+                )
+                stage_dim = int(embed_dim * 2 ** i_layer)
                 downsample = PatchMerging(
-                    input_resolution=(patches_resolution[0] // (2 ** i_layer),
-                                      patches_resolution[1] // (2 ** i_layer)),
-                    dim=int(embed_dim * 2 ** i_layer)
+                    input_resolution=stage_resolution,
+                    dim=stage_dim,
                 )
 
-            layer = VMRNNCell(hidden_dim=int(embed_dim * 2 ** i_layer),
-                              input_resolution=(patches_resolution[0] // (2 ** i_layer),
-                                                  patches_resolution[1] // (2 ** i_layer)),
-                              depth=depths_downsample[i_layer],
-                              drop=drop_rate,
-                              attn_drop=attn_drop_rate, 
-                              drop_path=dpr[sum(depths_downsample[:i_layer]):sum(depths_downsample[:i_layer + 1])],
-                              norm_layer=norm_layer, d_state=d_state, flag=flag)
+            layer = VMRNNCell(
+                hidden_dim=stage_dim,
+                input_resolution=stage_resolution,
+                depth=depths_downsample[i_layer],
+                drop=drop_rate,
+                attn_drop=attn_drop_rate,
+                drop_path=dpr[
+                    sum(depths_downsample[:i_layer]):
+                    sum(depths_downsample[:i_layer + 1])
+                ],
+                norm_layer=norm_layer,
+                d_state=d_state,
+                flag=flag,
+            )
             self.layers.append(layer)
             self.downsample.append(downsample)
+
 
     def forward(self, x, states_down):
         # x is assumed to be already pre-embedded with shape (B, L, C)
@@ -232,22 +244,36 @@ class UpSample(nn.Module):
 
 
         for i_layer in range(self.num_layers):
-            resolution1 = (patches_resolution[0] // (2 ** (self.num_layers - i_layer)))
-            resolution2 = (patches_resolution[1] // (2 ** (self.num_layers - i_layer)))
-            dimension = int(embed_dim * 2 ** (self.num_layers - i_layer))
-            # Use PatchExpanding for upsampling
             if is_temporal:
+                resolution1, resolution2 = patches_resolution
+                dimension = embed_dim
                 upsample = nn.Identity()
             else:
-                upsample = PatchExpanding(input_resolution=(resolution1, resolution2), dim=dimension)
-            layer = VMRNNCell(hidden_dim=dimension, input_resolution=(resolution1, resolution2),
-                              depth=depths_upsample[(self.num_layers - 1 - i_layer)],
-                              drop=drop_rate, attn_drop=attn_drop_rate, 
-                              drop_path=dpr[sum(depths_upsample[:(self.num_layers - 1 - i_layer)]):
-                                             sum(depths_upsample[:(self.num_layers - 1 - i_layer) + 1])],
-                              norm_layer=norm_layer, d_state=d_state, flag=flag)
+                resolution1 = patches_resolution[0] // (2 ** (self.num_layers - i_layer))
+                resolution2 = patches_resolution[1] // (2 ** (self.num_layers - i_layer))
+                dimension = int(embed_dim * 2 ** (self.num_layers - i_layer))
+                upsample = PatchExpanding(
+                    input_resolution=(resolution1, resolution2),
+                    dim=dimension,
+                )
+
+            layer = VMRNNCell(
+                hidden_dim=dimension,
+                input_resolution=(resolution1, resolution2),
+                depth=depths_upsample[(self.num_layers - 1 - i_layer)],
+                drop=drop_rate,
+                attn_drop=attn_drop_rate,
+                drop_path=dpr[
+                    sum(depths_upsample[:(self.num_layers - 1 - i_layer)]):
+                    sum(depths_upsample[:(self.num_layers - 1 - i_layer) + 1])
+                ],
+                norm_layer=norm_layer,
+                d_state=d_state,
+                flag=flag,
+            )
             self.layers.append(layer)
             self.upsample.append(upsample)
+
 
     def forward(self, x, states_up):
         hidden_states_up = []

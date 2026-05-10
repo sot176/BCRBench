@@ -193,7 +193,7 @@ class VMRAMaR(BaseRiskModel):
             final_dim,
             max_followup=int(getattr(args, "max_followup", 5)),
         )
-
+        
     def forward(self, batch):
         images = batch["images"]
 
@@ -210,29 +210,38 @@ class VMRAMaR(BaseRiskModel):
             B, T, C, V, H, W = images.shape
             x = images.permute(0, 1, 3, 2, 4, 5).contiguous()
 
-        x_flat = x.view(B * T * V, C, H, W)
+        if V < 4 and self.use_asymmetry:
+            raise ValueError(
+                f"Asymmetry expects 4 views ordered [R_CC, R_MLO, L_CC, L_MLO], got V={V}."
+            )
 
-        img_feats = self.image_encoder(
-            x_flat
-        )
+        x_flat = x.reshape(B * T * V, C, H, W)
 
-       # img_feats is expected as (B*T*V, C, 64, 52)
+        img_feats = self.image_encoder(x_flat)
+
+        # Encoder can return either spatial maps (B*T*V, C_feat, H_feat, W_feat)
+        # or pooled vectors (B*T*V, D).
         if img_feats.dim() == 4:
             C_feat, H_feat, W_feat = img_feats.shape[1:]
             img_maps = img_feats.reshape(B, T, V, C_feat, H_feat, W_feat)
 
-            # Vector embeddings for temporal VMRNN
-            img_vecs = img_maps.mean(dim=(-1, -2))  # (B, T, V, C)
+            # Pooled image vectors for VMRNN temporal branch.
+            img_vecs = img_maps.mean(dim=(-1, -2))  # (B, T, V, C_feat)
 
-            self.image_repr_dim = C_feat
+            if C_feat != self.image_repr_dim:
+                raise RuntimeError(
+                    f"Encoder returned {C_feat} channels, but image_repr_dim={self.image_repr_dim}."
+                )
         else:
             img_maps = None
             img_vecs = img_feats.reshape(B, T, V, -1)
             img_vecs = img_vecs[:, :, :, : self.image_repr_dim]
 
-        fused_feats = img_vecs.mean(dim=2)
+        # ----------------------------
+        # Temporal branch
+        # ----------------------------
+        fused_feats = img_vecs.mean(dim=2)  # (B, T, D)
         fused_feats = self.temporal_projection(fused_feats)
-
 
         vmrnn_outputs = self.vmrnn(fused_feats)
 
@@ -250,24 +259,60 @@ class VMRAMaR(BaseRiskModel):
 
         features = [temporal_feature]
 
+        # ----------------------------
+        # Spatial asymmetry branch
+        # View order: [R_CC, R_MLO, L_CC, L_MLO]
+        # ----------------------------
         r_aa = None
+        asymmetry_scores = None
+        asymmetry_coords = None
+        asymmetry_heatmap = None
+
         if self.use_asymmetry:
             if img_maps is None:
-                raise RuntimeError("Asymmetry requires spatial feature maps, but encoder returned vectors.")
+                raise RuntimeError(
+                    "Asymmetry requires spatial feature maps, but encoder returned vectors."
+                )
 
-            r_aa, asymmetry_scores, coords, coord_valid = compute_asymmetry_feature(
-                self.sad,
-                self.lat,
-                img_maps,
-                None,  # or view_mask if available
-                batch.get("exam_mask", torch.ones(B, T, device=images.device, dtype=torch.bool)),
+            right_cc = img_maps[:, :, 0]   # (B, T, C, H, W)
+            right_mlo = img_maps[:, :, 1]  # (B, T, C, H, W)
+            left_cc = img_maps[:, :, 2]    # (B, T, C, H, W)
+            left_mlo = img_maps[:, :, 3]   # (B, T, C, H, W)
+
+            sad_cc = self.sad(left_cc, right_cc)
+            sad_mlo = self.sad(left_mlo, right_mlo)
+
+            asymmetry_scores = 0.5 * (
+                sad_cc["asymmetry_values"] + sad_mlo["asymmetry_values"]
+            )  # (B, T)
+
+            asymmetry_coords = torch.stack(
+                [sad_cc["asymmetry_coords"], sad_mlo["asymmetry_coords"]],
+                dim=2,
+            )  # (B, T, 2 views, 2 coords)
+
+            asymmetry_heatmap = torch.stack(
+                [sad_cc["heatmap"], sad_mlo["heatmap"]],
+                dim=2,
+            )  # (B, T, 2 views, H, W)
+
+            exam_mask = batch.get(
+                "exam_mask",
+                torch.ones(B, T, device=images.device, dtype=torch.bool),
             )
+
+            try:
+                r_aa = self.lat(asymmetry_scores, exam_mask)
+            except TypeError:
+                r_aa = self.lat(asymmetry_scores)
+
+            if isinstance(r_aa, tuple):
+                r_aa = r_aa[0]
 
             if r_aa.dim() == 1:
                 r_aa = r_aa.unsqueeze(-1)
 
             features.append(r_aa)
-
 
         combined_feats = torch.cat(features, dim=1)
 
@@ -281,6 +326,9 @@ class VMRAMaR(BaseRiskModel):
             "temporal_output": temporal_output,
             "hidden_states": hidden_states,
             "r_aa": r_aa,
+            "asymmetry_scores": asymmetry_scores,
+            "asymmetry_coords": asymmetry_coords,
+            "asymmetry_heatmap": asymmetry_heatmap,
         }
 
     def get_risk_heads(self, outputs, batch):
