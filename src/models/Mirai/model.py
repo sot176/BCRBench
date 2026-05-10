@@ -10,13 +10,13 @@ from .model_utils import (
     register_onconet_alias,
     zero_risk_factors_for_args,
 )
-from onconet.models.pools.attention_pool import Simple_AttentionPool
 from models.common_parts import extract_mirai_backbone
 from config.config import cfg
 
 register_onconet_alias(_onconet)
 
 from .onconet.models.factory import get_model_by_name, load_model
+from .onconet.models.pools.attention_pool import Simple_AttentionPool
 
 
 class Mirai(nn.Module):
