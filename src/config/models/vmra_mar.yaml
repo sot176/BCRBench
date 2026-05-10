@@ -89,9 +89,9 @@ vss_backend: transformer
 exam_hidden_dim: 512
 vmrnn_hidden_dim: 128
 vmrnn_projection_dropout: 0.1
-vmrnn_spatial_resolution: [4, 4]
-vmrnn_downsample_depths: [1, 2]
-vmrnn_upsample_depths: [2, 1]
+vmrnn_spatial_resolution: (4, 4)
+vmrnn_downsample_depths: (1, 2)
+vmrnn_upsample_depths: (2, 1)
 vmrnn_dropout: 0.1
 vmamba_d_state: 16
 vmamba_drop_path: 0.0
