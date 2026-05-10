@@ -3,11 +3,10 @@ import torch.nn as nn
 from einops import rearrange
 from timm.models.swin_transformer import PatchMerging  # patch merging is still used for downsampling
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-from onconet.models.vmamba import VSSBlock, SS2D  # ensure correct import of VSSBlock and SS2D
+from .vmamba import VSSBlock, SS2D  # ensure correct import of VSSBlock and SS2D
 from typing import Optional, Callable
 from functools import partial
-from onconet.models.factory import load_model, RegisterModel, get_model_by_name
-
+ 
 
 class VSB(VSSBlock):
     def __init__(
@@ -260,7 +259,6 @@ class UpSample(nn.Module):
         return hidden_states_up, x
 
 
-@RegisterModel("vmrnn")
 class VMRNN(nn.Module):
     def __init__(self, embed_dim, depths_downsample, depths_upsample, 
                  feature_resolution: tuple, **kwargs):

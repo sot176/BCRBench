@@ -21,38 +21,6 @@ from .model_utils import (
 register_onconet_alias(_onconet)
 
 
-def parse_int_tuple_arg(value, default):
-    import ast
-
-    if value is None:
-        value = default
-
-    if isinstance(value, str):
-        value = value.strip()
-
-        # Handles "[4, 4]" or "(4, 4)"
-        if value.startswith("[") or value.startswith("("):
-            value = ast.literal_eval(value)
-        # Handles "4,4" or "4, 4"
-        elif "," in value:
-            value = value.split(",")
-        # Handles "4"
-        else:
-            value = (value,)
-
-    if isinstance(value, int):
-        value = (value,)
-
-    if isinstance(value, list):
-        value = tuple(value)
-
-    if not isinstance(value, tuple):
-        raise TypeError(f"Expected tuple/list/string, got {type(value)}: {value}")
-
-    return tuple(int(v) for v in value)
-
-
-
 class VMRAMaR(BaseRiskModel):
     def __init__(self, args, image_encoder=None, vmrnn=None, sad_module=None, lat_module=None):
         super(VMRAMaR, self).__init__()
