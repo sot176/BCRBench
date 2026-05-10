@@ -54,7 +54,6 @@ accelerate launch  main_train.py \
             --weight_decay 1e-4 \
             --model "Mirai" \
             --lr_decay 0.5 \
-            --warmup_steps 0 \
             --patience_lr_scheduler 5 \
             --num_epochs 40 \
             --patience 15 \
