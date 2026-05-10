@@ -57,7 +57,7 @@ def print_results(results):
             print(f"{key}: {value}")
 
 
-def save_model_results_to_file(probs, censor_times, golds, density_categories, censoring_dist, cancer_categories, out_dir):
+def save_model_results_to_file(probs, censor_times, golds, density_categories, censoring_dist, cancer_categories,patient_id, out_dir):
     """
     Computes and saves the AUC values, C-index by density, predictions,
     censoring times, and event labels to a JSON file.
@@ -101,7 +101,9 @@ def save_model_results_to_file(probs, censor_times, golds, density_categories, c
         "auc_by_cancer_type":auc_by_cancer,
         "predictions": probs.tolist(),
         "censor_times": censor_times.tolist(),
-        "golds": golds.tolist()
+        "golds": golds.tolist(),
+        "patient_id":patient_id.tolist()
+
     }
 
     # Define output file path

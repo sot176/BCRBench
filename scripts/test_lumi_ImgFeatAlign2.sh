@@ -44,22 +44,22 @@ mkdir -p  /scratch/project_465002861/thrunsol/LMV_Risk_prediction_test_results_1
 accelerate launch  main_test.py \
   --csv_file /scratch/project_465002861/thrunsol/csawcc_datasets/metadata_csawcc_dcm_path_density_new.csv \
   --data_root /scratch/project_465002861/thrunsol/csawcc_datasets/Risk_dataset_train_val_test_1664_2048_new \
-  --path_out_dir /scratch/project_465002861/thrunsol/Risk_prediction_training_results_1664_2048_Mirai_attention_layer_augmentations_New_journal_paper/csaw/TrainRisk_pred_CSAW_ImgFeatAlign-11369575  \
-  --path_test_folder  /scratch/project_465002861/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/csaw/ImgFeatAlign_frozen_encoder_pr_auc \
+  --path_out_dir /scratch/project_465002861/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/Train_Risk-16979301_Model_ImgFeatAlign_lr_5e-05_wd_0.0001_epochs_30_bs_8_2026-03-24-17-52 \
+  --path_test_folder  /scratch/project_465002861/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/embed/ImgFeatAlign_frozen_encoder_pr_auc \
   --model "ImgFeatAlign" \
   --id_training 4 \
   --batch_size 1 \
   --num_workers 7 \
   --best_model "True" \
-  --dataset "CSAW" \
+  --dataset "EMBED" \
   --seed 2023 \
 
 
  
 
+ 
 
-
-
+ 
 
 
 
