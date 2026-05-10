@@ -1,103 +1,279 @@
+import json
+from types import SimpleNamespace
+
 import torch
 import torch.nn as nn
-from .vmrnn import VMRNNEncoder
+
 from .sad import SpatialAsymmetryDetector
 from .lat import LongitudinalAsymmetryTracker
+from .vmrnn import VMRNN
+
 from models.common_parts import CumulativeProbabilityLayer
 from models.Mirai import onconet as _onconet
 from models.common_parts import BaseRiskModel
 from models.Mirai.onconet.models.factory import get_model_by_name, load_model
 from .model_utils import (
-    FORMAL_VIEW_SEQUENCE,
-    compute_asymmetry_feature,
-    expand_risk_factors_per_img,
-    register_onconet_alias,
+    freeze_encoder,
     get_img_repr_dim,
-    model_args,
-    setup_feature_map_hook,
-    zero_risk_factors_for_args,freeze_encoder
+    register_onconet_alias,
 )
 
 register_onconet_alias(_onconet)
 
 
+def str2bool(value):
+    if isinstance(value, bool):
+        return value
+    return str(value).lower() in {"true", "1", "yes", "y"}
+
+
+def parse_params(value):
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        return json.loads(value)
+    return dict(value)
+
+
+def parse_int_list(value, default):
+    if value is None:
+        value = default
+
+    if isinstance(value, str):
+        value = value.strip()
+        if value.startswith("[") or value.startswith("("):
+            value = value.strip("[]()")
+        value = [v.strip() for v in value.split(",") if v.strip()]
+
+    if isinstance(value, int):
+        value = [value]
+
+    if isinstance(value, tuple):
+        value = list(value)
+
+    return [int(v) for v in value]
+
+
 class VMRAMaR(BaseRiskModel):
-    def __init__(self, args, image_encoder=None, vmrnn=None, sad_module=None, lat_module=None):
-        super(VMRAMaR, self).__init__()
+    def __init__(self, args):
+        super().__init__(args)
         self.args = args
-        if args.img_encoder_snapshot is not None:
+
+        vmrnn_params = parse_params(getattr(args, "vmrnn_params", None))
+        asymmetry_params = parse_params(getattr(args, "asymmetry_params", None))
+
+        # ----------------------------
+        # Image encoder
+        # ----------------------------
+        img_encoder_snapshot = getattr(args, "img_encoder_snapshot", None)
+
+        if img_encoder_snapshot is not None:
             self.image_encoder = load_model(
-                args.img_encoder_snapshot,
+                img_encoder_snapshot,
                 args,
                 do_wrap_model=False,
             )
         else:
             self.image_encoder = get_model_by_name("custom_resnet", False, args)
 
-        if getattr(args, "freeze_image_encoder", False):
-            freeze_encoder(self.image_encoder) 
-        self.image_repr_dim = self.image_encoder._model.args.img_only_dim
-        if vmrnn is not None:
-            self.vmrnn = vmrnn
-        elif getattr(args, "vmrnn_snapshot", None) is not None:
-            self.vmrnn = load_model(args.vmrnn_snapshot, args, do_wrap_model=False)
-        else:
-            args.precomputed_hidden_dim = self.image_repr_dim
-            self.vmrnn = get_model_by_name('vmrnn', False, args)
-        self.use_asymmetry = getattr(args, "use_asymmetry", False)
+        if str2bool(getattr(args, "freeze_image_encoder", False)):
+            freeze_encoder(self.image_encoder)
+
+        self.image_repr_dim = int(
+            getattr(args, "image_repr_dim", get_img_repr_dim(self.image_encoder))
+        )
+
+        # ----------------------------
+        # VMRNN
+        # ----------------------------
+        self.vmrnn_embed_dim = int(
+            vmrnn_params.get("embed_dim", getattr(args, "embed_dim", 512))
+        )
+
+        depths_downsample = parse_int_list(
+            vmrnn_params.get(
+                "depths_downsample",
+                getattr(args, "depths_downsample", None),
+            ),
+            [1, 2],
+        )
+
+        depths_upsample = parse_int_list(
+            vmrnn_params.get(
+                "depths_upsample",
+                getattr(args, "depths_upsample", None),
+            ),
+            [2, 1],
+        )
+
+        feature_resolution = parse_int_list(
+            vmrnn_params.get(
+                "feature_resolution",
+                getattr(args, "feature_resolution", None),
+            ),
+            [1, 2],
+        )
+
+        self.vmrnn = VMRNN(
+            embed_dim=self.vmrnn_embed_dim,
+            depths_downsample=depths_downsample,
+            depths_upsample=depths_upsample,
+            feature_resolution=feature_resolution,
+        )
+
+        self.temporal_projection = nn.Identity()
+        if self.image_repr_dim != self.vmrnn_embed_dim:
+            self.temporal_projection = nn.Sequential(
+                nn.LayerNorm(self.image_repr_dim),
+                nn.Linear(self.image_repr_dim, self.vmrnn_embed_dim),
+                nn.Dropout(float(getattr(args, "vmrnn_projection_dropout", 0.1))),
+            )
+
+        # ----------------------------
+        # Asymmetry modules
+        # ----------------------------
+        self.use_asymmetry = str2bool(
+            asymmetry_params.get(
+                "use_asymmetry",
+                getattr(args, "use_asymmetry", False),
+            )
+        )
+
+        self.sad = None
+        self.lat = None
+        self.asym_dim = 0
+
         if self.use_asymmetry:
-            self.sad = sad_module or get_model_by_name('sad', False, args)
-            self.lat = lat_module or get_model_by_name('lat', False, args)
-        self.ahl = CumulativeProbabilityLayer(512, args, max_followup=5)
+            sad_args = SimpleNamespace(
+                latent_h=int(
+                    asymmetry_params.get(
+                        "latent_h",
+                        getattr(args, "latent_h", 5),
+                    )
+                ),
+                latent_w=int(
+                    asymmetry_params.get(
+                        "latent_w",
+                        getattr(args, "latent_w", 5),
+                    )
+                ),
+                lat_dropout=float(
+                    asymmetry_params.get(
+                        "lat_dropout",
+                        getattr(args, "lat_dropout", 0.1),
+                    )
+                ),
+                use_sad_bias=str2bool(
+                    asymmetry_params.get(
+                        "use_sad_bias",
+                        getattr(args, "use_sad_bias", True),
+                    )
+                ),
+                use_sad_bn=str2bool(
+                    asymmetry_params.get(
+                        "use_sad_bn",
+                        getattr(args, "use_sad_bn", True),
+                    )
+                ),
+            )
 
-    def forward(self, x, risk_factors=None, batch=None):
-        B, T, C, V, H, W = x.size()
-        x = x.view(B * T * V, C, H, W)
+            self.sad = SpatialAsymmetryDetector(sad_args)
+            self.lat = LongitudinalAsymmetryTracker(asymmetry_params)
 
-        if risk_factors is not None:
-            risk_factors_per_img = [
-                factor.expand([V, *factor.size()]).contiguous().view(-1, factor.size(-1))
-                for factor in risk_factors
-            ]
+            self.asym_dim = int(
+                asymmetry_params.get(
+                    "asym_dim",
+                    getattr(args, "asym_dim", 1),
+                )
+            )
+            if self.asym_dim <= 0:
+                self.asym_dim = 1
+
+        # ----------------------------
+        # Risk head
+        # ----------------------------
+        final_dim = self.vmrnn_embed_dim + self.asym_dim
+
+        self.ahl = CumulativeProbabilityLayer(
+            final_dim,
+            max_followup=int(getattr(args, "max_followup", 5)),
+        )
+
+    def forward(self, batch):
+        images = batch["images"]
+
+        if images.dim() != 6:
+            raise ValueError(f"Expected images with 6 dims, got shape {images.shape}")
+
+        # Accept both:
+        # (B, T, V, C, H, W)
+        # (B, T, C, V, H, W)
+        if images.shape[3] in {1, 3}:
+            B, T, V, C, H, W = images.shape
+            x = images
         else:
-            risk_factors_per_img = None
-        _, img_feats, _ = self.image_encoder(x, risk_factors_per_img, batch)
+            B, T, C, V, H, W = images.shape
+            x = images.permute(0, 1, 3, 2, 4, 5).contiguous()
+
+        x_flat = x.view(B * T * V, C, H, W)
+
+        _, img_feats, _ = self.image_encoder(
+            x_flat,
+            None,
+            batch,
+        )
+
         img_feats = img_feats.view(B, T, V, -1)
-        img_feats = img_feats[:, :, :, :self.image_repr_dim]
+        img_feats = img_feats[:, :, :, : self.image_repr_dim]
 
         fused_feats = img_feats.mean(dim=2)
-        """  
-        temporal_output, hidden_states = self.vmrnn(fused_feats, risk_factors, batch)
-        if self.use_asymmetry:
-            left_feats = img_feats[:, :, 0, :]
-            right_feats = img_feats[:, :, 1, :]
-            aligned_right_feats = self.sad(right_feats)
-            asym_feats = torch.abs(left_feats - aligned_right_feats)
-            asym_feature = self.lat(asym_feats)
+        fused_feats = self.temporal_projection(fused_feats)
+
+        vmrnn_outputs = self.vmrnn(fused_feats, None, batch)
+
+        if isinstance(vmrnn_outputs, tuple):
+            temporal_output = vmrnn_outputs[0]
+            hidden_states = vmrnn_outputs[1] if len(vmrnn_outputs) > 1 else None
+        else:
+            temporal_output = vmrnn_outputs
+            hidden_states = None
+
+        if temporal_output.dim() == 3:
             temporal_feature = temporal_output.mean(dim=1)
-            combined_feats = torch.cat([temporal_feature, asym_feature], dim=1)
         else:
-            combined_feats = temporal_output.mean(dim=1)
-        risk_pred = self.ahl(combined_feats)
-        """
-        # If asymmetry is used, compute left-right features
+            temporal_feature = temporal_output
+
+        features = [temporal_feature]
+
+        r_aa = None
         if self.use_asymmetry:
             left_feats = img_feats[:, :, 0, :]
             right_feats = img_feats[:, :, 1, :]
+
             aligned_right_feats = self.sad(right_feats)
             asym_feats = torch.abs(left_feats - aligned_right_feats)
-            asym_feature = self.lat(asym_feats)
-            # Temporal pooling (mean over time)
-            temporal_feature = fused_feats.mean(dim=1)
-            combined_feats = torch.cat([temporal_feature, asym_feature], dim=1)
-        else:
-            # Just average over time dimension
-            combined_feats = fused_feats.mean(dim=1)
+            r_aa = self.lat(asym_feats)
 
-        # Predict risk
-        risk_pred = self.ahl(combined_feats)
-        return risk_pred
+            if r_aa.dim() == 1:
+                r_aa = r_aa.unsqueeze(-1)
 
+            features.append(r_aa)
+
+        combined_feats = torch.cat(features, dim=1)
+
+        logits = self.ahl(combined_feats)
+        probs = torch.sigmoid(logits)
+
+        return {
+            "logit": logits,
+            "probs": probs,
+            "temporal_feature": temporal_feature,
+            "temporal_output": temporal_output,
+            "hidden_states": hidden_states,
+            "r_aa": r_aa,
+        }
 
     def get_risk_heads(self, outputs, batch):
         return {
@@ -110,4 +286,3 @@ class VMRAMaR(BaseRiskModel):
 
     def get_primary_risk_head(self, outputs):
         return outputs["probs"]
-
