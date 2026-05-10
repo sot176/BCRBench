@@ -115,6 +115,7 @@ class VMRAMaR(BaseRiskModel):
             depths_upsample=depths_upsample,
             feature_resolution=feature_resolution,
         )
+        self.spatial_pool = nn.AdaptiveAvgPool2d((1, 1))
 
         self.temporal_projection = nn.Identity()
         if self.image_repr_dim != self.vmrnn_embed_dim:
@@ -193,7 +194,7 @@ class VMRAMaR(BaseRiskModel):
             final_dim,
             max_followup=int(getattr(args, "max_followup", 5)),
         )
-        
+
     def forward(self, batch):
         images = batch["images"]
 
@@ -219,19 +220,25 @@ class VMRAMaR(BaseRiskModel):
 
         img_feats = self.image_encoder(x_flat)
 
-        # Encoder can return either spatial maps (B*T*V, C_feat, H_feat, W_feat)
-        # or pooled vectors (B*T*V, D).
+        # Encoder can return either:
+        # spatial maps: (B*T*V, C_feat, H_feat, W_feat)
+        # vectors:      (B*T*V, D)
         if img_feats.dim() == 4:
             C_feat, H_feat, W_feat = img_feats.shape[1:]
-            img_maps = img_feats.reshape(B, T, V, C_feat, H_feat, W_feat)
-
-            # Pooled image vectors for VMRNN temporal branch.
-            img_vecs = img_maps.mean(dim=(-1, -2))  # (B, T, V, C_feat)
 
             if C_feat != self.image_repr_dim:
                 raise RuntimeError(
                     f"Encoder returned {C_feat} channels, but image_repr_dim={self.image_repr_dim}."
                 )
+
+            img_maps = img_feats.reshape(B, T, V, C_feat, H_feat, W_feat)
+
+            img_vecs = self.spatial_pool(
+                img_maps.reshape(B * T * V, C_feat, H_feat, W_feat)
+            ).flatten(1)
+
+            img_vecs = img_vecs.reshape(B, T, V, C_feat)
+
         else:
             img_maps = None
             img_vecs = img_feats.reshape(B, T, V, -1)
@@ -243,19 +250,16 @@ class VMRAMaR(BaseRiskModel):
         fused_feats = img_vecs.mean(dim=2)  # (B, T, D)
         fused_feats = self.temporal_projection(fused_feats)
 
-        vmrnn_outputs = self.vmrnn(fused_feats)
+        reconstructed_output, states_down, states_up, latent_tokens = self.vmrnn(
+            fused_feats
+        )
 
-        if isinstance(vmrnn_outputs, tuple):
-            temporal_output = vmrnn_outputs[0]
-            hidden_states = vmrnn_outputs[1] if len(vmrnn_outputs) > 1 else None
+        if latent_tokens.dim() == 3:
+            temporal_feature = latent_tokens.mean(dim=1)
+        elif latent_tokens.dim() == 4:
+            temporal_feature = latent_tokens.flatten(1)
         else:
-            temporal_output = vmrnn_outputs
-            hidden_states = None
-
-        if temporal_output.dim() == 3:
-            temporal_feature = temporal_output.mean(dim=1)
-        else:
-            temporal_feature = temporal_output
+            temporal_feature = latent_tokens
 
         features = [temporal_feature]
 
@@ -284,17 +288,19 @@ class VMRAMaR(BaseRiskModel):
 
             asymmetry_scores = 0.5 * (
                 sad_cc["asymmetry_values"] + sad_mlo["asymmetry_values"]
-            )  # (B, T)
+            )
 
-            asymmetry_coords = torch.stack(
-                [sad_cc["asymmetry_coords"], sad_mlo["asymmetry_coords"]],
-                dim=2,
-            )  # (B, T, 2 views, 2 coords)
+            if "asymmetry_coords" in sad_cc and "asymmetry_coords" in sad_mlo:
+                asymmetry_coords = torch.stack(
+                    [sad_cc["asymmetry_coords"], sad_mlo["asymmetry_coords"]],
+                    dim=2,
+                )
 
-            asymmetry_heatmap = torch.stack(
-                [sad_cc["heatmap"], sad_mlo["heatmap"]],
-                dim=2,
-            )  # (B, T, 2 views, H, W)
+            if "heatmap" in sad_cc and "heatmap" in sad_mlo:
+                asymmetry_heatmap = torch.stack(
+                    [sad_cc["heatmap"], sad_mlo["heatmap"]],
+                    dim=2,
+                )
 
             exam_mask = batch.get(
                 "exam_mask",
@@ -323,13 +329,16 @@ class VMRAMaR(BaseRiskModel):
             "logit": logits,
             "probs": probs,
             "temporal_feature": temporal_feature,
-            "temporal_output": temporal_output,
-            "hidden_states": hidden_states,
+            "temporal_output": reconstructed_output,
+            "latent_tokens": latent_tokens,
+            "states_down": states_down,
+            "states_up": states_up,
             "r_aa": r_aa,
             "asymmetry_scores": asymmetry_scores,
             "asymmetry_coords": asymmetry_coords,
             "asymmetry_heatmap": asymmetry_heatmap,
         }
+
 
     def get_risk_heads(self, outputs, batch):
         return {

@@ -305,16 +305,20 @@ class VMRNN(nn.Module):
         """
         Args:
             features: Pre-extracted features from Mirai's image encoder with shape (B, L, C),
-                      where L = H * W and H, W are provided via feature_resolution.
+                    where L = H * W and H, W are provided via feature_resolution.
+
         Returns:
-            output: The reconstructed output after the VMRNN processing.
-            states_down: Downsampling hidden states.
-            states_up: Upsampling hidden states.
+            output: reconstructed output after the VMRNN up path
+            states_down: downsampling hidden states
+            states_up: upsampling hidden states
+            latent: latent tokens after the down path, before the up path
         """
         B = features.shape[0]
+
         if features.dim() == 3 and self.Downsample.is_temporal:
-            # Treat time as sequence length
-            features = features.view(B, -1, features.size(-1))
-        states_down, x = self.Downsample(features, states_down)
-        states_up, output = self.Upsample(x, states_up)
-        return output, states_down, states_up
+            features = features.reshape(B, -1, features.size(-1))
+
+        states_down, latent = self.Downsample(features, states_down)
+        states_up, output = self.Upsample(latent, states_up)
+
+        return output, states_down, states_up, latent
