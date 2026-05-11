@@ -1,123 +1,148 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from .asymmetry_metrics import hybrid_asymmetry
 
 
 class SpatialAsymmetryDetector(nn.Module):
-    """
-    Spatial Asymmetry Detector (SAD) module that uses hybrid_asymmetry
-    to detect asymmetries between left and right views.
-
-    Returns:
-        asymmetry_values:   (B, T)
-        asymmetry_features: (B, T, C)
-        asymmetry_coords:   (B, T, 2)
-        heatmap:            (B, T, latent_h, latent_w)
-    """
-
-    def __init__(self, args):
+    def __init__(
+        self,
+        latent_h: int = 5,
+        latent_w: int = 5,
+        flexible: bool = False,
+        embedding_channel: int = 512,
+        initial_asym_mean: float = 8_000_000.0,
+        initial_asym_std: float = 1_520_381.0,
+    ) -> None:
         super().__init__()
-        self.args = args
-        self.feature_dim = int(getattr(args, "feature_dim", 512))
-        self.latent_h = int(getattr(args, "latent_h", 64))
-        self.latent_w = int(getattr(args, "latent_w", 52))
+        self.latent_h = latent_h
+        self.latent_w = latent_w
+        self.flexible = flexible
 
-        self.use_bias = getattr(args, "use_sad_bias", True)
-        if self.use_bias:
-            self.bias = nn.Parameter(torch.zeros(1, self.feature_dim, 1, 1))
-        else:
-            self.bias = None
+        self.cc_stretch_params = nn.Parameter(torch.ones(embedding_channel))
+        self.mlo_stretch_params = nn.Parameter(torch.ones(embedding_channel))
 
-        self.use_bn = getattr(args, "use_sad_bn", True)
-        if self.use_bn:
-            self.bn = nn.BatchNorm2d(self.feature_dim)
+        self.learned_asym_mean = nn.Parameter(
+            torch.tensor(float(initial_asym_mean), dtype=torch.float32)
+        )
+        self.learned_asym_std = nn.Parameter(
+            torch.tensor(float(initial_asym_std), dtype=torch.float32)
+        )
 
-    def forward(self, left_features, right_features):
+        self.pair_definitions = (
+            (0, 1, "CC"),
+            (2, 3, "MLO"),
+        )
+
+    def _stretch(self, tensor: torch.Tensor, view_name: str) -> torch.Tensor:
+        params = self.cc_stretch_params if view_name == "CC" else self.mlo_stretch_params
+        return tensor * params.view(1, -1, 1, 1)
+
+    def forward(
+        self,
+        feature_maps: torch.Tensor,
+        view_mask: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Args:
-            left_features: Tensor of shape (B, T, C, H, W)
-            right_features: Tensor of shape (B, T, C, H, W)
+            feature_maps: Tensor of shape (B, T, V, C, H, W)
+            view_mask: Tensor of shape (B, T, V)
+
+        Returns:
+            exam_scores:     (B, T)
+            dominant_coords: (B, T, 2)
+            coord_valid:     (B, T)
         """
-        if left_features.dim() != 5 or right_features.dim() != 5:
+        if feature_maps.dim() != 6:
             raise ValueError(
-                "SpatialAsymmetryDetector expects left/right tensors with shape "
-                f"(B, T, C, H, W), got {left_features.shape} and {right_features.shape}."
+                f"SAD expects feature_maps with shape (B, T, V, C, H, W), got {feature_maps.shape}."
             )
 
-        if left_features.shape != right_features.shape:
+        if view_mask.dim() != 3:
             raise ValueError(
-                f"Left/right feature shapes must match, got "
-                f"{left_features.shape} and {right_features.shape}."
+                f"SAD expects view_mask with shape (B, T, V), got {view_mask.shape}."
             )
 
-        batch_size, time_steps, channels = left_features.shape[:3]
+        batch_size, time_steps, num_views, channels, _, _ = feature_maps.shape
 
-        if channels != self.feature_dim:
+        if num_views < 4:
+            raise ValueError(f"SAD expects at least 4 views, got V={num_views}.")
+
+        if view_mask.shape != (batch_size, time_steps, num_views):
             raise ValueError(
-                f"SAD was initialized with feature_dim={self.feature_dim}, "
-                f"but received feature maps with C={channels}."
+                f"view_mask shape must be {(batch_size, time_steps, num_views)}, got {view_mask.shape}."
             )
 
-        asymmetry_values = []
-        asymmetry_features = []
-        asymmetry_coords = []
-        asymmetry_maps = []
+        raw_pair_scores = []
+        normalized_pair_scores = []
+        pair_coords = []
+        pair_valid = []
 
-        for t in range(time_steps):
-            if self.use_bn:
-                left_t = self.bn(left_features[:, t])
-                right_t = self.bn(right_features[:, t])
-            else:
-                left_t = left_features[:, t]
-                right_t = right_features[:, t]
+        for left_index, right_index, view_name in self.pair_definitions:
+            left = feature_maps[:, :, left_index]
+            right = torch.flip(feature_maps[:, :, right_index], dims=[-1])
+            valid = view_mask[:, :, left_index] & view_mask[:, :, right_index]
 
-            max_asym, other = hybrid_asymmetry(
-                left_t,
-                right_t,
-                latent_h=self.latent_h,
-                latent_w=self.latent_w,
-                flexible=getattr(self.args, "flexible_asymmetry", False),
-                bias_params=self.bias if self.use_bias else None,
-            )
+            flat_left = left.reshape(batch_size * time_steps, *left.shape[2:])
+            flat_right = right.reshape(batch_size * time_steps, *right.shape[2:])
+            flat_valid = valid.reshape(batch_size * time_steps)
 
-            feature_diff = torch.mean(torch.abs(left_t - right_t), dim=(2, 3))
+            flat_raw_scores = flat_left.new_zeros(batch_size * time_steps)
+            flat_normalized_scores = flat_left.new_zeros(batch_size * time_steps)
+            flat_coords = flat_left.new_zeros(batch_size * time_steps, 2)
 
-            x_argmin = other.get(
-                "x_argmin",
-                torch.zeros(batch_size, device=left_t.device, dtype=left_t.dtype),
-            )
-            y_argmin = other.get(
-                "y_argmin",
-                torch.zeros(batch_size, device=left_t.device, dtype=left_t.dtype),
-            )
-            heatmap = other.get(
-                "heatmap",
-                torch.zeros(
-                    batch_size,
-                    self.latent_h,
-                    self.latent_w,
-                    device=left_t.device,
-                    dtype=left_t.dtype,
-                ),
-            )
+            if flat_valid.any():
+                valid_left = self._stretch(flat_left[flat_valid], view_name)
+                valid_right = self._stretch(flat_right[flat_valid], view_name)
 
-            asymmetry_values.append(max_asym)
-            asymmetry_features.append(feature_diff)
-            asymmetry_coords.append(
-                torch.stack(
-                    [
-                        x_argmin.to(device=left_t.device, dtype=left_t.dtype),
-                        y_argmin.to(device=left_t.device, dtype=left_t.dtype),
-                    ],
-                    dim=1,
+                valid_scores, details = hybrid_asymmetry(
+                    valid_left,
+                    valid_right,
+                    latent_h=self.latent_h,
+                    latent_w=self.latent_w,
+                    flexible=self.flexible,
                 )
-            )
-            asymmetry_maps.append(heatmap.to(device=left_t.device, dtype=left_t.dtype))
 
-        return {
-            "asymmetry_values": torch.stack(asymmetry_values, dim=1),
-            "asymmetry_features": torch.stack(asymmetry_features, dim=1),
-            "asymmetry_coords": torch.stack(asymmetry_coords, dim=1),
-            "heatmap": torch.stack(asymmetry_maps, dim=1),
-        }
+                normalized = (
+                    valid_scores - self.learned_asym_mean
+                ) / self.learned_asym_std.abs().clamp(min=1e-6)
+
+                flat_raw_scores[flat_valid] = valid_scores.to(flat_raw_scores.dtype)
+                flat_normalized_scores[flat_valid] = torch.sigmoid(normalized).to(
+                    flat_normalized_scores.dtype
+                )
+
+                flat_coords[flat_valid, 0] = details["y_argmax"].to(flat_coords.dtype)
+                flat_coords[flat_valid, 1] = details["x_argmax"].to(flat_coords.dtype)
+
+            raw_pair_scores.append(flat_raw_scores.reshape(batch_size, time_steps))
+            normalized_pair_scores.append(
+                flat_normalized_scores.reshape(batch_size, time_steps)
+            )
+            pair_coords.append(flat_coords.reshape(batch_size, time_steps, 2))
+            pair_valid.append(valid)
+
+        raw_scores = torch.stack(raw_pair_scores, dim=-1)
+        normalized_scores = torch.stack(normalized_pair_scores, dim=-1)
+        coords = torch.stack(pair_coords, dim=-2)
+        valid = torch.stack(pair_valid, dim=-1)
+
+        valid_float = valid.float()
+        exam_scores = (normalized_scores * valid_float).sum(dim=-1) / valid_float.sum(
+            dim=-1
+        ).clamp(min=1.0)
+
+        dominant_pair = raw_scores.masked_fill(~valid, float("-inf")).argmax(dim=-1)
+
+        dominant_coords = coords.gather(
+            dim=2,
+            index=dominant_pair.unsqueeze(-1)
+            .unsqueeze(-1)
+            .expand(batch_size, time_steps, 1, 2),
+        ).squeeze(2)
+
+        coord_valid = valid.any(dim=-1)
+        dominant_coords = dominant_coords * coord_valid.unsqueeze(-1).float()
+
+        return exam_scores, dominant_coords, coord_valid
