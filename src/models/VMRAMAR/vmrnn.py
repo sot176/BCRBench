@@ -32,8 +32,7 @@ class VSB(VSSBlock):
         self.input_resolution = input_resolution
 
     def forward(self, x, hx=None):
-        print("input resolution", self.input_resolution)
-        print(" x resolution", x.shape)
+
         H, W = self.input_resolution
         B, L, C = x.shape
         if not (H == 1 or W == 1):
