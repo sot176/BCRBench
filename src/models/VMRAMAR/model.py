@@ -56,7 +56,6 @@ def parse_int_list(value, default):
 
     return [int(v) for v in value]
 
-
 class VMRAMaR(BaseRiskModel):
     def __init__(self, args):
         super().__init__(args)
@@ -73,10 +72,10 @@ class VMRAMaR(BaseRiskModel):
         if getattr(args, "freeze_image_encoder", False):
             print("Freezing image encoder parameters.")
             freeze_encoder(self.image_encoder)
+            self.image_encoder.eval()
 
-        self.image_repr_dim = int(
-            getattr(args, "image_repr_dim")
-        )
+        self.image_repr_dim = int(getattr(args, "image_repr_dim", 512))
+        self.spatial_pool = nn.AdaptiveMaxPool2d((1, 1))
 
         # ----------------------------
         # VMRNN
@@ -115,7 +114,6 @@ class VMRAMaR(BaseRiskModel):
             depths_upsample=depths_upsample,
             feature_resolution=feature_resolution,
         )
-        self.spatial_pool = nn.AdaptiveMaxPool2d((1, 1))
 
         if self.image_repr_dim != self.vmrnn_embed_dim:
             self.temporal_projection = nn.Sequential(
@@ -123,6 +121,8 @@ class VMRAMaR(BaseRiskModel):
                 nn.Linear(self.image_repr_dim, self.vmrnn_embed_dim),
                 nn.Dropout(float(getattr(args, "vmrnn_projection_dropout", 0.1))),
             )
+        else:
+            self.temporal_projection = nn.Identity()
 
         # ----------------------------
         # Asymmetry modules
@@ -141,16 +141,10 @@ class VMRAMaR(BaseRiskModel):
         if self.use_asymmetry:
             sad_args = SimpleNamespace(
                 latent_h=int(
-                    asymmetry_params.get(
-                        "latent_h",
-                        getattr(args, "latent_h", 5),
-                    )
+                    asymmetry_params.get("latent_h", getattr(args, "latent_h", 5))
                 ),
                 latent_w=int(
-                    asymmetry_params.get(
-                        "latent_w",
-                        getattr(args, "latent_w", 5),
-                    )
+                    asymmetry_params.get("latent_w", getattr(args, "latent_w", 5))
                 ),
                 lat_dropout=float(
                     asymmetry_params.get(
@@ -176,10 +170,7 @@ class VMRAMaR(BaseRiskModel):
             self.lat = LongitudinalAsymmetryTracker(asymmetry_params)
 
             self.asym_dim = int(
-                asymmetry_params.get(
-                    "asym_dim",
-                    getattr(args, "asym_dim", 1),
-                )
+                asymmetry_params.get("asym_dim", getattr(args, "asym_dim", 1))
             )
             if self.asym_dim <= 0:
                 self.asym_dim = 1
@@ -193,6 +184,34 @@ class VMRAMaR(BaseRiskModel):
             final_dim,
             max_followup=int(getattr(args, "max_followup", 5)),
         )
+
+    def train(self, mode=True):
+        super().train(mode)
+
+        if getattr(self.args, "freeze_image_encoder", False):
+            self.image_encoder.eval()
+
+        return self
+
+    def _run_sad_pair(self, left, right, B, T, C, H, W):
+        left_flat = left.reshape(B * T, C, H, W)
+        right_flat = right.reshape(B * T, C, H, W)
+
+        out = self.sad(left_flat, right_flat)
+
+        if "asymmetry_values" in out:
+            values = out["asymmetry_values"]
+            out["asymmetry_values"] = values.reshape(B, T, *values.shape[1:])
+
+        if "asymmetry_coords" in out:
+            coords = out["asymmetry_coords"]
+            out["asymmetry_coords"] = coords.reshape(B, T, *coords.shape[1:])
+
+        if "heatmap" in out:
+            heatmap = out["heatmap"]
+            out["heatmap"] = heatmap.reshape(B, T, *heatmap.shape[1:])
+
+        return out
 
     def forward(self, batch):
         images = batch["images"]
@@ -216,7 +235,6 @@ class VMRAMaR(BaseRiskModel):
             )
 
         x_flat = x.reshape(B * T * V, C, H, W)
-
         img_feats = self.image_encoder(x_flat)
 
         # Encoder can return either:
@@ -232,12 +250,8 @@ class VMRAMaR(BaseRiskModel):
 
             img_maps = img_feats.reshape(B, T, V, C_feat, H_feat, W_feat)
 
-            img_vecs = self.spatial_pool(
-                img_maps.reshape(B * T * V, C_feat, H_feat, W_feat)
-            ).flatten(1)
-
+            img_vecs = self.spatial_pool(img_feats).flatten(1)
             img_vecs = img_vecs.reshape(B, T, V, C_feat)
-
         else:
             img_maps = None
             img_vecs = img_feats.reshape(B, T, V, -1)
@@ -256,9 +270,18 @@ class VMRAMaR(BaseRiskModel):
         if latent_tokens.dim() == 3:
             temporal_feature = latent_tokens.mean(dim=1)
         elif latent_tokens.dim() == 4:
-            temporal_feature = latent_tokens.flatten(1)
+            temporal_feature = latent_tokens.mean(dim=(1, 2))
         else:
             temporal_feature = latent_tokens
+
+        if temporal_feature.dim() != 2:
+            temporal_feature = temporal_feature.reshape(B, -1)
+
+        if temporal_feature.shape[1] != self.vmrnn_embed_dim:
+            raise RuntimeError(
+                f"Temporal feature has dim {temporal_feature.shape[1]}, "
+                f"but risk head expects vmrnn_embed_dim={self.vmrnn_embed_dim}."
+            )
 
         features = [temporal_feature]
 
@@ -282,8 +305,24 @@ class VMRAMaR(BaseRiskModel):
             left_cc = img_maps[:, :, 2]    # (B, T, C, H, W)
             left_mlo = img_maps[:, :, 3]   # (B, T, C, H, W)
 
-            sad_cc = self.sad(left_cc, right_cc)
-            sad_mlo = self.sad(left_mlo, right_mlo)
+            sad_cc = self._run_sad_pair(
+                left_cc,
+                right_cc,
+                B,
+                T,
+                C_feat,
+                H_feat,
+                W_feat,
+            )
+            sad_mlo = self._run_sad_pair(
+                left_mlo,
+                right_mlo,
+                B,
+                T,
+                C_feat,
+                H_feat,
+                W_feat,
+            )
 
             asymmetry_scores = 0.5 * (
                 sad_cc["asymmetry_values"] + sad_mlo["asymmetry_values"]
@@ -317,11 +356,23 @@ class VMRAMaR(BaseRiskModel):
             if r_aa.dim() == 1:
                 r_aa = r_aa.unsqueeze(-1)
 
+            if r_aa.dim() > 2:
+                r_aa = r_aa.reshape(B, -1)
+
+            if r_aa.shape[1] != self.asym_dim:
+                raise RuntimeError(
+                    f"Asymmetry feature has dim {r_aa.shape[1]}, "
+                    f"but risk head expects asym_dim={self.asym_dim}."
+                )
+
             features.append(r_aa)
 
         combined_feats = torch.cat(features, dim=1)
 
         logits = self.ahl(combined_feats)
+
+        # Keep this only if CumulativeProbabilityLayer returns logits.
+        # If it already returns cumulative probabilities, remove sigmoid.
         probs = torch.sigmoid(logits)
 
         return {
