@@ -50,7 +50,7 @@ accelerate launch  main_train.py \
             --batch_size 2 \
             --augmentations \
             --num_workers 7 \
-            --learning_rate 5e-5 \
+            --learning_rate 1e-4 \
             --freeze_image_encoder \
             --weight_decay 1e-4 \
             --model "VMRA-MaR" \
