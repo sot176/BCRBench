@@ -65,7 +65,7 @@ class Mirai(nn.Module):
         feat_map = self.image_encoder(x)
 
         if feat_map.dim() == 4:
-            _, img_x = self.spatial_pool(feat_map)
+            img_x = self.spatial_pool(feat_map)
         else:
             img_x = feat_map
 
