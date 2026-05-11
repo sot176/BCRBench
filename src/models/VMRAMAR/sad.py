@@ -8,6 +8,12 @@ class SpatialAsymmetryDetector(nn.Module):
     """
     Spatial Asymmetry Detector (SAD) module that uses hybrid_asymmetry
     to detect asymmetries between left and right views.
+
+    Returns:
+        asymmetry_values:   (B, T)
+        asymmetry_features: (B, T, C)
+        asymmetry_coords:   (B, T, 2)
+        heatmap:            (B, T, latent_h, latent_w)
     """
 
     def __init__(self, args):
@@ -54,6 +60,7 @@ class SpatialAsymmetryDetector(nn.Module):
             )
 
         asymmetry_values = []
+        asymmetry_features = []
         asymmetry_coords = []
         asymmetry_maps = []
 
@@ -73,6 +80,8 @@ class SpatialAsymmetryDetector(nn.Module):
                 flexible=getattr(self.args, "flexible_asymmetry", False),
                 bias_params=self.bias if self.use_bias else None,
             )
+
+            feature_diff = torch.mean(torch.abs(left_t - right_t), dim=(2, 3))
 
             x_argmin = other.get(
                 "x_argmin",
@@ -94,6 +103,7 @@ class SpatialAsymmetryDetector(nn.Module):
             )
 
             asymmetry_values.append(max_asym)
+            asymmetry_features.append(feature_diff)
             asymmetry_coords.append(
                 torch.stack(
                     [
@@ -107,7 +117,7 @@ class SpatialAsymmetryDetector(nn.Module):
 
         return {
             "asymmetry_values": torch.stack(asymmetry_values, dim=1),
+            "asymmetry_features": torch.stack(asymmetry_features, dim=1),
             "asymmetry_coords": torch.stack(asymmetry_coords, dim=1),
             "heatmap": torch.stack(asymmetry_maps, dim=1),
         }
-

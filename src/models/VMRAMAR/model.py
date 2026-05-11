@@ -284,25 +284,27 @@ class VMRAMaR(BaseRiskModel):
             sad_mlo = self.sad(left_mlo, right_mlo)
 
             asymmetry_scores = 0.5 * (
-                sad_cc["asymmetry_values"] + sad_mlo["asymmetry_values"]
+            sad_cc["asymmetry_values"] + sad_mlo["asymmetry_values"]
             )
 
-            if asymmetry_scores.dim() == 2:
-                asymmetry_scores = asymmetry_scores.unsqueeze(-1)  # (B, T, 1)
+            asymmetry_features = 0.5 * (
+                sad_cc["asymmetry_features"] + sad_mlo["asymmetry_features"]
+            )
 
             asymmetry_coords = 0.5 * (
                 sad_cc["asymmetry_coords"] + sad_mlo["asymmetry_coords"]
-            )  # (B, T, 2)
+            )
 
             asymmetry_heatmap = 0.5 * (
                 sad_cc["heatmap"] + sad_mlo["heatmap"]
-            )  # (B, T, H, W)
+            )
 
             r_aa = self.lat(
-                asymmetry_scores,
+                asymmetry_features,
                 asymmetry_coords,
                 asymmetry_heatmap,
             )
+
 
 
             if isinstance(r_aa, tuple):
