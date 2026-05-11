@@ -48,7 +48,7 @@ accelerate launch  main_train.py \
             --freeze_image_encoder \
             --id_training 1 \
             --use_scheduler \
-            --batch_size 8 \
+            --batch_size 6 \
             --augmentations \
             --num_workers 7 \
             --learning_rate 5e-5 \
