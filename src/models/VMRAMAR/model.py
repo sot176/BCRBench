@@ -141,6 +141,7 @@ class VMRAMaR(BaseRiskModel):
         if self.use_asymmetry:
             print("Using asymmetry modules")
             sad_args = SimpleNamespace(
+                feature_dim=self.image_repr_dim,
                 latent_h=int(
                     asymmetry_params.get("latent_h", getattr(args, "latent_h", 5))
                 ),
