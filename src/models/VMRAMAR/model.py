@@ -171,11 +171,7 @@ class VMRAMaR(BaseRiskModel):
             self.sad = SpatialAsymmetryDetector(sad_args)
             self.lat = LongitudinalAsymmetryTracker(asymmetry_params)
 
-            self.asym_dim = int(
-                asymmetry_params.get("asym_dim", getattr(args, "asym_dim", 1))
-            )
-            if self.asym_dim <= 0:
-                self.asym_dim = 1
+            self.asym_dim = self.vmrnn_embed_dim
 
         # ----------------------------
         # Risk head
