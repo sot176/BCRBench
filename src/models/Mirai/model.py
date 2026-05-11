@@ -3,10 +3,7 @@ import torch.nn as nn
 
 from . import onconet as _onconet
 from .model_utils import (
-    expand_risk_factors_per_img,
     freeze_encoder,
-    get_img_repr_dim,
-    model_args,
     register_onconet_alias,
     zero_risk_factors_for_args,
 )
@@ -16,7 +13,6 @@ from config.config import cfg
 register_onconet_alias(_onconet)
 
 from .onconet.models.factory import get_model_by_name, load_model
-from .onconet.models.pools.attention_pool import Simple_AttentionPool
 
 
 class Mirai(nn.Module):

@@ -23,18 +23,7 @@ def freeze_encoder(encoder: nn.Module) -> None:
     encoder.eval()
 
 
-def model_args(model):
-    if hasattr(model, "_model"):
-        return model._model.args
-    return model.args
-
-
-def get_img_repr_dim(image_encoder) -> int:
-    if hasattr(image_encoder, "_model"):
-        return image_encoder._model.args.img_only_dim
-    return image_encoder.args.img_only_dim
-
-
+ 
 def zero_risk_factors_for_args(
     args,
     batch_size: int,
@@ -65,15 +54,3 @@ def zero_risk_factors_for_args(
 
     return None
 
-
-def expand_risk_factors_per_img(risk_factors, num_imgs: int):
-    if risk_factors is None:
-        return None
-
-    expanded = []
-    for factor in risk_factors:
-        factor = factor.unsqueeze(1).expand(-1, num_imgs, -1)
-        factor = factor.contiguous().view(-1, factor.size(-1))
-        expanded.append(factor)
-
-    return expanded
