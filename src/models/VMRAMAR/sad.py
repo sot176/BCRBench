@@ -58,12 +58,12 @@ class SpatialAsymmetryDetector(nn.Module):
         asymmetry_maps = []
 
         for t in range(time_steps):
-            left_t = left_features[:, t]
-            right_t = right_features[:, t]
-
             if self.use_bn:
-                left_t = self.bn(left_t)
-                right_t = self.bn(right_t)
+                left_t = self.bn(left_features[:, t])
+                right_t = self.bn(right_features[:, t])
+            else:
+                left_t = left_features[:, t]
+                right_t = right_features[:, t]
 
             max_asym, other = hybrid_asymmetry(
                 left_t,
@@ -71,27 +71,43 @@ class SpatialAsymmetryDetector(nn.Module):
                 latent_h=self.latent_h,
                 latent_w=self.latent_w,
                 flexible=getattr(self.args, "flexible_asymmetry", False),
-                bias_params=self.bias,
+                bias_params=self.bias if self.use_bias else None,
+            )
+
+            x_argmin = other.get(
+                "x_argmin",
+                torch.zeros(batch_size, device=left_t.device, dtype=left_t.dtype),
+            )
+            y_argmin = other.get(
+                "y_argmin",
+                torch.zeros(batch_size, device=left_t.device, dtype=left_t.dtype),
+            )
+            heatmap = other.get(
+                "heatmap",
+                torch.zeros(
+                    batch_size,
+                    self.latent_h,
+                    self.latent_w,
+                    device=left_t.device,
+                    dtype=left_t.dtype,
+                ),
             )
 
             asymmetry_values.append(max_asym)
-
-            if "x_argmin" in other and "y_argmin" in other:
-                asymmetry_coords.append(
-                    torch.stack([other["x_argmin"], other["y_argmin"]], dim=1)
+            asymmetry_coords.append(
+                torch.stack(
+                    [
+                        x_argmin.to(device=left_t.device, dtype=left_t.dtype),
+                        y_argmin.to(device=left_t.device, dtype=left_t.dtype),
+                    ],
+                    dim=1,
                 )
+            )
+            asymmetry_maps.append(heatmap.to(device=left_t.device, dtype=left_t.dtype))
 
-            if "heatmap" in other:
-                asymmetry_maps.append(other["heatmap"])
-
-        output = {
+        return {
             "asymmetry_values": torch.stack(asymmetry_values, dim=1),
+            "asymmetry_coords": torch.stack(asymmetry_coords, dim=1),
+            "heatmap": torch.stack(asymmetry_maps, dim=1),
         }
 
-        if len(asymmetry_coords) == time_steps:
-            output["asymmetry_coords"] = torch.stack(asymmetry_coords, dim=1)
-
-        if len(asymmetry_maps) == time_steps:
-            output["heatmap"] = torch.stack(asymmetry_maps, dim=1)
-
-        return output
