@@ -115,9 +115,8 @@ class VMRAMaR(BaseRiskModel):
             depths_upsample=depths_upsample,
             feature_resolution=feature_resolution,
         )
-        self.spatial_pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.spatial_pool = nn.AdaptiveMaxPool2d((1, 1))
 
-        self.temporal_projection = nn.Identity()
         if self.image_repr_dim != self.vmrnn_embed_dim:
             self.temporal_projection = nn.Sequential(
                 nn.LayerNorm(self.image_repr_dim),
