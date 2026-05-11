@@ -188,153 +188,153 @@ class VMRAMaR(BaseRiskModel):
         )
 
 
-def forward(self, batch):
-    images = batch["images"]
+    def forward(self, batch):
+        images = batch["images"]
 
-    if images.dim() != 6:
-        raise ValueError(f"Expected images with 6 dims, got shape {images.shape}")
+        if images.dim() != 6:
+            raise ValueError(f"Expected images with 6 dims, got shape {images.shape}")
 
-    # Accept both:
-    # (B, T, V, C, H, W)
-    # (B, T, C, V, H, W)
-    if images.shape[3] in {1, 3}:
-        B, T, V, C, H, W = images.shape
-        x = images
-    else:
-        B, T, C, V, H, W = images.shape
-        x = images.permute(0, 1, 3, 2, 4, 5).contiguous()
+        # Accept both:
+        # (B, T, V, C, H, W)
+        # (B, T, C, V, H, W)
+        if images.shape[3] in {1, 3}:
+            B, T, V, C, H, W = images.shape
+            x = images
+        else:
+            B, T, C, V, H, W = images.shape
+            x = images.permute(0, 1, 3, 2, 4, 5).contiguous()
 
-    if V < 4 and self.use_asymmetry:
-        raise ValueError(
-            f"Asymmetry expects 4 views ordered [R_CC, R_MLO, L_CC, L_MLO], got V={V}."
-        )
-
-    x_flat = x.reshape(B * T * V, C, H, W)
-    img_feats = self.image_encoder(x_flat)
-
-    # Encoder can return either:
-    # spatial maps: (B*T*V, C_feat, H_feat, W_feat)
-    # vectors:      (B*T*V, D)
-    if img_feats.dim() == 4:
-        C_feat, H_feat, W_feat = img_feats.shape[1:]
-
-        if C_feat != self.image_repr_dim:
-            raise RuntimeError(
-                f"Encoder returned {C_feat} channels, but image_repr_dim={self.image_repr_dim}."
+        if V < 4 and self.use_asymmetry:
+            raise ValueError(
+                f"Asymmetry expects 4 views ordered [R_CC, R_MLO, L_CC, L_MLO], got V={V}."
             )
 
-        img_maps = img_feats.reshape(B, T, V, C_feat, H_feat, W_feat)
+        x_flat = x.reshape(B * T * V, C, H, W)
+        img_feats = self.image_encoder(x_flat)
 
-        img_vecs = self.spatial_pool(img_feats).flatten(1)
-        img_vecs = img_vecs.reshape(B, T, V, C_feat)
-    else:
-        img_maps = None
-        img_vecs = img_feats.reshape(B, T, V, -1)
-        img_vecs = img_vecs[:, :, :, : self.image_repr_dim]
+        # Encoder can return either:
+        # spatial maps: (B*T*V, C_feat, H_feat, W_feat)
+        # vectors:      (B*T*V, D)
+        if img_feats.dim() == 4:
+            C_feat, H_feat, W_feat = img_feats.shape[1:]
 
-    # ----------------------------
-    # Temporal branch
-    # ----------------------------
-    fused_feats = img_vecs.mean(dim=2)  # (B, T, D)
-    fused_feats = self.temporal_projection(fused_feats)
+            if C_feat != self.image_repr_dim:
+                raise RuntimeError(
+                    f"Encoder returned {C_feat} channels, but image_repr_dim={self.image_repr_dim}."
+                )
 
-    reconstructed_output, states_down, states_up, latent_tokens = self.vmrnn(
-        fused_feats
-    )
+            img_maps = img_feats.reshape(B, T, V, C_feat, H_feat, W_feat)
 
-    if latent_tokens.dim() == 3:
-        temporal_feature = latent_tokens.mean(dim=1)
-    elif latent_tokens.dim() == 4:
-        temporal_feature = latent_tokens.mean(dim=(1, 2))
-    else:
-        temporal_feature = latent_tokens
+            img_vecs = self.spatial_pool(img_feats).flatten(1)
+            img_vecs = img_vecs.reshape(B, T, V, C_feat)
+        else:
+            img_maps = None
+            img_vecs = img_feats.reshape(B, T, V, -1)
+            img_vecs = img_vecs[:, :, :, : self.image_repr_dim]
 
-    if temporal_feature.dim() != 2:
-        temporal_feature = temporal_feature.reshape(B, -1)
+        # ----------------------------
+        # Temporal branch
+        # ----------------------------
+        fused_feats = img_vecs.mean(dim=2)  # (B, T, D)
+        fused_feats = self.temporal_projection(fused_feats)
 
-    if temporal_feature.shape[1] != self.vmrnn_embed_dim:
-        raise RuntimeError(
-            f"Temporal feature has dim {temporal_feature.shape[1]}, "
-            f"but risk head expects vmrnn_embed_dim={self.vmrnn_embed_dim}."
+        reconstructed_output, states_down, states_up, latent_tokens = self.vmrnn(
+            fused_feats
         )
 
-    features = [temporal_feature]
+        if latent_tokens.dim() == 3:
+            temporal_feature = latent_tokens.mean(dim=1)
+        elif latent_tokens.dim() == 4:
+            temporal_feature = latent_tokens.mean(dim=(1, 2))
+        else:
+            temporal_feature = latent_tokens
 
-    # ----------------------------
-    # Spatial asymmetry branch
-    # View order: [R_CC, R_MLO, L_CC, L_MLO]
-    # ----------------------------
-    r_aa = None
-    asymmetry_scores = None
-    asymmetry_coords = None
-    asymmetry_heatmap = None
+        if temporal_feature.dim() != 2:
+            temporal_feature = temporal_feature.reshape(B, -1)
 
-    if self.use_asymmetry:
-        if img_maps is None:
+        if temporal_feature.shape[1] != self.vmrnn_embed_dim:
             raise RuntimeError(
-                "Asymmetry requires spatial feature maps, but encoder returned vectors."
+                f"Temporal feature has dim {temporal_feature.shape[1]}, "
+                f"but risk head expects vmrnn_embed_dim={self.vmrnn_embed_dim}."
             )
 
-        right_cc = img_maps[:, :, 0]   # (B, T, C, H, W)
-        right_mlo = img_maps[:, :, 1]  # (B, T, C, H, W)
-        left_cc = img_maps[:, :, 2]    # (B, T, C, H, W)
-        left_mlo = img_maps[:, :, 3]   # (B, T, C, H, W)
+        features = [temporal_feature]
 
-        sad_cc = self.sad(left_cc, right_cc)
-        sad_mlo = self.sad(left_mlo, right_mlo)
+        # ----------------------------
+        # Spatial asymmetry branch
+        # View order: [R_CC, R_MLO, L_CC, L_MLO]
+        # ----------------------------
+        r_aa = None
+        asymmetry_scores = None
+        asymmetry_coords = None
+        asymmetry_heatmap = None
 
-        asymmetry_scores = 0.5 * (
-            sad_cc["asymmetry_values"] + sad_mlo["asymmetry_values"]
-        )
+        if self.use_asymmetry:
+            if img_maps is None:
+                raise RuntimeError(
+                    "Asymmetry requires spatial feature maps, but encoder returned vectors."
+                )
 
-        asymmetry_coords = torch.stack(
-            [sad_cc["asymmetry_coords"], sad_mlo["asymmetry_coords"]],
-            dim=2,
-        )
+            right_cc = img_maps[:, :, 0]   # (B, T, C, H, W)
+            right_mlo = img_maps[:, :, 1]  # (B, T, C, H, W)
+            left_cc = img_maps[:, :, 2]    # (B, T, C, H, W)
+            left_mlo = img_maps[:, :, 3]   # (B, T, C, H, W)
 
-        asymmetry_heatmap = torch.stack(
-            [sad_cc["heatmap"], sad_mlo["heatmap"]],
-            dim=2,
-        )
+            sad_cc = self.sad(left_cc, right_cc)
+            sad_mlo = self.sad(left_mlo, right_mlo)
 
-        r_aa = self.lat(
-            asymmetry_scores,
-            asymmetry_coords,
-            asymmetry_heatmap,
-        )
+            asymmetry_scores = 0.5 * (
+                sad_cc["asymmetry_values"] + sad_mlo["asymmetry_values"]
+            )
 
-        if isinstance(r_aa, tuple):
-            r_aa = r_aa[0]
+            asymmetry_coords = torch.stack(
+                [sad_cc["asymmetry_coords"], sad_mlo["asymmetry_coords"]],
+                dim=2,
+            )
 
-        if r_aa.dim() == 1:
-            r_aa = r_aa.unsqueeze(-1)
+            asymmetry_heatmap = torch.stack(
+                [sad_cc["heatmap"], sad_mlo["heatmap"]],
+                dim=2,
+            )
 
-        if r_aa.dim() > 2:
-            r_aa = r_aa.reshape(B, -1)
+            r_aa = self.lat(
+                asymmetry_scores,
+                asymmetry_coords,
+                asymmetry_heatmap,
+            )
 
-        features.append(r_aa)
+            if isinstance(r_aa, tuple):
+                r_aa = r_aa[0]
 
-    combined_feats = torch.cat(features, dim=1)
+            if r_aa.dim() == 1:
+                r_aa = r_aa.unsqueeze(-1)
 
-    logits = self.ahl(combined_feats)
+            if r_aa.dim() > 2:
+                r_aa = r_aa.reshape(B, -1)
 
-    # Keep this only if CumulativeProbabilityLayer returns logits.
-    # If it already returns cumulative probabilities, remove sigmoid.
-    probs = torch.sigmoid(logits)
+            features.append(r_aa)
 
-    return {
-        "logit": logits,
-        "probs": probs,
-        "temporal_feature": temporal_feature,
-        "temporal_output": reconstructed_output,
-        "latent_tokens": latent_tokens,
-        "states_down": states_down,
-        "states_up": states_up,
-        "r_aa": r_aa,
-        "asymmetry_scores": asymmetry_scores,
-        "asymmetry_coords": asymmetry_coords,
-        "asymmetry_heatmap": asymmetry_heatmap,
-    }
+        combined_feats = torch.cat(features, dim=1)
+
+        logits = self.ahl(combined_feats)
+
+        # Keep this only if CumulativeProbabilityLayer returns logits.
+        # If it already returns cumulative probabilities, remove sigmoid.
+        probs = torch.sigmoid(logits)
+
+        return {
+            "logit": logits,
+            "probs": probs,
+            "temporal_feature": temporal_feature,
+            "temporal_output": reconstructed_output,
+            "latent_tokens": latent_tokens,
+            "states_down": states_down,
+            "states_up": states_up,
+            "r_aa": r_aa,
+            "asymmetry_scores": asymmetry_scores,
+            "asymmetry_coords": asymmetry_coords,
+            "asymmetry_heatmap": asymmetry_heatmap,
+        }
 
 
 
