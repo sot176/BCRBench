@@ -186,33 +186,7 @@ class VMRAMaR(BaseRiskModel):
             max_followup=int(getattr(args, "max_followup", 5)),
         )
 
-    def train(self, mode=True):
-        super().train(mode)
 
-        if getattr(self.args, "freeze_image_encoder", False):
-            self.image_encoder.eval()
-
-        return self
-
-    def _run_sad_pair(self, left, right, B, T, C, H, W):
-        left_flat = left.reshape(B * T, C, H, W)
-        right_flat = right.reshape(B * T, C, H, W)
-
-        out = self.sad(left_flat, right_flat)
-
-        if "asymmetry_values" in out:
-            values = out["asymmetry_values"]
-            out["asymmetry_values"] = values.reshape(B, T, *values.shape[1:])
-
-        if "asymmetry_coords" in out:
-            coords = out["asymmetry_coords"]
-            out["asymmetry_coords"] = coords.reshape(B, T, *coords.shape[1:])
-
-        if "heatmap" in out:
-            heatmap = out["heatmap"]
-            out["heatmap"] = heatmap.reshape(B, T, *heatmap.shape[1:])
-
-        return out
 
     def forward(self, batch):
         images = batch["images"]
@@ -306,24 +280,8 @@ class VMRAMaR(BaseRiskModel):
             left_cc = img_maps[:, :, 2]    # (B, T, C, H, W)
             left_mlo = img_maps[:, :, 3]   # (B, T, C, H, W)
 
-            sad_cc = self._run_sad_pair(
-                left_cc,
-                right_cc,
-                B,
-                T,
-                C_feat,
-                H_feat,
-                W_feat,
-            )
-            sad_mlo = self._run_sad_pair(
-                left_mlo,
-                right_mlo,
-                B,
-                T,
-                C_feat,
-                H_feat,
-                W_feat,
-            )
+            sad_cc = self.sad(left_cc, right_cc)
+            sad_mlo = self.sad(left_mlo, right_mlo)
 
             asymmetry_scores = 0.5 * (
                 sad_cc["asymmetry_values"] + sad_mlo["asymmetry_values"]
@@ -359,12 +317,6 @@ class VMRAMaR(BaseRiskModel):
 
             if r_aa.dim() > 2:
                 r_aa = r_aa.reshape(B, -1)
-
-            if r_aa.shape[1] != self.asym_dim:
-                raise RuntimeError(
-                    f"Asymmetry feature has dim {r_aa.shape[1]}, "
-                    f"but risk head expects asym_dim={self.asym_dim}."
-                )
 
             features.append(r_aa)
 
