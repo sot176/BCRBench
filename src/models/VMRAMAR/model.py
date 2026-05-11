@@ -287,6 +287,9 @@ class VMRAMaR(BaseRiskModel):
                 sad_cc["asymmetry_values"] + sad_mlo["asymmetry_values"]
             )
 
+            if asymmetry_scores.dim() == 2:
+                asymmetry_scores = asymmetry_scores.unsqueeze(-1)
+
             asymmetry_coords = torch.stack(
                 [sad_cc["asymmetry_coords"], sad_mlo["asymmetry_coords"]],
                 dim=2,
@@ -302,6 +305,7 @@ class VMRAMaR(BaseRiskModel):
                 asymmetry_coords,
                 asymmetry_heatmap,
             )
+
 
             if isinstance(r_aa, tuple):
                 r_aa = r_aa[0]
