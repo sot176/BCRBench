@@ -80,8 +80,6 @@ data_parallel: false
 model_parallel: false
 wrap_model: false
 
-
 vmrnn_params: '{"depths_downsample": "2", "depths_upsample": "2", "num_heads": "8", "patch_size": 32, "window_size": 64, "embed_dim": 512, "feature_resolution": [1, 2]}'
 
-asymmetry_params: '{"use_asymmetry": true, "latent_h": 64, "latent_w": 52, "use_sad_bias": true, "use_lat_bn": true, "lat_dropout": 0.1, "initial_asym_mean": 2000, "initial_asym_std": 300}'
-
+asymmetry_params: '{"use_asymmetry": true, "latent_h": 5, "latent_w": 5, "flexible_asymmetry": false, "initial_asym_mean": 2000, "initial_asym_std": 300, "threshold_ratio": 0.4, "persistent_weight": 1.0}'

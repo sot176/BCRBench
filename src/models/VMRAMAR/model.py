@@ -140,38 +140,51 @@ class VMRAMaR(BaseRiskModel):
 
         if self.use_asymmetry:
             print("Using asymmetry modules")
-            sad_args = SimpleNamespace(
-                feature_dim=self.image_repr_dim,
+
+            self.sad = SpatialAsymmetryDetector(
                 latent_h=int(
                     asymmetry_params.get("latent_h", getattr(args, "latent_h", 5))
                 ),
                 latent_w=int(
                     asymmetry_params.get("latent_w", getattr(args, "latent_w", 5))
                 ),
-                lat_dropout=float(
+                flexible=str2bool(
                     asymmetry_params.get(
-                        "lat_dropout",
-                        getattr(args, "lat_dropout", 0.1),
+                        "flexible_asymmetry",
+                        getattr(args, "flexible_asymmetry", False),
                     )
                 ),
-                use_sad_bias=str2bool(
+                embedding_channel=self.image_repr_dim,
+                initial_asym_mean=float(
                     asymmetry_params.get(
-                        "use_sad_bias",
-                        getattr(args, "use_sad_bias", True),
+                        "initial_asym_mean",
+                        getattr(args, "initial_asym_mean", 8_000_000.0),
                     )
                 ),
-                use_sad_bn=str2bool(
+                initial_asym_std=float(
                     asymmetry_params.get(
-                        "use_sad_bn",
-                        getattr(args, "use_sad_bn", True),
+                        "initial_asym_std",
+                        getattr(args, "initial_asym_std", 1_520_381.0),
                     )
                 ),
             )
 
-            self.sad = SpatialAsymmetryDetector(sad_args)
-            self.lat = LongitudinalAsymmetryTracker(asymmetry_params)
+            self.lat = LongitudinalAsymmetryTracker(
+                threshold_ratio=float(
+                    asymmetry_params.get(
+                        "threshold_ratio",
+                        getattr(args, "threshold_ratio", 0.4),
+                    )
+                ),
+                persistent_weight=float(
+                    asymmetry_params.get(
+                        "persistent_weight",
+                        getattr(args, "persistent_weight", 1.0),
+                    )
+                ),
+            )
 
-            self.asym_dim = self.vmrnn_embed_dim
+            self.asym_dim = 1
 
         # ----------------------------
         # Risk head
@@ -182,7 +195,6 @@ class VMRAMaR(BaseRiskModel):
             final_dim,
             max_followup=int(getattr(args, "max_followup", 5)),
         )
-
 
     def forward(self, batch):
         images = batch["images"]
@@ -257,13 +269,12 @@ class VMRAMaR(BaseRiskModel):
         features = [temporal_feature]
 
         # ----------------------------
-        # Spatial asymmetry branch
-        # View order: [R_CC, R_MLO, L_CC, L_MLO]
+        # Asymmetry-aware risk factor branch
         # ----------------------------
         r_aa = None
         asymmetry_scores = None
         asymmetry_coords = None
-        asymmetry_heatmap = None
+        coord_valid = None
 
         if self.use_asymmetry:
             if img_maps is None:
@@ -271,47 +282,30 @@ class VMRAMaR(BaseRiskModel):
                     "Asymmetry requires spatial feature maps, but encoder returned vectors."
                 )
 
-            right_cc = img_maps[:, :, 0]   # (B, T, C, H, W)
-            right_mlo = img_maps[:, :, 1]  # (B, T, C, H, W)
-            left_cc = img_maps[:, :, 2]    # (B, T, C, H, W)
-            left_mlo = img_maps[:, :, 3]   # (B, T, C, H, W)
-
-            sad_cc = self.sad(left_cc, right_cc)
-            sad_mlo = self.sad(left_mlo, right_mlo)
-
-            asymmetry_scores = 0.5 * (
-            sad_cc["asymmetry_values"] + sad_mlo["asymmetry_values"]
+            view_mask = batch.get(
+                "view_mask",
+                torch.ones(B, T, V, device=images.device, dtype=torch.bool),
             )
 
-            asymmetry_features = 0.5 * (
-                sad_cc["asymmetry_features"] + sad_mlo["asymmetry_features"]
+            exam_mask = batch.get(
+                "exam_mask",
+                torch.ones(B, T, device=images.device, dtype=torch.bool),
             )
 
-            asymmetry_coords = 0.5 * (
-                sad_cc["asymmetry_coords"] + sad_mlo["asymmetry_coords"]
-            )
-
-            asymmetry_heatmap = 0.5 * (
-                sad_cc["heatmap"] + sad_mlo["heatmap"]
+            asymmetry_scores, asymmetry_coords, coord_valid = self.sad(
+                img_maps,
+                view_mask,
             )
 
             r_aa = self.lat(
-                asymmetry_features,
+                asymmetry_scores,
                 asymmetry_coords,
-                asymmetry_heatmap,
+                coord_valid,
+                exam_mask,
+                window_size=max(H_feat, W_feat),
             )
 
-
-
-            if isinstance(r_aa, tuple):
-                r_aa = r_aa[0]
-
-            if r_aa.dim() == 1:
-                r_aa = r_aa.unsqueeze(-1)
-
-            if r_aa.dim() > 2:
-                r_aa = r_aa.reshape(B, -1)
-
+            r_aa = r_aa.unsqueeze(-1)  # (B, 1)
             features.append(r_aa)
 
         combined_feats = torch.cat(features, dim=1)
@@ -333,8 +327,9 @@ class VMRAMaR(BaseRiskModel):
             "r_aa": r_aa,
             "asymmetry_scores": asymmetry_scores,
             "asymmetry_coords": asymmetry_coords,
-            "asymmetry_heatmap": asymmetry_heatmap,
+            "coord_valid": coord_valid,
         }
+
 
 
 
