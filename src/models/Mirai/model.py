@@ -34,7 +34,7 @@ class Mirai(nn.Module):
                 getattr(args, "image_repr_dim")
             )
         
-        self.spatial_pool = Simple_AttentionPool(args, self.image_repr_dim)
+        self.spatial_pool = nn.AdaptiveMaxPool2d((1, 1))
 
         if args.transformer_snapshot is not None:
             self.transformer = load_model(
