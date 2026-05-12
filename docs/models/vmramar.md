@@ -3,14 +3,17 @@
  
  
 ## 📌 Overview
+VMRAMaR is a longitudinal breast cancer risk prediction model that combines:
 
-VMRAMaR is a deep learning architecture for breast cancer risk prediction that combines:
+- Multi-view mammography encoding
+- Temporal sequence modeling using VMRNN
+- Optional asymmetry-aware risk modeling
 
-- **Patient-vise mammography encoding (e.g., CC / MLO of both breasts)**
-- **Longitudinal temporal modeling via VMRNN**
-- **Optional asymmetry analysis between left/right breasts**
+Image features are extracted independently for each mammography view and aggregated across views using mean pooling. Sequential visit representations are processed using a VMRNN to capture temporal evolution across screening history.
 
-The model produces **multi-year risk predictions** using a cumulative probability framework, integrating both temporal progression and spatial asymmetry cues.
+An optional asymmetry branch compares left and right breast feature maps using a Spatial Asymmetry Detector (SAD), followed by longitudinal aggregation using a Longitudinal Asymmetry Tracker (LAT).
+
+Temporal and asymmetry features are fused and passed to a cumulative probability prediction layer for multi-year breast cancer risk estimation.
 
 ---
 
@@ -18,7 +21,7 @@ The model produces **multi-year risk predictions** using a cumulative probabilit
 
 VMRAMaR is built on three central principles:
 
-- **Temporal modeling with memory:** Sequential mammography visits are modeled using a **VMRNN**, capturing disease progression over time  
+- **Temporal modeling:** Sequential mammography visits are modeled using a **VMRNN**, capturing disease progression over time  
 - **Cross-view aggregation:** Multiple views (e.g., CC and MLO) are fused using **multi-head self-attention**  
 - **Asymmetry-aware learning (optional):** Differences between left and right breast representations are explicitly modeled using spatial and longitudinal asymmetry modules  
 
@@ -50,9 +53,9 @@ The model consists of five main components:
 
 ### 2. View Aggregation (Multi-View Fusion)
 
-- Spatially pooled features → `[B, T, V, C]`  
-- Linear projection into embedding space  
-- **Multi-head attention** applied across views (e.g., CC, MLO)  
+- Spatially pooled image features are aggregated across mammography views
+- Features are averaged across views (e.g., CC and MLO)
+- Resulting visit-level representations are projected into the VMRNN embedding space
 
 **Output:**
 - Visit-level embeddings: `[B, T, D]`
@@ -88,7 +91,7 @@ Activated when `use_asymmetry = True`.
 - Incorporates spatial coordinates and temporal evolution  
 
 **Output:**
-- Asymmetry feature vector: `[B, 512]`
+- Longitudinal asymmetry risk factor: `[B, 1]`
 
 ---
 
@@ -97,7 +100,6 @@ Activated when `use_asymmetry = True`.
 - Concatenates:
   - Temporal features  
   - (Optional) asymmetry features  
-- Layer normalization applied  
 - Passed into **Cumulative Probability Layer (AHL)**  
 
 **Output:**
