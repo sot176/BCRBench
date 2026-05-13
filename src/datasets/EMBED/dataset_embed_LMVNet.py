@@ -176,12 +176,11 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
             current_row["years_last_followup"]
         )
 
-        target, y_mask, event_time, event_observed = (
-            self._build_survival_target(
+        target, y_mask, event_time, event_observed = self._build_survival_target(
                 current_time_to_cancer,
                 years_last_followup,
             )
-        )
+        
 
         time_gap = min(
             abs(sample.current_date.year - sample.prior_date.year),
@@ -202,23 +201,13 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
             "time_gap": torch.tensor(time_gap, dtype=torch.float32),
             "target": torch.tensor(target, dtype=torch.float32),
             "y_mask": torch.tensor(y_mask, dtype=torch.float32),
-            "event_observed": torch.tensor(
-                event_observed,
-                dtype=torch.float32,
-            ),
-            "event_times": torch.tensor(
-                event_time,
-                dtype=torch.float32,
-            ),
+            "event_observed": torch.tensor(event_observed,dtype=torch.float32,),
+            "event_times": torch.tensor(event_time,dtype=torch.float32,),
             "years_to_cancer": current_time_to_cancer - 1,
             "years_to_last_followup": years_last_followup,
             "density": self._map_density(current_row["density"]),
-            "cancer_type": self._map_cancer_type(
-                current_row["path_severity"]
-            ),
-            "race": self._map_race(
-                current_row.get("RACE_DESC")
-            ),
+            "cancer_type": self._map_cancer_type(current_row["path_severity"]),
+            "race": self._map_race(current_row.get("RACE_DESC")),
         }
 
     @staticmethod
@@ -408,119 +397,3 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
 
         return target, y_mask, event_time, event_observed
     
-
-
-def main():
-    path_data_train_val = "C:/UiT_PhD_datasets/embed_dataset/risk_dataset_1664_2048/"
-
-    csv_file = "C:/Users/sothr1456/OneDrive - UiT Office 365/Documents/UiT PhD/EMBED/combined_cases_with_follow_up_races_new.csv"
-
-    import kornia.augmentation.container as K_C
-
-    train_transform = K_C.AugmentationSequential(
-        K_A.RandomCrop(size=(1946, 1581), p=0.2),
-        K_A.Resize((2048, 1664), resample=Resample.NEAREST.name),
-        K_A.RandomAffine(translate=(0.0, 0.1), scale=(1.0, 1.1), degrees=0, shear=0, p=0.5),
-        K_A.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.0, p=0.5),
-        K_A.RandomGamma(gamma=(0.8, 1.2), gain=(0.9, 1.05), p=0.5),
-    )
-
-    BATCH_SIZE = 12
-
-    print("Initializing dataset...")
-    train_dataset = BreastCancerRiskDatasetEMBEDLMVNet(
-        csv_file=csv_file,
-        image_dir=path_data_train_val,
-        mode='train',
-        transforms=train_transform
-    )
-
-    if len(train_dataset) == 0:
-        print("Dataset is empty. Please check paths and data processing logic.")
-        return
-
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=BATCH_SIZE,
-        shuffle=True,
-        pin_memory=True,
-        num_workers=0  # Important for Windows debugging
-    )
-
-    # --- 3. Fetch and Inspect a Single Batch ---
-    print("\nFetching a batch from the DataLoader...")
-    try:
-        batch = next(iter(train_loader))
-    except StopIteration:
-        print("DataLoader is empty. Could not fetch a batch.")
-        return
-
-    # Extract the relevant tensors and data from the batch dictionary
-    current_image_cc = batch['current_image_cc']
-    current_image_mlo = batch['current_image_mlo']
-    previous_image_cc = batch['previous_image_cc']
-    previous_image_mlo = batch['previous_image_mlo']
-    patient_id = batch['patient_id']
-    print(batch['laterality'])
-    print(previous_image_cc.shape)
-    time_gap = batch['time_gap']  # time_gap is the same for both views
-    y_mask = batch['y_mask']
-    event_times = batch['event_times']
-    event_observed = batch['event_observed']
-    density = batch['density']
-    target = batch['target']
-
-    # --- 4. Print Metadata for the Batch ---
-    print("\n--- Batch Metadata ---")
-    print(f"Batch size: {current_image_cc.shape[0]}")
-    print(f"Time Gap (years): {time_gap.numpy()}")
-    print(f"Event Observed (1=Cancer, 0=Censored): {event_observed.numpy()}")
-    print(f"Time to Event/Censoring (years): {event_times.numpy()}")
-    print(f"Breast Density: {density}")
-    print(f"Target Vector (risk over 5 years): \n{target.numpy()}")
-    print(f"Mask Vector (valid time points): \n{y_mask.numpy()}")
-    print("----------------------\n")
-
-    # --- 5. Visualize the Images for Each Sample in the Batch ---
-    print("Plotting the four-image quartet for each sample in the batch...")
-    num_samples_to_plot = 4
-
-    for i in range(num_samples_to_plot):
-        # Create a 2x2 subplot for each patient sample
-        fig, axes = plt.subplots(2, 2, figsize=(10, 12))
-        fig.suptitle(
-            f"Sample {i + 1} from Batch | Time Gap: {time_gap[i].item():.1f} years | Density: {density[i]} Patient_ID:{patient_id[i]}",
-            fontsize=16)
-
-        # It's safer to move tensors to CPU for plotting
-        img_cur_cc_plot = current_image_cc[i].squeeze().cpu().numpy()
-        img_cur_mlo_plot = current_image_mlo[i].squeeze().cpu().numpy()
-        img_prev_cc_plot = previous_image_cc[i].squeeze().cpu().numpy()
-        img_prev_mlo_plot = previous_image_mlo[i].squeeze().cpu().numpy()
-
-        # Plot Prior CC
-        axes[0, 0].imshow(img_prev_cc_plot, cmap='gray')
-        axes[0, 0].set_title('Prior CC')
-        axes[0, 0].axis('off')
-
-        # Plot Current CC
-        axes[0, 1].imshow(img_cur_cc_plot, cmap='gray')
-        axes[0, 1].set_title('Current CC')
-        axes[0, 1].axis('off')
-
-        # Plot Prior MLO
-        axes[1, 0].imshow(img_prev_mlo_plot, cmap='gray')
-        axes[1, 0].set_title('Prior MLO')
-        axes[1, 0].axis('off')
-
-        # Plot Current MLO
-        axes[1, 1].imshow(img_cur_mlo_plot, cmap='gray')
-        axes[1, 1].set_title('Current MLO')
-        axes[1, 1].axis('off')
-
-        plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust layout to make room for suptitle
-        plt.show()
-
-
-if __name__ == '__main__':
-    main()
