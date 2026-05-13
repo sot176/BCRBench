@@ -3,7 +3,7 @@ import torch
 import numpy as np
 import pandas as pd
 from PIL import Image
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional, Callable
@@ -16,10 +16,6 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset 
 
-import matplotlib.pyplot as plt
-import kornia.augmentation as K_A
-from kornia.constants import Resample
-import kornia.augmentation.container as K_C
 
 MAX_VIEWS = 2
 MAX_SIDES = 2
