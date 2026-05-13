@@ -19,15 +19,11 @@ class CSAWImageRecord:
 
 
 class BreastCancerRiskDatasetCSAWCC_ImgFeatAlign(Dataset):
-    """
-    Clean CSAW dataset (refactored to match EMBED-style design).
+    """Longitudinal CSAW-CC mammography dataset.
 
-    Key improvements:
-    - deterministic image pairing
-    - no random sampling
-    - minimal record structure
-    - consistent normalization
-    - clean separation of CSV + image logic
+    Each sample contains a current mammogram, its previous mammogram from the
+    same patient/laterality/view, and the risk labels derived from the CSV row
+    matching the current image.
     """
 
     def __init__(
