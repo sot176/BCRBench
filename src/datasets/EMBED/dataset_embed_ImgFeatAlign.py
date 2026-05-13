@@ -19,10 +19,7 @@ import numpy as np
 import pandas as pd
 import torch
 from PIL import Image
-from torch.utils.data import Dataset, DataLoader
-import kornia.augmentation as K_A
-import matplotlib.pyplot as plt
-from kornia.constants import Resample
+from torch.utils.data import Dataset
 
 
 try:
@@ -295,6 +292,3 @@ class BreastCancerRiskDatasetEMBEDImgFeatAlign(Dataset):
         return target, y_mask, event_time, event_observed
 
  
-
-if __name__ == '__main__':
-    main()
