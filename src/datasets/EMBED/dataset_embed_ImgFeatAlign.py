@@ -294,70 +294,7 @@ class BreastCancerRiskDatasetEMBEDImgFeatAlign(Dataset):
 
         return target, y_mask, event_time, event_observed
 
-
-def main():
-    path_data_train_val = "C:/UiT_PhD_datasets/embed_dataset/risk_dataset_1664_2048/"
-    #csv_file = "D:/UiT PhD/EMBED/combined_cases_with_followup_new.csv"
-    csv_file = "C:/Users/sothr1456/OneDrive - UiT Office 365/Documents/UiT PhD/EMBED/combined_cases_with_followup_race.csv"
-    train_transform  =torch.nn.Sequential(
-        K_A.RandomAffine(translate=(0.0, 0.1), scale=(1.0, 1.05), degrees=0, shear=0, p=0.5),
-        K_A.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.0, p=0.5),
-        K_A.RandomGamma(gamma=(0.8, 1.4), gain=(0.95, 1.05), p=0.5),
-        K_A.RandomCrop(size=(1843, 1498), p=0.2),
-        K_A.Resize((2048, 1664), resample=Resample.NEAREST.name),
-    )
-
-    train_dataset = BreastCancerRiskDatasetEMBEDImgFeatAlign(csv_file, path_data_train_val, 'train',
-                                             transforms=train_transform)
-    train_loader = DataLoader( train_dataset, batch_size=10,
-                              shuffle=True, pin_memory=True)
-
-
-    batch = next(iter(train_loader))  # grab a batch from the dataloader
-    img_current = batch['current_image']
-    img_previous = batch['previous_image']
-    event_times = batch['event_times']
-    event_observed = batch['event_observed']
-    target_prior = batch['target_prior']
-    time_gap = batch['time_gap']
-    target = batch['target']
-    density = batch['density']
-    cancer_type = batch['cancer_type']
-    print("cancer type ", cancer_type)
-    # Compute class weights
-    classcount = torch.tensor([539, 190, 163, 90, 67], dtype=torch.float)
-
-    n_samples = classcount.sum()
-    n_classes = len(classcount)
-
-    class_weights = n_samples / (n_classes * classcount)
-    print(class_weights)
-    y_mask = batch['y_mask']
-    y_mask_pri = batch['y_mask_prior']
-    print(event_observed)
-    print(event_times)
-    print("density", density)
-    print("time gap", time_gap)
-    print("mask", y_mask)
-    print("target", target)
-    print("mask prior", y_mask_pri)
-    print("target_prior", target_prior)
-    for i in range(8):
-        print(img_current.shape)
-        print(img_current.dtype)
-        current_image_float32 = img_current[i].squeeze()#.cpu().numpy()  # Convert to float32 and move to CPU
-        previous_image_float32 = img_previous[i].squeeze()#.cpu().numpy()  # Same for previous image
-
-        plt.subplot(1, 2, 1)
-        plt.imshow(current_image_float32, cmap='gray')
-        plt.title('Current Image')
-        # Plot the previous image in the second subplot (1 row, 2 columns, 2nd position)
-        plt.subplot(1, 2, 2)
-        plt.imshow(previous_image_float32, cmap='gray')
-        plt.title('Previous Image')
-        plt.show()
-    label = batch['label']
-    print(label)
+ 
 
 if __name__ == '__main__':
     main()
