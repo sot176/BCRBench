@@ -27,8 +27,8 @@ def _csaw_lmvnet(**kwargs):
 
 
 def _csaw_vmra(**kwargs):
-    from .CSAW.dataset_csaw_VMRA import BreastCancerRiskDatasetCSAWCC_VMRA
-    return _build_dataset(BreastCancerRiskDatasetCSAWCC_VMRA, **kwargs)
+    from .CSAW.dataset_csaw_VMRA import BreastCancerRiskDatasetCSAWVMRA
+    return _build_dataset(BreastCancerRiskDatasetCSAWVMRA, **kwargs)
 
 
 def _embed_mirai(**kwargs):
