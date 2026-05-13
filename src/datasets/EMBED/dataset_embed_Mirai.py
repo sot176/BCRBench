@@ -60,9 +60,7 @@ class MIRAISample:
     views: dict[str, ImageRecord]
 
 
-def scale_to_uint16_range(
-    image: np.ndarray,
-) -> np.ndarray:
+def scale_to_uint16_range(image: np.ndarray) -> np.ndarray:
     """Scale image intensities to uint16 range."""
 
     image = image.astype(np.float32)
@@ -73,15 +71,7 @@ def scale_to_uint16_range(
     if image_range == 0:
         return np.zeros_like(image, dtype=np.float32)
 
-    return (
-        (image - image_min)
-        / image_range
-        * 65535.0
-    )
-
-
-# Backwards compatibility
-imgunit16 = scale_to_uint16_range
+    return (image - image_min) / image_range * 65535.0
 
 
 def pad_to_length(
@@ -92,11 +82,7 @@ def pad_to_length(
     """Pad sequence to fixed length."""
 
     arr = arr[-max_length:]
-
-    return np.array(
-        [pad_token] * (max_length - len(arr))
-        + arr
-    )
+    return np.array([pad_token] * (max_length - len(arr)) + arr)
 
 
 class BreastCancerRiskDatasetEMBEDMirai(Dataset):

@@ -58,10 +58,6 @@ def scale_to_uint16_range(image: np.ndarray) -> np.ndarray:
     return (image - image_min) / image_range * 65535.0
 
 
-# Backwards-compatible name used in older scripts.
-imgunit16 = scale_to_uint16_range
-
-
 class BreastCancerRiskDatasetEMBEDImgFeatAlign(Dataset):
     """Longitudinal EMBED mammography dataset.
 
