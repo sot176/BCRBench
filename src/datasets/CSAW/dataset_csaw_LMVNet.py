@@ -21,6 +21,13 @@ class CSAWImageRecord:
     view: str
     study_date: pd.Timestamp
 
+"""
+Images are stored as PNG but keep the same base name from the original DICOM file
+00004_20990909_R_MLO_2.dcm  →  00004_20990909_R_MLO_2.png
+The CSV must contain the file_name e.g. 00004_20990909_R_MLO_2.png
+Each row corresponds to exactly ONE IMAGE.
+Each exam has 4 images: L_CC, L_MLO, R_CC, R_MLO
+"""
 
 class BreastCancerRiskDatasetCSAWCCLMVNet(Dataset):
     """Longitudinal multi-view CSAW-CC mammography dataset."""
