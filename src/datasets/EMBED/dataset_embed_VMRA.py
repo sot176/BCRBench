@@ -15,7 +15,7 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
-from utils import (
+from .utils import (
     load_tabular_data,
     load_image_tensor,
     map_density,
