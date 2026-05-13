@@ -14,7 +14,7 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
-from .datasetutils import (
+from .utils import (
     load_tabular_data,
     load_image_tensor,
     map_density,
@@ -28,7 +28,7 @@ from .datasetutils import (
 )
 
 try:
-    from BreastCancerRiskBenchmark.src.datasets.EMBED.datasetutils import RACE_TO_ID
+    from BreastCancerRiskBenchmark.src.datasets.EMBED.utils import RACE_TO_ID
 except ImportError:
     RACE_TO_ID = {"Unknown": 0}
 
