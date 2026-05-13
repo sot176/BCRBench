@@ -73,17 +73,12 @@ class MIRAISample:
 
 
 def scale_to_uint16_range(image: np.ndarray) -> np.ndarray:
-    """Scale image intensities to uint16 range."""
+    """Normalize mammogram using fixed physical intensity scale."""
 
     image = image.astype(np.float32)
+    image = image / 65535.0
+    return  image 
 
-    image_min = image.min()
-    image_range = image.max() - image_min
-
-    if image_range == 0:
-        return np.zeros_like(image, dtype=np.float32)
-
-    return (image - image_min) / image_range * 65535.0
 
 
 def pad_to_length(
