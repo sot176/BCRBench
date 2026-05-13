@@ -7,7 +7,8 @@ from torch.utils.data import Dataset
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional, Callable
- 
+from pathlib import Path
+
 
 @dataclass(frozen=True)
 class CSAWImageRecord:
@@ -35,7 +36,7 @@ class BreastCancerRiskDatasetCSAWCCLMVNet(Dataset):
         transforms: Optional[Callable] = None,
         n_years: int = 5,
     ):
-        self.data_dir = image_dir
+        self.data_dir = Path(image_dir)
         self.mode = mode
         self.transform = transforms
         self.n_years = n_years

@@ -12,8 +12,8 @@ def _build_dataset(dataset_class, **kwargs):
 
 # ── Lazy dataset builders ────────────────────────────────────────
 def _csaw_mirai(**kwargs):
-    from .CSAW.dataset_csaw_Mirai import BreastCancerRiskDatasetCSAWCC_Mirai
-    return _build_dataset(BreastCancerRiskDatasetCSAWCC_Mirai, **kwargs)
+    from .CSAW.dataset_csaw_Mirai import BreastCancerRiskDatasetCSAWMirai
+    return _build_dataset(BreastCancerRiskDatasetCSAWMirai, **kwargs)
 
 
 def _csaw_imgfeatalign(**kwargs):
