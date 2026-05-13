@@ -1,34 +1,35 @@
-"""PyTorch dataset utilities for EMBED LMVNet longitudinal modelling.
-
-This module contains the longitudinal multi-view dataset used for breast
-cancer risk prediction with current/prior CC and MLO mammograms.
-
-The implementation follows the same structure and conventions as the
-EMBED image-feature-alignment dataset for repository consistency.
-"""
-
 from __future__ import annotations
 
 import os
 import re
 import random
-from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
+from collections import defaultdict
 
-import numpy as np
 import pandas as pd
 import torch
-from PIL import Image
 from torch.utils.data import Dataset
 
+from utils import (
+    load_tabular_data,
+    load_image_tensor,
+    map_density,
+    map_cancer_type,
+    map_race,
+    clean_time_to_cancer,
+    clean_followup_years,
+    build_survival_target,
+    build_row_lookup,
+)
 
 try:
     from utils import RACE_TO_ID
 except ImportError:
     RACE_TO_ID = {"Unknown": 0}
+
 
 """
  Expected filename format:
@@ -63,8 +64,6 @@ IMAGE_FILENAME_RE = re.compile(
 
 @dataclass(frozen=True)
 class ImageRecord:
-    """Metadata parsed from one mammogram filename."""
-
     filename: str
     patient_id: str
     laterality: str
@@ -74,19 +73,10 @@ class ImageRecord:
 
 @dataclass(frozen=True)
 class LongitudinalSample:
-    """Represents one longitudinal multi-view sample."""
-
     patient_id: str
     laterality: str
     current_date: pd.Timestamp
     prior_date: pd.Timestamp
-
-def scale_to_uint16_range(image: np.ndarray) -> np.ndarray:
-    """Normalize mammogram using fixed physical intensity scale."""
-
-    image = image.astype(np.float32)
-    image = image / 65535.0
-    return  image 
 
 
 class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
@@ -108,55 +98,46 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
         self.n_years = n_years
         self.race_to_id = race_to_id or RACE_TO_ID
 
-        self.data = self._load_tabular_data(csv_file)
-        self.row_lookup = self._build_row_lookup(self.data)
+        # ---- shared utilities ----
+        self.data = load_tabular_data(csv_file)
+        self.row_lookup = build_row_lookup(self.data)
 
+        # ---- dataset-specific indexing ----
         self.image_data = self._load_image_data()
         self.samples = self._build_longitudinal_samples()
 
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(
-        self,
-        index: int,
-    ) -> dict[str, torch.Tensor | str | int | np.ndarray]:
+    def __getitem__(self, index: int):
 
         if index < 0 or index >= len(self.samples):
             raise IndexError(f"Index {index} outside dataset length {len(self)}.")
 
         sample = self.samples[index]
 
-        current_cc = self.image_data[
-            sample.patient_id
-        ][sample.current_date][f"{sample.laterality}_CC"]
+        # ---- fetch image records ----
+        current_cc = self.image_data[sample.patient_id][sample.current_date][f"{sample.laterality}_CC"]
+        current_mlo = self.image_data[sample.patient_id][sample.current_date][f"{sample.laterality}_MLO"]
 
-        current_mlo = self.image_data[
-            sample.patient_id
-        ][sample.current_date][f"{sample.laterality}_MLO"]
+        previous_cc = self.image_data[sample.patient_id][sample.prior_date][f"{sample.laterality}_CC"]
+        previous_mlo = self.image_data[sample.patient_id][sample.prior_date][f"{sample.laterality}_MLO"]
 
-        previous_cc = self.image_data[
-            sample.patient_id
-        ][sample.prior_date][f"{sample.laterality}_CC"]
+        # ---- load images ----
+        current_image_cc = load_image_tensor(self.data_dir / self.mode / current_cc.filename)
+        current_image_mlo = load_image_tensor(self.data_dir / self.mode / current_mlo.filename)
 
-        previous_mlo = self.image_data[
-            sample.patient_id
-        ][sample.prior_date][f"{sample.laterality}_MLO"]
+        previous_image_cc = load_image_tensor(self.data_dir / self.mode / previous_cc.filename)
+        previous_image_mlo = load_image_tensor(self.data_dir / self.mode / previous_mlo.filename)
 
-        current_image_cc = self._load_image_tensor(current_cc.filename)
-        current_image_mlo = self._load_image_tensor(current_mlo.filename)
-
-        previous_image_cc = self._load_image_tensor(previous_cc.filename)
-        previous_image_mlo = self._load_image_tensor(previous_mlo.filename)
-
-        if self.transform is not None:
+        # ---- transforms ----
+        if self.transform:
             current_image_cc = self.transform(current_image_cc).squeeze(0)
             current_image_mlo = self.transform(current_image_mlo).squeeze(0)
-
             previous_image_cc = self.transform(previous_image_cc).squeeze(0)
             previous_image_mlo = self.transform(previous_image_mlo).squeeze(0)
 
-        if self.mode == "train":
+            # grouped tensor for augmentation consistency
             images = torch.stack(
                 [
                     current_image_cc,
@@ -166,7 +147,7 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
                 ]
             )
 
-            if torch.rand(1).item() < 0.5:
+            if self.mode == "train" and torch.rand(1).item() < 0.5:
                 images = torch.flip(images, dims=[-1])
 
             (
@@ -176,21 +157,17 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
                 previous_image_mlo,
             ) = images
 
+        # ---- tabular lookup ----
         current_row = self._lookup_row(current_cc)
 
-        current_time_to_cancer = self._clean_time_to_cancer(
-            current_row["Time_to_Cancer_Years"]
-        )
+        ttc = clean_time_to_cancer(current_row["Time_to_Cancer_Years"])
+        followup = clean_followup_years(current_row["years_last_followup"])
 
-        years_last_followup = self._clean_followup_years(
-            current_row["years_last_followup"]
+        target, y_mask, event_time, event_observed = build_survival_target(
+            self.n_years,
+            ttc,
+            followup,
         )
-
-        target, y_mask, event_time, event_observed = self._build_survival_target(
-                current_time_to_cancer,
-                years_last_followup,
-            )
-        
 
         time_gap = min(
             abs(sample.current_date.year - sample.prior_date.year),
@@ -202,41 +179,21 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
             "current_image_mlo": current_image_mlo,
             "previous_image_cc": previous_image_cc,
             "previous_image_mlo": previous_image_mlo,
+
             "patient_id": sample.patient_id,
             "time_gap": torch.tensor(time_gap, dtype=torch.float32),
+
             "target": torch.tensor(target, dtype=torch.float32),
             "y_mask": torch.tensor(y_mask, dtype=torch.float32),
-            "event_observed": torch.tensor(event_observed,dtype=torch.float32,),
-            "event_times": torch.tensor(event_time,dtype=torch.float32,),
-            "density": self._map_density(current_row["density"]),
-            "cancer_type": self._map_cancer_type(current_row["path_severity"]),
-            "race": self._map_race(current_row.get("RACE_DESC")),
+            "event_observed": torch.tensor(event_observed, dtype=torch.float32),
+            "event_times": torch.tensor(event_time, dtype=torch.float32),
+
+            "density": map_density(current_row["density"]),
+            "cancer_type": map_cancer_type(current_row["path_severity"]),
+            "race": map_race(current_row.get("RACE_DESC"), self.race_to_id),
         }
 
-    @staticmethod
-    def _load_tabular_data(csv_file: str | os.PathLike) -> pd.DataFrame:
-        data = pd.read_csv(csv_file, low_memory=False)
-        data["study_date_anon"] = pd.to_datetime(
-            data["study_date_anon"], format="%Y-%m-%d"
-        )
-        return data
-
-    @staticmethod
-    def _build_row_lookup(data: pd.DataFrame) -> dict[tuple[str, str, str, pd.Timestamp], pd.Series]:
-        lookup: dict[tuple[str, str, str, pd.Timestamp], pd.Series] = {}
-
-        for _, row in data.iterrows():
-            key = (
-                str(row["patient_id"]),
-                str(row["ImageLateralityFinal"]),
-                str(row["view"]),
-                row["study_date_anon"],
-            )
-            lookup[key] = row
-
-        return lookup
-
-    def _load_image_data(self,) -> dict[str, dict[pd.Timestamp, dict[str, ImageRecord]]]:
+    def _load_image_data(self):
         image_data = defaultdict(lambda: defaultdict(dict))
 
         image_folder = self.data_dir / self.mode
@@ -247,8 +204,7 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
         for image_path in image_folder.iterdir():
 
             match = IMAGE_FILENAME_RE.match(image_path.name)
-
-            if match is None:
+            if not match:
                 continue
 
             record = ImageRecord(
@@ -257,22 +213,16 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
                 laterality=match.group("laterality"),
                 view=match.group("view"),
                 study_date=pd.Timestamp(
-                    datetime.strptime(
-                        match.group("date"),
-                        "%Y-%m-%d",
-                    )
+                    datetime.strptime(match.group("date"), "%Y-%m-%d")
                 ),
             )
 
-            full_view = (f"{record.laterality}_{record.view}")
-
-            image_data[record.patient_id][record.study_date][full_view] = record
+            view_key = f"{record.laterality}_{record.view}"
+            image_data[record.patient_id][record.study_date][view_key] = record
 
         return image_data
 
-    def _build_longitudinal_samples(
-        self,
-    ) -> list[LongitudinalSample]:
+    def _build_longitudinal_samples(self):
 
         samples = []
 
@@ -283,8 +233,6 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
 
             sorted_dates = sorted(date_dict.keys())
 
-            patient_samples = []
-
             for idx in range(1, len(sorted_dates)):
 
                 prior_date = sorted_dates[idx - 1]
@@ -292,17 +240,16 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
 
                 for laterality in ["L", "R"]:
 
-                    cc_view = f"{laterality}_CC"
-                    mlo_view = f"{laterality}_MLO"
+                    cc = f"{laterality}_CC"
+                    mlo = f"{laterality}_MLO"
 
                     if (
-                        cc_view in date_dict[current_date]
-                        and mlo_view in date_dict[current_date]
-                        and cc_view in date_dict[prior_date]
-                        and mlo_view in date_dict[prior_date]
+                        cc in date_dict[current_date]
+                        and mlo in date_dict[current_date]
+                        and cc in date_dict[prior_date]
+                        and mlo in date_dict[prior_date]
                     ):
-
-                        patient_samples.append(
+                        samples.append(
                             LongitudinalSample(
                                 patient_id=patient_id,
                                 laterality=laterality,
@@ -310,9 +257,6 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
                                 prior_date=prior_date,
                             )
                         )
-
-            random.shuffle(patient_samples)
-            samples.extend(patient_samples)
 
         random.shuffle(samples)
 
@@ -323,80 +267,11 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
 
         return samples
 
-    def _load_image_tensor(self, filename: str) -> torch.Tensor:
-        image_path = self.data_dir / self.mode / filename
-
-        try:
-            with Image.open(image_path) as image:
-                image_array = np.array(image)
-        except OSError as exc:
-            raise OSError(f"Could not load image: {image_path}") from exc
-
-        image_tensor = torch.from_numpy(image_array).float() / 65535.0
-        return image_tensor.unsqueeze(0)
-
-    def _lookup_row(self, record: ImageRecord) -> pd.Series:
-        key = (record.patient_id, record.laterality, record.view, record.study_date)
-
-        try:
-            return self.row_lookup[key]
-        except KeyError as exc:
-            raise KeyError(
-                "No CSV row matched image "
-                f"{record.filename} using key {key}."
-            ) from exc
-
-    def _map_density(self, value: object) -> torch.Tensor:
-        value = -1 if pd.isna(value) else int(value)
-        return torch.tensor(value if value in {1, 2, 3, 4} else -1, dtype=torch.long)
-
-    @staticmethod
-    def _map_cancer_type(value: object) -> torch.Tensor:
-        value = -1 if pd.isna(value) else int(value)
-        return torch.tensor(value if value in set(range(7)) else -1, dtype=torch.long)
-
-    def _map_race(self, value: object) -> torch.Tensor:
-        if not isinstance(value, str) or value.strip() == "":
-            race = "Unknown"
-        else:
-            race = value.strip()
-
-        race_id = self.race_to_id.get(race, self.race_to_id["Unknown"])
-        return torch.tensor(race_id, dtype=torch.long)
-
-    @staticmethod
-    def _clean_time_to_cancer(value: object) -> int:
-        if pd.isna(value):
-            return 6
-
-        value = int(value)
-        return 1 if value == 0 else value
-
-    @staticmethod
-    def _clean_followup_years(value: object) -> int:
-        if pd.isna(value):
-            return 1
-
-        value = int(value)
-        return 1 if value == 0 else value
-
-
-    def _build_survival_target(
-        self,
-        time_to_cancer: int,
-        years_last_followup: int,
-    ) -> tuple[np.ndarray, np.ndarray, int, int]:
-        target = np.zeros(self.n_years, dtype=np.int8)
-        event_time = time_to_cancer - 1
-        event_observed = int(event_time < self.n_years)
-
-        if event_observed:
-            target[event_time:] = 1
-        else:
-            event_time = min(years_last_followup, self.n_years) - 1
-
-        y_mask = np.zeros(self.n_years, dtype=np.int8)
-        y_mask[: event_time + 1] = 1
-
-        return target, y_mask, event_time, event_observed
-    
+    def _lookup_row(self, record: ImageRecord):
+        key = (
+            record.patient_id,
+            record.laterality,
+            record.view,
+            record.study_date,
+        )
+        return self.row_lookup[key]
