@@ -246,6 +246,7 @@ class BreastCancerRiskDatasetEMBEDMirai(Dataset):
             "years_to_last_followup": years_last_followup,
         }
 
+
     @staticmethod
     def _load_tabular_data(csv_file: str | os.PathLike) -> pd.DataFrame:
         data = pd.read_csv(csv_file, low_memory=False)

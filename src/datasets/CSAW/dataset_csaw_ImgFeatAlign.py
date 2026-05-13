@@ -199,12 +199,10 @@ class BreastCancerRiskDatasetCSAWCCImgFeatAlign(Dataset):
 
     @staticmethod
     def _map_density(x):
-        mapping = {"A": 1, "B": 2, "C": 3}
-        return torch.tensor(mapping.get(x, -1), dtype=torch.long)
+        return torch.tensor({"A": 1, "B": 2, "C": 3}.get(x, -1))
 
     @staticmethod
     def _map_cancer_type(x):
-        mapping = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6}
-        return torch.tensor(mapping.get(x, -1), dtype=torch.long)
+        return torch.tensor({1: 1, 2: 2, 3: 3}.get(x, -1))
 
  
