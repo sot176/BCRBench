@@ -29,18 +29,31 @@ try:
 except ImportError:  # Keeps the module importable in minimal examples/tests.
     RACE_TO_ID = {"Unknown": 0}
 
-# Expected filename format:
+
+"""
+ Expected filename format:
 #     <patient_id>_<laterality>_<view>_<YYYY-MM-DD>_<index>.png
 #
-# Single exam examples:
-#     10093833_L_CC_2017-08-03_4505.png
-#     10093833_L_MLO_2017-08-03_5642.png
-#     10093833_R_MLO_2017-08-03_2678.png
-#     10093833_R_CC_2017-08-03_4123.png
-#     10093833_R_CC_2014-07-02_7821.png
-#     10093833_R_MLO_2014-07-02_4689.png
-#     10093833_L_MLO_2014-07-02_7897.png
-#     10093833_L_CC_2014-07-02_6798.png
+# example:
+     10093833_L_CC_2017-08-03_4505.png
+     10093833_L_MLO_2017-08-03_5642.png
+     10093833_R_MLO_2017-08-03_2678.png
+     10093833_R_CC_2017-08-03_4123.png
+     10093833_R_CC_2014-07-02_7821.png
+     10093833_R_MLO_2014-07-02_4689.png
+     10093833_L_MLO_2014-07-02_7897.png
+     10093833_L_CC_2014-07-02_6798.png
+
+
+CSV FORMAT REQUIREMENT:
+Each row corresponds to exactly ONE IMAGE.
+A full screening exam consists of 4 rows:
+    - L_CC
+    - L_MLO
+    - R_CC
+    - R_MLO
+All rows share the same patient_id and study_date_anon.
+"""
 
 IMAGE_FILENAME_RE = re.compile(
     r"(?P<patient_id>\d+)_(?P<laterality>[A-Z]+)_(?P<view>[A-Z]+)_"
