@@ -59,7 +59,7 @@ class BreastCancerRiskDatasetCSAW_Mirai(Dataset):
  
 
     def __len__(self) -> int:
-        return len(self.image_pairs)
+        return len(self.samples)
 
     def __getitem__(self, index):
 
