@@ -30,6 +30,18 @@ try:
 except ImportError:
     RACE_TO_ID = {"Unknown": 0}
 
+# Expected filename format:
+#     <patient_id>_<laterality>_<view>_<YYYY-MM-DD>_<index>.png
+#
+# Single exam examples:
+#     10093833_L_CC_2017-08-03_4505.png
+#     10093833_L_MLO_2017-08-03_5642.png
+#     10093833_R_MLO_2017-08-03_2678.png
+#     10093833_R_CC_2017-08-03_4123.png
+#     10093833_R_CC_2014-07-02_7821.png
+#     10093833_R_MLO_2014-07-02_4689.png
+#     10093833_L_MLO_2014-07-02_7897.png
+#     10093833_L_CC_2014-07-02_6798.png
 
 IMAGE_FILENAME_RE = re.compile(
     r"(?P<patient_id>\d+)_(?P<laterality>[A-Z]+)_"
