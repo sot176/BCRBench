@@ -224,7 +224,7 @@ class BreastCancerRiskDatasetEMBED_Mirai(Dataset):
 def main():
     path_data_train_val = "C:/UiT_PhD_datasets/embed_dataset/risk_dataset_1664_2048/"
 
-    csv_file = "C:/Users/sothr1456/OneDrive - UiT Office 365/Documents/UiT PhD/EMBED/combined_cases_with_followup.csv"
+    csv_file = "C:/Users/sothr1456/OneDrive - UiT Office 365/Documents/UiT PhD/EMBED/combined_cases_with_follow_up_races_new.csv"
 
     import kornia.augmentation.container as K_C
 

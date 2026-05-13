@@ -42,8 +42,8 @@ def _embed_imgfeatalign(**kwargs):
 
 
 def _embed_lmvnet(**kwargs):
-    from .EMBED.dataset_embed_LMVNet import BreastCancerRiskDatasetEMBED_LMVNet
-    return _build_dataset(BreastCancerRiskDatasetEMBED_LMVNet, **kwargs)
+    from .EMBED.dataset_embed_LMVNet import BreastCancerRiskDatasetEMBEDLMVNet
+    return _build_dataset(BreastCancerRiskDatasetEMBEDLMVNet, **kwargs)
 
 
 def _embed_vmra(**kwargs):
