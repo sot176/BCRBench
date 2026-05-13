@@ -1,305 +1,298 @@
+"""PyTorch dataset utilities for EMBED mammography risk modelling.
 
-import torch
-from torch.utils.data import Dataset, DataLoader
-import pandas as pd
-from PIL import Image
+This module contains the image-pair dataset used for longitudinal breast
+cancer risk prediction. It intentionally avoids hard-coded local paths so it
+can be imported from training scripts, notebooks, and published repositories.
+"""
+
+from __future__ import annotations
+
 import os
 import re
 from collections import defaultdict
-import random
+from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
+from typing import Callable, Optional
+
 import numpy as np
-import matplotlib.pyplot as plt
+import pandas as pd
+import torch
+from PIL import Image
+from torch.utils.data import Dataset, DataLoader
 import kornia.augmentation as K_A
+import matplotlib.pyplot as plt
 from kornia.constants import Resample
-from sklearn.utils.class_weight import compute_class_weight
-from  utils import RACE_TO_ID
-
-def imgunit16(img):
-    mammogram_scaled = (
-        (img.astype(np.float32) - img.min()) / (img.max() - img.min()) * 65535
-    )
-    return mammogram_scaled
 
 
-class BreastCancerRiskDatasetEMBED_ImgFeatAlign(Dataset):
-    def __init__(self, csv_file, image_dir, mode, transforms=None, n_years=5):
-        """
-        Args:
-            csv_file (str): Path to the CSV file containing patient data.
-            image_dir (str): Directory containing mammogram images.
-            transform (callable, optional): Optional transform to be applied on an image.
-            n_years (int): Number of years for risk prediction (default: 5).
-        """
-        self.data = pd.read_csv(csv_file, low_memory=False)
-        self.data_dir = image_dir
+try:
+    from utils import RACE_TO_ID
+except ImportError:  # Keeps the module importable in minimal examples/tests.
+    RACE_TO_ID = {"Unknown": 0}
+
+
+IMAGE_FILENAME_RE = re.compile(
+    r"(?P<patient_id>\d+)_(?P<laterality>[A-Z]+)_(?P<view>[A-Z]+)_"
+    r"(?P<date>\d{4}-\d{2}-\d{2})_.*\.png$"
+)
+
+
+@dataclass(frozen=True)
+class ImageRecord:
+    """Metadata parsed from one mammogram filename."""
+
+    filename: str
+    patient_id: str
+    laterality: str
+    view: str
+    study_date: pd.Timestamp
+
+
+def scale_to_uint16_range(image: np.ndarray) -> np.ndarray:
+    """Scale an image array to the full uint16 intensity range."""
+
+    image = image.astype(np.float32)
+    image_min = image.min()
+    image_range = image.max() - image_min
+
+    if image_range == 0:
+        return np.zeros_like(image, dtype=np.float32)
+
+    return (image - image_min) / image_range * 65535.0
+
+
+# Backwards-compatible name used in older scripts.
+imgunit16 = scale_to_uint16_range
+
+
+class BreastCancerRiskDatasetEMBEDImgFeatAlign(Dataset):
+    """Longitudinal EMBED mammography dataset.
+
+    Each sample contains a current mammogram, its previous mammogram from the
+    same patient/laterality/view, and the risk labels derived from the CSV row
+    matching the current image.
+    """
+
+    def __init__(
+        self,
+        csv_file: str | os.PathLike,
+        image_dir: str | os.PathLike,
+        mode: str,
+        transforms: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
+        n_years: int = 5,
+        race_to_id: Optional[dict[str, int]] = None,
+    ) -> None:
+        self.data_dir = Path(image_dir)
+        self.mode = mode
         self.transform = transforms
         self.n_years = n_years
-        self.mode = mode
+        self.race_to_id = race_to_id or RACE_TO_ID
+
+        self.data = self._load_tabular_data(csv_file)
+        self.row_lookup = self._build_row_lookup(self.data)
         self.image_data = self._load_image_data()
-        # Precompute the patient-view pairs once during initialization
-        self.patient_view_pairs = []
+        self.image_pairs = self._build_image_pairs()
 
-        for patient_id, view_images in self.image_data.items():
-            if (
-                    len(view_images) > 1
-            ):  # Only consider patient-view pairs with multiple images
-                for i in range(len(view_images) - 1):
-                    self.patient_view_pairs.append((patient_id, view_images, i))
+    def __len__(self) -> int:
+        return len(self.image_pairs)
 
-        # Store the length of the dataset (number of valid patient-view pairs)
-        self.num_elements = len(self.patient_view_pairs)
+    def __getitem__(self, index: int) -> dict[str, torch.Tensor | str | int | np.ndarray]:
+        if index < 0 or index >= len(self.image_pairs):
+            raise IndexError(f"Index {index} is outside dataset length {len(self)}.")
 
-    def map_density(self, value):
-        """Map density value to integer tensor suitable for GPU operations."""
-        mapping = {1: 1, 2: 2, 3: 3, 4: 4}  # Map 1-4
-        index = mapping.get(value, -1)  # Use -1 for 'NA' if
-        return torch.tensor(index, dtype=torch.long)
-    
-    def map_cancer_type(self, value):
-        """Map cancer type (0,1,2) to integer tensor suitable for GPU ops.
-           Return -1 if value is missing or outside {0,1,2}.
-        """
-        mapping = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5:5, 6:6}
-        index = mapping.get(value, -1)
-        return torch.tensor(index, dtype=torch.long)
+        previous_record, current_record = self.image_pairs[index]
+        current_image = self._load_image_tensor(current_record.filename)
+        previous_image = self._load_image_tensor(previous_record.filename)
 
-    def _load_image_data(self):
-        """
-        Load image data into a dictionary grouped by patient ID and view type.
-        """
-        image_data = defaultdict(list)
+        current_row = self._lookup_row(current_record)
+        previous_row = self._lookup_row(previous_record)
 
-        # Regex pattern to extract the necessary information from the filename
-        pattern = r"(\d+)_([A-Z]+_[A-Z]+)_(\d{4})-\d{2}-\d{2}_.*\.png"
+        if self.transform is not None:
+            current_image = self.transform(current_image).squeeze(0)
+            previous_image = self.transform(previous_image).squeeze(0)
 
-        # Iterate over the files in the image directory
-        for filename in os.listdir(
-                os.path.join(self.data_dir, self.mode).replace("\\", "/")
-        ):
-            # Match the filename to extract the relevant info
-            match = re.match(pattern, filename)
-            if match:
-                patient_id = match.group(1)
-                view = match.group(2)
-                year = int(match.group(3))
+        current_time_to_cancer = self._clean_time_to_cancer(
+            current_row["Time_to_Cancer_Years"]
+        )
+        previous_time_to_cancer = self._clean_time_to_cancer(
+            previous_row["Time_to_Cancer_Years"]
+        )
 
-                # Store the filename with patient_id and view as the key
-                image_data[(patient_id, view)].append((filename, year))
+        years_last_followup = self._clean_followup_years(
+            current_row["years_last_followup"]
+        )
+        previous_years_last_followup = self._clean_followup_years(
+            previous_row["years_last_followup"]
+        )
+
+        target, y_mask, event_time, event_observed = self._build_survival_target(
+            current_time_to_cancer, years_last_followup
+        )
+        previous_target, previous_y_mask, previous_event_time, _ = (
+            self._build_survival_target(
+                previous_time_to_cancer, previous_years_last_followup
+            )
+        )
+
+        time_gap = min(
+            abs(current_record.study_date.year - previous_record.study_date.year),
+            self.n_years,
+        )
+
+        return {
+            "current_image": current_image,
+            "previous_image": previous_image,
+            "current_image_id": current_record.filename,
+            "previous_image_id": previous_record.filename,
+            "event_observed": event_observed,
+            "event_times": event_time,
+            "time_gap": time_gap,
+            "y_mask": y_mask,
+            "y_mask_prior": previous_y_mask,
+            "years_to_cancer": current_time_to_cancer - 1,
+            "years_to_cancer_prior": previous_time_to_cancer - 1,
+            "years_to_last_followup": years_last_followup,
+            "years_to_last_followup_prior": previous_years_last_followup,
+            "target": target,
+            "target_prior": previous_target,
+            "density": self._map_density(current_row["density"]),
+            "cancer_type": self._map_cancer_type(current_row["path_severity"]),
+            "race": self._map_race(current_row.get("RACE_DESC")),
+            "previous_event_times": previous_event_time,
+        }
+
+    @staticmethod
+    def _load_tabular_data(csv_file: str | os.PathLike) -> pd.DataFrame:
+        data = pd.read_csv(csv_file, low_memory=False)
+        data["study_date_anon"] = pd.to_datetime(
+            data["study_date_anon"], format="%Y-%m-%d"
+        )
+        return data
+
+    @staticmethod
+    def _build_row_lookup(data: pd.DataFrame) -> dict[tuple[str, str, str, pd.Timestamp], pd.Series]:
+        lookup: dict[tuple[str, str, str, pd.Timestamp], pd.Series] = {}
+
+        for _, row in data.iterrows():
+            key = (
+                str(row["patient_id"]),
+                str(row["ImageLateralityFinal"]),
+                str(row["view"]),
+                row["study_date_anon"],
+            )
+            lookup[key] = row
+
+        return lookup
+
+    def _load_image_data(self) -> dict[tuple[str, str, str], list[ImageRecord]]:
+        image_data: dict[tuple[str, str, str], list[ImageRecord]] = defaultdict(list)
+        image_folder = self.data_dir / self.mode
+
+        if not image_folder.exists():
+            raise FileNotFoundError(f"Image folder does not exist: {image_folder}")
+
+        for image_path in image_folder.iterdir():
+            match = IMAGE_FILENAME_RE.match(image_path.name)
+            if match is None:
+                continue
+
+            record = ImageRecord(
+                filename=image_path.name,
+                patient_id=match.group("patient_id"),
+                laterality=match.group("laterality"),
+                view=match.group("view"),
+                study_date=pd.Timestamp(
+                    datetime.strptime(match.group("date"), "%Y-%m-%d")
+                ),
+            )
+            image_data[(record.patient_id, record.laterality, record.view)].append(record)
 
         return image_data
 
-    def __len__(self):
-        return self.num_elements
+    def _build_image_pairs(self) -> list[tuple[ImageRecord, ImageRecord]]:
+        pairs: list[tuple[ImageRecord, ImageRecord]] = []
 
-    def __getitem__(self, idx):
-        if not self.patient_view_pairs:
-            raise ValueError("No valid patient-view pairs generated.")
-        if idx < 0 or idx >= len(self.patient_view_pairs):
-            raise ValueError(
-                f"Index {idx} is out of range. Valid range: 0 to {len(self.patient_view_pairs) - 1}"
-            )
+        for records in self.image_data.values():
+            records = sorted(records, key=lambda record: record.study_date)
+            pairs.extend(zip(records[:-1], records[1:]))
 
-            # Access the patient-view pair
-        patient_id, view_images, image_idx = self.patient_view_pairs[idx]
+        return pairs
 
-        # Extract the date from the filename
-        def extract_date_from_filename(filename):
-            date_str = filename.split("_")[3]  # e.g., "2019-07-13"
-            return datetime.strptime(date_str, "%Y-%m-%d")  # Convert to datetime object
+    def _load_image_tensor(self, filename: str) -> torch.Tensor:
+        image_path = self.data_dir / self.mode / filename
 
-        # Sort the images by year (ascending order)
-
-        view_images.sort(key=lambda x: x[1])
-
-        # Ensure there are at least two images to form a valid current-previous pair
-        if len(view_images) < 2:
-            raise ValueError(
-                f"Not enough images for patient {patient_id} and view {view_images[0][1]}."
-            )
-
-        # Randomly pick one image, and then get its previous image
-        idx = random.randint(
-            1, len(view_images) - 1
-        )  # Ensure at least one previous image exists
-        selected_image = view_images[
-            idx
-        ]  # Randomly chosen image (e.g., the current image)
-        previous_image = view_images[idx - 1]  # Previous image
-
-        # Extract the filenames
-        current_image_file = selected_image[0]
-        previous_image_file = previous_image[0]
-        current_year = extract_date_from_filename(current_image_file)
-        previous_year = extract_date_from_filename(previous_image_file)
-
-        time_gap = abs(current_year.year - previous_year.year)
-        if time_gap > 5:
-            time_gap = 5
-        current_image_path = os.path.join(self.data_dir, self.mode, current_image_file)
-        previous_image_path = os.path.join(
-            self.data_dir, self.mode, previous_image_file
-        )
         try:
-            current_image_pil = Image.open(current_image_path)
-            current_image_pil.load()
-            previous_image_pil = Image.open(previous_image_path)
-            previous_image_pil.load()
-        except OSError:
-            print(f"Problematic current image: {current_image_path}")
-            print(f"Problematic previous image: {previous_image_path}")
+            with Image.open(image_path) as image:
+                image_array = np.array(image)
+        except OSError as exc:
+            raise OSError(f"Could not load image: {image_path}") from exc
 
+        image_tensor = torch.from_numpy(image_array).float() / 65535.0
+        return image_tensor.unsqueeze(0)
 
-        current_image_np = np.array(current_image_pil)
-        current_image = (
-            torch.from_numpy(current_image_np).to(torch.float16)
-        )
-        previous_image_np = np.array(previous_image_pil)
+    def _lookup_row(self, record: ImageRecord) -> pd.Series:
+        key = (record.patient_id, record.laterality, record.view, record.study_date)
 
-        previous_image = (
-            torch.from_numpy(previous_image_np).to(torch.float16)
-        )
-        previous_image = previous_image.float() / 65535.0
-        current_image = current_image.float() / 65535.0
-        if self.transform is not None:
-            current_image = self.transform(current_image)
-            previous_image = self.transform(previous_image)
-            previous_image = previous_image.squeeze(0)
-            current_image = current_image.squeeze(0)
+        try:
+            return self.row_lookup[key]
+        except KeyError as exc:
+            raise KeyError(
+                "No CSV row matched image "
+                f"{record.filename} using key {key}."
+            ) from exc
 
+    def _map_density(self, value: object) -> torch.Tensor:
+        value = -1 if pd.isna(value) else int(value)
+        return torch.tensor(value if value in {1, 2, 3, 4} else -1, dtype=torch.long)
+
+    @staticmethod
+    def _map_cancer_type(value: object) -> torch.Tensor:
+        value = -1 if pd.isna(value) else int(value)
+        return torch.tensor(value if value in set(range(7)) else -1, dtype=torch.long)
+
+    def _map_race(self, value: object) -> torch.Tensor:
+        if not isinstance(value, str) or value.strip() == "":
+            race = "Unknown"
         else:
-            previous_image = previous_image.unsqueeze(0)
-            current_image = current_image.unsqueeze(0)
+            race = value.strip()
 
-        # Extract patient ID, laterality, and view from the filename
-        parts = current_image_file.split("_")
-        patient_id = parts[0]
-        image_laterality = parts[1]
-        view = parts[2]
-        parts_prior = previous_image_file.split("_")
-        patient_id_prior = parts_prior[0]
-        image_laterality_prior = parts_prior[1]
-        view_prior = parts_prior[2]
+        race_id = self.race_to_id.get(race, self.race_to_id["Unknown"])
+        return torch.tensor(race_id, dtype=torch.long)
 
-        # Ensure study_date and data['study_date_anon'] are datetime objects
-        self.data["study_date_anon"] = pd.to_datetime(
-            self.data["study_date_anon"], format="%Y-%m-%d"
-        )
-        study_date = pd.to_datetime(current_year, format="%Y-%m-%d")
-        study_date_prior = pd.to_datetime(previous_year, format="%Y-%m-%d")
-        # Find the corresponding row in the CSV
-        matching_row = self.data[
-            (self.data["patient_id"].astype(str) == str(patient_id))
-            & (self.data["ImageLateralityFinal"].astype(str) == str(image_laterality))
-            & (self.data["view"].astype(str) == str(view))
-            & (self.data["study_date_anon"] == study_date)
-            ]
+    @staticmethod
+    def _clean_time_to_cancer(value: object) -> int:
+        if pd.isna(value):
+            return 6
 
-        matching_row_prior = self.data[
-            (self.data["patient_id"].astype(str) == str(patient_id_prior))
-            & (
-                    self.data["ImageLateralityFinal"].astype(str)
-                    == str(image_laterality_prior)
-            )
-            & (self.data["view"].astype(str) == str(view_prior))
-            & (self.data["study_date_anon"] == study_date_prior)
-            ]
-        # Initialize variables
-        years_last_followup_prior = matching_row_prior["years_last_followup"].values[0]
-        years_last_followup = matching_row["years_last_followup"].values[0]
+        value = int(value)
+        return 1 if value == 0 else value
 
-        time_to_cancer = matching_row["Time_to_Cancer_Years"].values[0]
-        time_to_cancer_prior_img = matching_row_prior["Time_to_Cancer_Years"].values[0]
-        density = matching_row["density"].values[0]
-        density = self.map_density(density)
-        cancer_type =  self.map_cancer_type(matching_row["path_severity"].values[0])
-        race_col = matching_row.get("RACE_DESC")
+    @staticmethod
+    def _clean_followup_years(value: object) -> int:
+        if pd.isna(value):
+            return 1
 
-        if race_col is None or len(matching_row) == 0:
-            race_str = "Unknown"
+        value = int(value)
+        return 1 if value == 0 else value
+
+    def _build_survival_target(
+        self,
+        time_to_cancer: int,
+        years_last_followup: int,
+    ) -> tuple[np.ndarray, np.ndarray, int, int]:
+        target = np.zeros(self.n_years, dtype=np.int8)
+        event_time = time_to_cancer - 1
+        event_observed = int(event_time < self.n_years)
+
+        if event_observed:
+            target[event_time:] = 1
         else:
-            race = race_col.values[0]
-            if not isinstance(race, str) or race.strip() == "":
-                race_str = "Unknown"
-            else:
-                race_str = race.strip()
+            event_time = min(years_last_followup, self.n_years) - 1
 
-        race_id = RACE_TO_ID.get(race_str, RACE_TO_ID["Unknown"])
+        y_mask = np.zeros(self.n_years, dtype=np.int8)
+        y_mask[: event_time + 1] = 1
 
-        if time_to_cancer == 0:
-            time_to_cancer = 1
-        if pd.isna(time_to_cancer):  # Check if the value is NaN
-            time_to_cancer = 6
-        if time_to_cancer_prior_img == 0:
-            time_to_cancer_prior_img = 1
-        if pd.isna(time_to_cancer_prior_img):  # Check if the value is NaN
-            time_to_cancer_prior_img = 6
-
-        years_last_followup = int(years_last_followup)
-        time_to_cancer = int(time_to_cancer)
-        time_to_cancer_prior_img = int(time_to_cancer_prior_img)
-
-        time_to_cancer = time_to_cancer - 1
-
-        time_to_cancer_prior_img = time_to_cancer_prior_img - 1
-        any_cancer = time_to_cancer < 5
-
-        # Initialize the sequence with zeros
-        target = np.zeros(5, dtype=np.int8)
-        target_prior = np.zeros(5, dtype=np.int8)
-
-        # If the patient has cancer, mark the event year and later with 1
-        if any_cancer:
-            time_at_event = int(time_to_cancer)
-            event_observed = 1
-            time_at_event_prior = int(time_to_cancer_prior_img)
-            target[time_at_event:] = 1
-            target_prior[time_at_event_prior:] = 1
-            # target[-1] = 0
-            # target_prior[-1] = 0
-
-        else:
-            # If no cancer, use the last follow-up year
-            if years_last_followup == 0:
-                years_last_followup = 1
-            time_at_event = int(min(years_last_followup, 5))
-            time_at_event = time_at_event - 1
-            event_observed = 0
-            time_at_event_prior = int(min(years_last_followup_prior, 5))
-            time_at_event_prior = time_at_event_prior - 1
-            # target[-1] = 1
-            # target_prior[-1] = 1
-
-        y_mask = np.array([1] * (time_at_event + 1) + [0] * (5 - (time_at_event + 1)), dtype=np.int8)
-        y_mask_prior = np.array(
-            [1] * (time_at_event_prior + 1) + [0] * (5 - (time_at_event_prior + 1)), dtype=np.int8
-        )
-        y_mask = y_mask[:5]
-        y_mask_prior = y_mask_prior[:5]
-        # Create a mask for valid time points (before the last event or follow-up)
-        event_times = time_at_event
-        data = {
-            'current_image': current_image,
-            'previous_image': previous_image,
-            'current_image_id': current_image_file,
-            'previous_image_id': previous_image_file,
-            'event_observed': event_observed,
-            'event_times': event_times,
-            'time_gap': time_gap,
-            'y_mask': y_mask,
-            'y_mask_prior': y_mask_prior,
-            'years_to_cancer': time_to_cancer,
-            'years_to_cancer_prior': time_to_cancer_prior_img,
-            'years_to_last_followup': years_last_followup,
-            'years_to_last_followup_prior': years_last_followup_prior,
-            'target': target,
-            'target_prior': target_prior,
-            'density': density,
-            'cancer_type': cancer_type,
-            'race':  torch.tensor(race_id, dtype=torch.long),
-
-        }
-        return data
+        return target, y_mask, event_time, event_observed
 
 
 def main():
@@ -314,7 +307,7 @@ def main():
         K_A.Resize((2048, 1664), resample=Resample.NEAREST.name),
     )
 
-    train_dataset = BreastCancerRiskDatasetEMBED_ImgFeatAlign(csv_file, path_data_train_val, 'train',
+    train_dataset = BreastCancerRiskDatasetEMBEDImgFeatAlign(csv_file, path_data_train_val, 'train',
                                              transforms=train_transform)
     train_loader = DataLoader( train_dataset, batch_size=10,
                               shuffle=True, pin_memory=True)
