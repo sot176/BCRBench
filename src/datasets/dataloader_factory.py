@@ -47,8 +47,8 @@ def _embed_lmvnet(**kwargs):
 
 
 def _embed_vmra(**kwargs):
-    from .EMBED.dataset_embed_VMRA import BreastCancerRiskDatasetEMBED_VMRA
-    return _build_dataset(BreastCancerRiskDatasetEMBED_VMRA, **kwargs)
+    from .EMBED.dataset_embed_VMRA import BreastCancerRiskDatasetEMBEDVMRA
+    return _build_dataset(BreastCancerRiskDatasetEMBEDVMRA, **kwargs)
 
 
 # ── Registry ─────────────────────────────────────────────────────
