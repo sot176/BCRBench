@@ -37,8 +37,8 @@ def _embed_mirai(**kwargs):
 
 
 def _embed_imgfeatalign(**kwargs):
-    from .EMBED.dataset_embed_ImgFeatAlign import BreastCancerRiskDatasetEMBED_ImgFeatAlign
-    return _build_dataset(BreastCancerRiskDatasetEMBED_ImgFeatAlign, **kwargs)
+    from .EMBED.dataset_embed_ImgFeatAlign import BreastCancerRiskDatasetEMBEDImgFeatAlign
+    return _build_dataset(BreastCancerRiskDatasetEMBEDImgFeatAlign, **kwargs)
 
 
 def _embed_lmvnet(**kwargs):
