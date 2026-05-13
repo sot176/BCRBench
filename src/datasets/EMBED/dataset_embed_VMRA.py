@@ -140,21 +140,16 @@ class BreastCancerRiskDatasetEMBEDVMRA(Dataset):
 
         return {
             "images": images,
-
             "exam_mask": exam_mask,
             "view_mask": view_mask,
-
             "target": torch.tensor(target, dtype=torch.float32),
             "y_mask": torch.tensor(y_mask, dtype=torch.float32),
             "event_observed": torch.tensor(event_observed, dtype=torch.float32),
             "event_times": torch.tensor(event_time, dtype=torch.float32),
-
             "patient_id": sample.patient_id,
-
             "time_seq": time_seq,
             "view_seq": view_seq,
             "side_seq": side_seq,
-
             "density": map_density(row["density"]),
             "cancer_type": map_cancer_type(row["path_severity"]),
             "race": map_race(row.get("RACE_DESC"), self.race_to_id),

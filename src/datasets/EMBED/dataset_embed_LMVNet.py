@@ -179,15 +179,12 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
             "current_image_mlo": current_image_mlo,
             "previous_image_cc": previous_image_cc,
             "previous_image_mlo": previous_image_mlo,
-
             "patient_id": sample.patient_id,
             "time_gap": torch.tensor(time_gap, dtype=torch.float32),
-
             "target": torch.tensor(target, dtype=torch.float32),
             "y_mask": torch.tensor(y_mask, dtype=torch.float32),
             "event_observed": torch.tensor(event_observed, dtype=torch.float32),
             "event_times": torch.tensor(event_time, dtype=torch.float32),
-
             "density": map_density(current_row["density"]),
             "cancer_type": map_cancer_type(current_row["path_severity"]),
             "race": map_race(current_row.get("RACE_DESC"), self.race_to_id),

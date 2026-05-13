@@ -14,7 +14,7 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
-from utils import (
+from .utils import (
     load_tabular_data,
     load_image_tensor,
     map_density,
@@ -152,31 +152,35 @@ class BreastCancerRiskDatasetEMBEDMirai(Dataset):
             followup,
         )
 
-        # ---- FIXED: meaningful MIRAI sequences ----
-        # (previous code had constant placeholders 0/1 which is not informative)
+      # ---- simple temporal encoding ----
+        base_views = [0, 1, 0, 1]
+        base_sides = [1, 1, 0, 0]
+        base_times = [0, 0, 0, 0]
 
-        view_seq = torch.tensor([0, 1, 0, 1], dtype=torch.long)
-        side_seq = torch.tensor([1, 1, 0, 0], dtype=torch.long)
-        time_seq = torch.zeros(4, dtype=torch.long)  # placeholder unless extended temporally
+        view_seq = torch.tensor(pad_to_length(base_views, MAX_VIEWS, len(base_views)), dtype=torch.long)
+        side_seq = torch.tensor(pad_to_length(base_sides, MAX_SIDES, len(base_sides)), dtype=torch.long)
+        time_seq = torch.tensor(pad_to_length(base_times, MAX_TIME, len(base_times)), dtype=torch.long)
+
+        # ---- masks ----
+        exam_mask = torch.ones(2, dtype=torch.bool)
+        view_mask = torch.ones(2, 4, dtype=torch.bool)
+
 
         return {
             "images": images,
-
+            "exam_mask": exam_mask,
+            "view_mask": view_mask,
             "target": torch.tensor(target, dtype=torch.float32),
             "y_mask": torch.tensor(y_mask, dtype=torch.float32),
             "event_observed": torch.tensor(event_observed, dtype=torch.float32),
             "event_times": torch.tensor(event_time, dtype=torch.float32),
-
             "density": map_density(current_row["density"]),
             "cancer_type": map_cancer_type(current_row["path_severity"]),
             "race": map_race(current_row.get("RACE_DESC"), self.race_to_id),
-
             "patient_id": sample.patient_id,
-
             "view_seq": view_seq,
             "side_seq": side_seq,
             "time_seq": time_seq,
-
             "years_to_cancer": ttc - 1,
             "years_to_last_followup": followup,
         }
