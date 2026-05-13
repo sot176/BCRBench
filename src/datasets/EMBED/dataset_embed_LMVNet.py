@@ -22,11 +22,8 @@ import numpy as np
 import pandas as pd
 import torch
 from PIL import Image
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
-import matplotlib.pyplot as plt
-import kornia.augmentation as K_A
-from kornia.constants import Resample
 
 try:
     from utils import RACE_TO_ID

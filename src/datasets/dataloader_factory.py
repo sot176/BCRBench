@@ -32,8 +32,8 @@ def _csaw_vmra(**kwargs):
 
 
 def _embed_mirai(**kwargs):
-    from .EMBED.dataset_embed_Mirai import BreastCancerRiskDatasetEMBED_Mirai
-    return _build_dataset(BreastCancerRiskDatasetEMBED_Mirai, **kwargs)
+    from .EMBED.dataset_embed_Mirai import BreastCancerRiskDatasetEMBEDMirai
+    return _build_dataset(BreastCancerRiskDatasetEMBEDMirai, **kwargs)
 
 
 def _embed_imgfeatalign(**kwargs):
