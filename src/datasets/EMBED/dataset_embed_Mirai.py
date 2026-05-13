@@ -209,15 +209,10 @@ class BreastCancerRiskDatasetEMBEDMirai(Dataset):
             )
         )
 
-        (
-            target,
-            y_mask,
-            event_time,
-            event_observed,
-        ) = self._build_survival_target(
-            current_time_to_cancer,
-            years_last_followup,
-        )
+        target, y_mask, event_time, event_observed = self._build_survival_target(
+                current_time_to_cancer,
+                years_last_followup,
+            )
 
         all_views = [0, 1, 0, 1]
         all_sides = [1, 1, 0, 0]

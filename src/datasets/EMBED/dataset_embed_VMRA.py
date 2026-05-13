@@ -1,223 +1,332 @@
-import torch
-from torch.utils.data import Dataset, DataLoader
-import pandas as pd
-from PIL import Image
+"""PyTorch dataset utilities for EMBED VMRA longitudinal modelling."""
+
+from __future__ import annotations
+
 import os
 import re
-from collections import defaultdict
 import random
+from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
+from typing import Callable, Optional
+from dataclasses import dataclass
+
 import numpy as np
+import pandas as pd
+import torch
+from PIL import Image
+from torch.utils.data import Dataset, DataLoader
+
 import matplotlib.pyplot as plt
 import kornia.augmentation as K_A
 from kornia.constants import Resample
-from utils.utils import RACE_TO_ID
 
-def pad_to_length(arr, pad_token, max_length):
+try:
+    from utils import RACE_TO_ID
+except ImportError:
+    RACE_TO_ID = {"Unknown": 0}
+
+# Expected filename format:
+#     <patient_id>_<laterality>_<view>_<YYYY-MM-DD>_<index>.png
+#
+# Single exam examples:
+#     10093833_L_CC_2017-08-03_4505.png
+#     10093833_L_MLO_2017-08-03_5642.png
+#     10093833_R_MLO_2017-08-03_2678.png
+#     10093833_R_CC_2017-08-03_4123.png
+#     10093833_R_CC_2014-07-02_7821.png
+#     10093833_R_MLO_2014-07-02_4689.png
+#     10093833_L_MLO_2014-07-02_7897.png
+#     10093833_L_CC_2014-07-02_6798.png
+
+IMAGE_FILENAME_RE = re.compile(
+    r"(?P<patient_id>\d+)_(?P<laterality>[A-Z]+)_(?P<view>[A-Z]+)_(?P<date>\d{4}-\d{2}-\d{2})_.*\.png$"
+)
+
+MAX_VIEWS, MAX_SIDES, MAX_TIME = 2, 2, 10
+
+@dataclass(frozen=True)
+class ImageRecord:
+    filename: str
+    patient_id: str
+    laterality: str
+    view: str
+    study_date: pd.Timestamp
+
+
+@dataclass(frozen=True)
+class LongitudinalSample:
+    patient_id: str
+    current_date: pd.Timestamp
+    prior_date: pd.Timestamp
+
+
+def scale_to_uint16_range(image: np.ndarray) -> np.ndarray:
+    image = image.astype(np.float32)
+    image_min = image.min()
+    image_range = image.max() - image_min
+    if image_range == 0:
+        return np.zeros_like(image, dtype=np.float32)
+    return (image - image_min) / image_range * 65535.0
+
+def pad_to_length(
+    arr: list[int],
+    pad_token: int,
+    max_length: int,
+) -> np.ndarray:
+    """Pad sequence to fixed length."""
+
     arr = arr[-max_length:]
-    return  np.array( [pad_token]* (max_length - len(arr)) + arr)
-
-def imgunit16(img):
-    mammogram_scaled = (
-            (img.astype(np.float32) - img.min()) / (img.max() - img.min()) * 65535
-    )
-    return mammogram_scaled
+    return np.array([pad_token] * (max_length - len(arr)) + arr)
 
 
-def extract_date_from_filename(filename):
-    """Extracts a datetime object from a standard filename."""
-    # e.g., "12345_R_MLO_2019-07-13_....png" -> "2019-07-13"
-    try:
-        date_str = filename.split("_")[3]
-        return datetime.strptime(date_str, "%Y-%m-%d")
-    except (IndexError, ValueError):
-        return None  # Return None if filename format is unexpected
+class BreastCancerRiskDatasetEMBEDVMRA(Dataset):
 
-MAX_VIEWS = 2
-MAX_SIDES = 2
-MAX_TIME=10
+    def __init__(
+        self,
+        csv_file: str | os.PathLike,
+        image_dir: str | os.PathLike,
+        mode: str,
+        transforms: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
+        n_years: int = 5,
+        race_to_id: Optional[dict[str, int]] = None,
+    ) -> None:
 
-class BreastCancerRiskDatasetEMBED_VMRA(Dataset):
-    def __init__(self, csv_file, image_dir, mode, transforms=None, n_years=5):
-        self.data = pd.read_csv(csv_file, low_memory=False)
-        self.data_dir = image_dir
+        self.data_dir = Path(image_dir)
+        self.mode = mode
         self.transform = transforms
         self.n_years = n_years
-        self.mode = mode
+        self.race_to_id = race_to_id or RACE_TO_ID
 
-        self.data["study_date_anon"] = pd.to_datetime(
-            self.data["study_date_anon"], errors='coerce'
-        )
+        self.data = self._load_tabular_data(csv_file)
+        self.row_lookup = self._build_row_lookup(self.data)
 
         self.image_data = self._load_image_data()
-        self.samples = self._create_samples_with_priors()
 
-    def map_density(self, value):
-        """Map density value to integer tensor."""
-        mapping = {1: 1, 2: 2, 3: 3, 4: 4}
-        return torch.tensor(mapping.get(value, -1), dtype=torch.long)
-
-    def map_cancer_type(self, value):
-        """Map cancer type value to integer tensor."""
-        mapping = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6}
-        return torch.tensor(mapping.get(value, -1), dtype=torch.long)
-
-    def _load_image_data(self):
-        """Load image data into nested dict: {patient_id -> {date -> {view -> filename}}}."""
-        image_data = defaultdict(lambda: defaultdict(dict))
-        pattern = r"(\d+)_([RL])_([A-Z]+)_(\d{4}-\d{2}-\d{2})_.*\.png"
-
-        mode_path = os.path.join(self.data_dir, self.mode).replace("\\", "/")
-        for filename in os.listdir(mode_path):
-            match = re.match(pattern, filename)
-            if match:
-                patient_id = match.group(1)
-                laterality = match.group(2)
-                view_type = match.group(3)
-                date_obj = datetime.strptime(match.group(4), "%Y-%m-%d")
-                full_view = f"{laterality}_{view_type}"
-                image_data[patient_id][date_obj][full_view] = filename
-        return image_data
-
-    def _create_samples_with_priors(self):
-        """
-        Create samples only for patients who have both current and prior exams.
-        Each sample = (patient_id, current_date, current_views, prior_views)
-        """
-        samples = []
-        for patient_id, date_dict in self.image_data.items():
-            dates_sorted = sorted(date_dict.keys())
-            for i in range(1, len(dates_sorted)):  # start from 1 because we need a prior
-                curr_date = dates_sorted[i]
-                prev_date = dates_sorted[i - 1]
-                curr_views = date_dict[curr_date]
-                prior_views = date_dict[prev_date]
-                # Only include if both exams have all 4 standard views
-                if all(v in curr_views for v in ['L_CC', 'L_MLO', 'R_CC', 'R_MLO']) and \
-                        all(v in prior_views for v in ['L_CC', 'L_MLO', 'R_CC', 'R_MLO']):
-                    samples.append((patient_id, curr_date, curr_views, prior_views))
-
-        print(f"Found {len(samples)} valid samples with priors in '{self.mode}' dataset.")
-        return samples
+        self.samples = self._build_longitudinal_samples()
 
     def __len__(self):
         return len(self.samples)
 
-    def _get_metadata_for_image(self, filename):
-        """Helper to get metadata row from CSV for a given image."""
-        parts = filename.split("_")
-        patient_id, laterality, view = parts[0], parts[1], parts[2]
-        study_date = extract_date_from_filename(filename)
-
-        matching_row = self.data[
-            (self.data["patient_id"].astype(str) == patient_id) &
-            (self.data["ImageLateralityFinal"] == laterality) &
-            (self.data["view"] == view) &
-            (self.data["study_date_anon"] == study_date)
-        ]
-
-        return matching_row.iloc[0] if not matching_row.empty else None
-
     def __getitem__(self, idx):
-        patient_id, date, curr_views, prior_views = self.samples[idx]
 
-        def load_and_process(filename):
-            img_path = os.path.join(self.data_dir, self.mode, filename)
-            img = Image.open(img_path)
-            img = np.array(img)
-            tensor = torch.from_numpy(img) / 65535.0
+        sample = self.samples[idx]
+
+        def load(rec: ImageRecord):
+            img = self._load_image_tensor(rec.filename)
             if self.transform:
-                tensor = self.transform(tensor).squeeze(0)
-            else:
-                tensor = tensor.unsqueeze(0)
-            if tensor.shape[0] == 1:
-                tensor = tensor.repeat(3, 1, 1)
-            return tensor
+                img = self.transform(img).squeeze(0)
+            return img
 
-        # Load current 4 views
-        curr_imgs = torch.stack([
-            load_and_process(curr_views['L_CC']),
-            load_and_process(curr_views['L_MLO']),
-            load_and_process(curr_views['R_CC']),
-            load_and_process(curr_views['R_MLO'])
+        curr = torch.stack([
+            load(self.image_data[sample.patient_id][sample.current_date][v])
+            for v in ["L_CC", "L_MLO", "R_CC", "R_MLO"]
         ])
 
-        # Load prior 4 views (guaranteed to exist)
-        prior_imgs = torch.stack([
-            load_and_process(prior_views['L_CC']),
-            load_and_process(prior_views['L_MLO']),
-            load_and_process(prior_views['R_CC']),
-            load_and_process(prior_views['R_MLO'])
+        prior = torch.stack([
+            load(self.image_data[sample.patient_id][sample.prior_date][v])
+            for v in ["L_CC", "L_MLO", "R_CC", "R_MLO"]
         ])
 
-        all_imgs = torch.stack([prior_imgs, curr_imgs], dim=0)  # [2, 4, 3, H, W]
-        # --- metadata + target logic (unchanged) ---
-        metadata = self._get_metadata_for_image(curr_views['R_CC'])
-        if metadata is None:
-            print(f"Warning: Missing metadata for {patient_id} on {date}. Skipping sample.")
-            return self.__getitem__((idx + 1) % len(self))
+        images = torch.stack([prior, curr])  # [2,4,3,H,W]
 
-        years_last_followup = int(metadata["years_last_followup"])
-        time_to_cancer = metadata["Time_to_Cancer_Years"]
+        row = self._lookup_row(
+            self.image_data[sample.patient_id][sample.current_date]["R_CC"]
+        )
 
-        density = self.map_density(metadata["density"])
-        cancer_type = self.map_cancer_type(metadata["path_severity"])
-        race_str = metadata.get("RACE_DESC", "")
-        if not isinstance(race_str, str) or race_str.strip() == "":
-            race_str = "Unknown"
-        race_id = RACE_TO_ID.get(race_str, RACE_TO_ID["Unknown"])
+        ttc = self._clean_time_to_cancer(row["Time_to_Cancer_Years"])
+        follow = self._clean_followup_years(row["years_last_followup"])
 
-        if time_to_cancer == 0:
-            time_to_cancer = 1
-        if pd.isna(time_to_cancer):
-            time_to_cancer = 6
+        target, y_mask, event_time, event_observed = self._build_survival_target(
+            ttc, follow
+        )
 
-        time_to_cancer = int(time_to_cancer) - 1
-        any_cancer = time_to_cancer < 5
-        target = np.zeros(5, dtype=np.int8)
+        all_views = [0, 1, 0, 1]
+        all_sides = [1, 1, 0, 0]
+        all_times = [0, 0, 0, 0]
 
-        if any_cancer:
-            time_at_event = int(time_to_cancer)
-            event_observed = 1
-            target[time_at_event:] = 1
-        else:
-            if years_last_followup == 0:
-                years_last_followup = 1
-            time_at_event = int(min(years_last_followup, 5) - 1)
-            event_observed = 0
-
-        all_images = ['R_CC', 'R_MLO', 'L_CC', 'L_MLO']
-        all_views = [0, 1, 0, 1]  # CC=0, MLO=1
-        all_sides = [0, 0, 1, 1]  # Right=0, Left=1
-        time_stamps = [0] * len(all_images)
+        time_seq = pad_to_length(all_times, MAX_TIME, len(all_times))
+        view_seq = pad_to_length(all_views, MAX_VIEWS, len(all_views))
+        side_seq = pad_to_length(all_sides, MAX_SIDES, len(all_sides))
         
-        T = all_imgs.shape[0]  # = 2
-        V = all_imgs.shape[2]  # = 4
-
-        exam_mask = torch.ones(2, dtype=torch.bool)
+        exam_mask = torch.ones(2, dtype=torch.bool) 
         view_mask = torch.ones(2, 4, dtype=torch.bool)
-       # Fix padding values to match MAX constants:
-        time_seq = pad_to_length(time_stamps, MAX_TIME,   len(all_images))  # pad with 10
-        view_seq = pad_to_length(all_views,   MAX_VIEWS,  len(all_images))  # pad with 2
-        side_seq = pad_to_length(all_sides,   MAX_SIDES,  len(all_images))  # pad with 2
-        y_mask = np.array([1] * (time_at_event + 1) + [0] * (5 - (time_at_event + 1)), dtype=np.int8)
-
+        
         return {
-            'images': all_imgs,
+            'images': images,
             'exam_mask': exam_mask,
             'view_mask': view_mask,
             'target': target,
             'y_mask': y_mask,
             'event_observed': event_observed,
-            'event_times': torch.tensor(time_at_event, dtype=torch.float32),
-            'density': density,
-            'patient_id': patient_id,
-            'cancer_type': cancer_type,
+            'event_times': torch.tensor(event_time, dtype=torch.float32),
+            "patient_id": sample.patient_id,
             'time_seq': torch.tensor(time_seq, dtype=torch.long),
             'view_seq': torch.tensor(view_seq, dtype=torch.long),
             'side_seq': torch.tensor(side_seq, dtype=torch.long),
-            'race':  torch.tensor(race_id, dtype=torch.long),
+            "density": self._map_density(row["density"]),
+            "cancer_type": self._map_cancer_type(row["path_severity"]),
+            "race": self._map_race(row.get("RACE_DESC")),
         }
+
+    # -------------------------
+    # IMAGE LOADING (FIXED)
+    # -------------------------
+    def _load_image_data(self):
+        data = defaultdict(lambda: defaultdict(dict))
+        path = self.data_dir / self.mode
+
+        for f in os.listdir(path):
+            m = IMAGE_FILENAME_RE.match(f)
+            if not m:
+                continue
+
+            pid, lat, view, date = m.group(
+                "patient_id", "laterality", "view", "date"
+            )
+            date = datetime.strptime(date, "%Y-%m-%d")
+
+            record = ImageRecord(
+                filename=f,
+                patient_id=pid,
+                laterality=lat,
+                view=view,
+                study_date=pd.Timestamp(date),
+            )
+
+            key = f"{lat}_{view}"
+            data[pid][record.study_date][key] = record
+
+        return data
+
+    def _build_longitudinal_samples(self):
+
+        samples = []
+        required = {"L_CC", "L_MLO", "R_CC", "R_MLO"}
+
+        for pid, date_dict in self.image_data.items():
+
+            dates = sorted(date_dict.keys())
+            if len(dates) < 2:
+                continue
+
+            for i in range(1, len(dates)):
+
+                prior, curr = dates[i - 1], dates[i]
+
+                if (
+                    required.issubset(date_dict[prior].keys())
+                    and required.issubset(date_dict[curr].keys())
+                ):
+                    samples.append(
+                        LongitudinalSample(
+                            patient_id=pid,
+                            current_date=curr,
+                            prior_date=prior,
+                        )
+                    )
+
+        random.shuffle(samples)
+        print(f"Found {len(samples)} longitudinal samples")
+        return samples
+
+
+    def _load_image_tensor(self, fname):
+        path = self.data_dir / self.mode / fname
+        img = np.array(Image.open(path))
+        t = torch.from_numpy(img).float() / 65535.0
+        if t.ndim == 2:
+            t = t.unsqueeze(0)
+        if t.shape[0] == 1:
+            t = t.repeat(3, 1, 1)
+        return t
+
+    def _lookup_row(self, record: ImageRecord) -> pd.Series:
+        key = (record.patient_id, record.laterality, record.view, record.study_date)
+
+        try:
+            return self.row_lookup[key]
+        except KeyError as exc:
+            raise KeyError(
+                "No CSV row matched image "
+                f"{record.filename} using key {key}."
+            ) from exc
+        
+    @staticmethod
+    def _load_tabular_data(csv_file: str | os.PathLike) -> pd.DataFrame:
+        data = pd.read_csv(csv_file, low_memory=False)
+        data["study_date_anon"] = pd.to_datetime(
+            data["study_date_anon"], format="%Y-%m-%d"
+        )
+        return data
+
+    @staticmethod
+    def _build_row_lookup(data: pd.DataFrame) -> dict[tuple[str, str, str, pd.Timestamp], pd.Series]:
+        lookup: dict[tuple[str, str, str, pd.Timestamp], pd.Series] = {}
+
+        for _, row in data.iterrows():
+            key = (
+                str(row["patient_id"]),
+                str(row["ImageLateralityFinal"]),
+                str(row["view"]),
+                row["study_date_anon"],
+            )
+            lookup[key] = row
+
+        return lookup
+
+    def _map_density(self, value: object) -> torch.Tensor:
+        value = -1 if pd.isna(value) else int(value)
+        return torch.tensor(value if value in {1, 2, 3, 4} else -1, dtype=torch.long)
+
+    @staticmethod
+    def _map_cancer_type(value: object) -> torch.Tensor:
+        value = -1 if pd.isna(value) else int(value)
+        return torch.tensor(value if value in set(range(7)) else -1, dtype=torch.long)
+
+    def _map_race(self, value: object) -> torch.Tensor:
+        if not isinstance(value, str) or value.strip() == "":
+            race = "Unknown"
+        else:
+            race = value.strip()
+
+        race_id = self.race_to_id.get(race, self.race_to_id["Unknown"])
+        return torch.tensor(race_id, dtype=torch.long)
+
+    @staticmethod
+    def _clean_time_to_cancer(value: object) -> int:
+        if pd.isna(value):
+            return 6
+
+        value = int(value)
+        return 1 if value == 0 else value
+
+    @staticmethod
+    def _clean_followup_years(value: object) -> int:
+        if pd.isna(value):
+            return 1
+
+        value = int(value)
+        return 1 if value == 0 else value
+
+    def _build_survival_target(
+        self,
+        time_to_cancer: int,
+        years_last_followup: int,
+    ) -> tuple[np.ndarray, np.ndarray, int, int]:
+        target = np.zeros(self.n_years, dtype=np.int8)
+        event_time = time_to_cancer - 1
+        event_observed = int(event_time < self.n_years)
+
+        if event_observed:
+            target[event_time:] = 1
+        else:
+            event_time = min(years_last_followup, self.n_years) - 1
+
+        y_mask = np.zeros(self.n_years, dtype=np.int8)
+        y_mask[: event_time + 1] = 1
+
+        return target, y_mask, event_time, event_observed
 
 
 def main():
@@ -238,7 +347,7 @@ def main():
     BATCH_SIZE = 12
 
     print("Initializing dataset...")
-    train_dataset = BreastCancerRiskDataset_VMRA(
+    train_dataset = BreastCancerRiskDatasetEMBEDVMRA(
         csv_file=csv_file,
         image_dir=path_data_train_val,
         mode='test',
