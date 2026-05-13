@@ -1,212 +1,218 @@
+import os
 import torch
-from torch.utils.data import Dataset
+import numpy as np
 import pandas as pd
 from PIL import Image
-import os
+from torch.utils.data import Dataset, DataLoader
 from collections import defaultdict
-import random
-import numpy as np
+from dataclasses import dataclass
+from typing import Optional, Callable
+
+import matplotlib.pyplot as plt
+import kornia.augmentation as K_A
+from kornia.constants import Resample
+import kornia.augmentation.container as K_C
+
+@dataclass(frozen=True)
+class CSAWImageRecord:
+    filename: str
+    patient_id: str
+    laterality: str
+    view: str
+    study_date: pd.Timestamp
 
 
-def imgunit16(img):
-    # mammogram_dicom = img
-    # orig_min = mammogram_dicom.min()
-    # orig_max = mammogram_dicom.max()
-    # target_min = 0.0
-    # target_max = 255.0
-    # mammogram_scaled = (mammogram_dicom-orig_min)*((target_max-target_min)/(orig_max-orig_min))+target_min
-    mammogram_scaled = (img.astype(np.float32) - img.min()) / (img.max() - img.min()) * 65535
-
-    # print(mammogram_uint8_by_function.max(), mammogram_uint8_by_function.min())
-    # mammogram_uint8_by_function = mammogram_uint8_by_function
-    return mammogram_scaled
-
-class BreastCancerRiskDatasetCSAWCC_LMVNet(Dataset):
-    def __init__(self, csv_file, image_dir, mode, transforms=None, n_years=5):
-        self.data = pd.read_csv(csv_file, low_memory=False)
-        self.csv_data = self.data.set_index('file_name').to_dict(orient='index')
+class BreastCancerRiskDatasetCSAWCCLMVNet(Dataset):
+    """Longitudinal multi-view CSAW-CC mammography dataset."""
+    def __init__(
+        self,
+        csv_file,
+        image_dir,
+        mode,
+        transforms: Optional[Callable] = None,
+        n_years: int = 5,
+    ):
         self.data_dir = image_dir
+        self.mode = mode
         self.transform = transforms
         self.n_years = n_years
-        self.mode = mode
+
+        self.data = pd.read_csv(csv_file, low_memory=False)
+        self.csv_data = self.data.set_index("file_name").to_dict(orient="index")
+
         self.image_data = self._load_image_data()
-        self.patient_view_pairs = self._create_longitudinal_samples()
-        self.num_elements = len(self.patient_view_pairs)
-
-    def map_density(self, value):
-        mapping = {
-            'A': 1,
-            'B': 2,
-            'C': 3,
-        }
-        index = mapping.get(value, -1)  # -1 for NA or unknown values
-        return torch.tensor(index, dtype=torch.long)
-
-    def map_cancer_type(self, value):
-        """Map cancer type (0,1,2) to integer tensor suitable for GPU ops.
-           Return -1 if value is missing or outside {0,1,2}.
-        """
-        mapping = { 1: 1, 2: 2, 3:3}
-        index = mapping.get(value, -1)
-        return torch.tensor(index, dtype=torch.long)
+        self.samples = self._create_longitudinal_samples()
 
     def _load_image_data(self):
-        """
-        Load image data into a nested dictionary:
-        { patient_id -> { exam_year -> { view -> metadata } } }
-        """
-        image_data = defaultdict(lambda: defaultdict(dict))  # Nested defaultdict
-        csv_data = self.csv_data
-        image_dir_path = os.path.join(self.data_dir, self.mode).replace("\\", "/")
-        for filename in os.listdir(image_dir_path):
-            if filename in csv_data:
-                file_info = csv_data[filename]
-                # Extract required fields
-                patient_id = str(file_info['patient_id'])
-                exam_year = file_info['exam_year']
-                laterality = file_info['laterality']  # Left or Right
-                view = file_info['viewposition']  # CC or MLO
-                years_to_cancer = file_info['years_to_cancer']
-                years_last_followup = file_info['years_to_last_followup']
-                density = file_info['density_group']
-                cancer_type = file_info['x_type']
-                # Map laterality to L and R for consistency
-                laterality = 'L' if laterality == 'Left' else 'R' if laterality == 'Right' else None
-                # Skip if laterality is invalid
-                if laterality is None:
-                    print(f"Skipping file due to invalid laterality: {filename}")
-                    continue
-                # Group by patient_id, exam_year, and view
-                key = f"{laterality}_{view}"
-                image_data[patient_id][exam_year][key] = {
-                    'filename': filename,
-                    'years_to_cancer': years_to_cancer,
-                    'years_last_followup': years_last_followup,
-                    'density': density,
-                    'cancer_type':cancer_type,
-                }
+        image_data = defaultdict(lambda: defaultdict(dict))
+        base_dir = os.path.join(self.data_dir, self.mode)
+
+        for filename in os.listdir(base_dir):
+            if filename not in self.csv_data:
+                continue
+
+            meta = self.csv_data[filename]
+
+            patient_id = str(meta["patient_id"])
+            exam_year = meta["exam_year"]
+            laterality = meta["laterality"]
+            view = meta["viewposition"]
+
+            laterality = "L" if laterality == "Left" else "R"
+            key = f"{laterality}_{view}"
+
+            image_data[patient_id][exam_year][key] = {
+                "filename": filename,
+                "years_to_cancer": meta["years_to_cancer"],
+                "years_last_followup": meta["years_to_last_followup"],
+                "density": meta["density_group"],
+                "cancer_type": meta["x_type"],
+            }
+
         return image_data
 
-
     def _create_longitudinal_samples(self):
-        """
-        Pre-compute longitudinal samples per patient.
-        """
         samples = []
+
         for patient_id, year_dict in self.image_data.items():
-            if len(year_dict) < 2:
-                continue  # Skip patients with fewer than 2 exam years
-            # Sort years in ascending order
-            sorted_years = sorted(year_dict.keys())
-            for idx in range(1, len(sorted_years)):
-                prior_year = sorted_years[idx - 1]
-                current_year = sorted_years[idx]
-                # Check for both CC and MLO views for the current and prior years
-                for laterality in ['L', 'R']:
-                    cc_view = f"{laterality}_CC"
-                    mlo_view = f"{laterality}_MLO"
-                    if (cc_view in year_dict[current_year] and mlo_view in year_dict[current_year] and
-                            cc_view in year_dict[prior_year] and mlo_view in year_dict[prior_year]):
-                        samples.append((patient_id, laterality, current_year, prior_year))
-        random.shuffle(samples)
-        print(f"Found {len(samples)} valid longitudinal multi-view samples in '{self.mode}' dataset.")
+            years = sorted(year_dict.keys())
+
+            if len(years) < 2:
+                continue
+
+            for i in range(1, len(years)):
+                prior_year = years[i - 1]
+                current_year = years[i]
+
+                for laterality in ["L", "R"]:
+                    key_cc = f"{laterality}_CC"
+                    key_mlo = f"{laterality}_MLO"
+
+                    if (
+                        key_cc in year_dict[current_year]
+                        and key_mlo in year_dict[current_year]
+                        and key_cc in year_dict[prior_year]
+                        and key_mlo in year_dict[prior_year]
+                    ):
+                        samples.append(
+                            (patient_id, laterality, current_year, prior_year)
+                        )
+
+        print(f"[INFO] Found {len(samples)} longitudinal samples")
         return samples
 
     def __len__(self):
-        return self.num_elements
+        return len(self.samples)
 
     def __getitem__(self, idx):
-        """
-        Fetches a complete longitudinal multi-view sample.
-        Returns a dictionary containing the current and prior CC and MLO images.
-        """
-        # Get the pre-computed sample information
-        patient_id, laterality, current_year, prior_year = self.patient_view_pairs[idx]
-        # Retrieve all four filenames
-        cc_view = f"{laterality}_CC"
-        mlo_view = f"{laterality}_MLO"
-        current_cc_file = self.image_data[patient_id][current_year][cc_view]['filename']
-        current_mlo_file = self.image_data[patient_id][current_year][mlo_view]['filename']
-        prior_cc_file = self.image_data[patient_id][prior_year][cc_view]['filename']
-        prior_mlo_file = self.image_data[patient_id][prior_year][mlo_view]['filename']
 
-        def load_and_process(filename):
-            """Helper to load, convert, normalize, and transform an image."""
-            img_path = os.path.join(self.data_dir, self.mode, filename)
-            img_pil = Image.open(img_path)  # Ensure grayscale
-            img_np = np.array(img_pil)
-            img_tensor = torch.from_numpy(img_np).to(torch.float32)
-            img_tensor = img_tensor / 256.0
-            if self.transform:
-                img_tensor = self.transform(img_tensor)
-                img_tensor = img_tensor.squeeze(0)
-            else:
-                img_tensor = img_tensor.unsqueeze(0)
-            return img_tensor
-        # Load and process images
-        current_image_cc = load_and_process(current_cc_file)
-        current_image_mlo = load_and_process(current_mlo_file)
-        previous_image_cc = load_and_process(prior_cc_file)
-        previous_image_mlo = load_and_process(prior_mlo_file)
+        patient_id, laterality, current_year, prior_year = self.samples[idx]
 
-        if self.mode == 'train':
-            images = torch.stack([current_image_cc, current_image_mlo, previous_image_cc, previous_image_mlo])
-            if torch.rand(1).item() < 0.5:  # 50% probability of flipping
-                images = torch.flip(images, dims=[-1])  # Flip horizontally
-            current_image_cc, current_image_mlo, previous_image_cc, previous_image_mlo = images
+        key_cc = f"{laterality}_CC"
+        key_mlo = f"{laterality}_MLO"
 
-        # Fetch metadata (primarily based on the current screening date)
-        current_metadata = self.image_data[patient_id][current_year][cc_view]
-        years_last_followup = current_metadata['years_last_followup']
-        time_to_cancer = current_metadata['years_to_cancer']
-        density = self.map_density(current_metadata['density'])
-        cancer_type =  self.map_cancer_type(current_metadata["cancer_type"])
+        cur = self.image_data[patient_id][current_year]
+        prev = self.image_data[patient_id][prior_year]
 
-        time_gap = abs(current_year - prior_year)
-        if time_gap > 5:  # Limit the time gap to 5 years max
-            time_gap = 5
-        if time_to_cancer == 0:
-            time_to_cancer = 1
-        if pd.isna(time_to_cancer):  # Check if the value is NaN
-            time_to_cancer = 6
-        years_last_followup = int(years_last_followup)
-        time_to_cancer = int(time_to_cancer)
-        time_to_cancer = time_to_cancer - 1
-        any_cancer = time_to_cancer < 5
-        # Initialize the sequence with zeros
-        target = np.zeros(5, dtype=np.int8)
-        # If the patient has cancer, mark the event year and later with 1
-        if any_cancer:
-            time_at_event = int(time_to_cancer)
-            event_observed = 1
-            target[time_at_event:] = 1
-        else:
-            # If no cancer, use the last follow-up year
-            if years_last_followup == 0:
-                years_last_followup = 1
-            time_at_event = int(min(years_last_followup, 5) - 1)
-            event_observed = 0
-        y_mask = np.array([1] * (time_at_event + 1) + [0] * (5 - (time_at_event + 1)), dtype=np.int8)
-        y_mask = y_mask[:5]
-        # Return the data
+        current_cc = self._load_image(cur[key_cc]["filename"])
+        current_mlo = self._load_image(cur[key_mlo]["filename"])
+        previous_cc = self._load_image(prev[key_cc]["filename"])
+        previous_mlo = self._load_image(prev[key_mlo]["filename"])
+
+
+        meta = cur[key_cc]
+
+        time_to_cancer = self._clean_time(meta["years_to_cancer"])
+        followup = self._clean_followup(meta["years_last_followup"])
+
+        density = self._map_density(meta["density"])
+        cancer_type = self._map_cancer_type(meta["cancer_type"])
+
+        time_gap = min(abs(current_year - prior_year), self.n_years)
+
+        target, mask, event_time, event_observed = self._build_survival_target(
+            time_to_cancer, followup
+        )
+
+        if self.transform:
+            current_cc = self.transform(current_cc).squeeze(0)
+            current_mlo = self.transform(current_mlo).squeeze(0)
+            previous_cc = self.transform(previous_cc).squeeze(0)
+            previous_mlo = self.transform(previous_mlo).squeeze(0)
+
         return {
-            'current_image_cc': current_image_cc,
-            'current_image_mlo': current_image_mlo,
-            'previous_image_cc': previous_image_cc,
-            'previous_image_mlo': previous_image_mlo,
-            'current_image_id_cc': current_cc_file,
-            'current_image_id_mlo': current_mlo_file,
-            'previous_image_id_cc': prior_cc_file,
-            'previous_image_id_mlo': prior_mlo_file,
-            'time_gap': torch.tensor(time_gap, dtype=torch.float32),
-            'target': torch.tensor(target, dtype=torch.float32),
-            'y_mask': torch.tensor(y_mask, dtype=torch.float32),
-            'event_observed': torch.tensor(event_observed, dtype=torch.float32),
-            'event_times': torch.tensor(time_at_event, dtype=torch.float32),
-            'density': density,
-            'patient_id': patient_id,
-            'cancer_type': cancer_type,
+            "current_image_cc": current_cc,
+            "current_image_mlo": current_mlo,
+            "previous_image_cc": previous_cc,
+            "previous_image_mlo": previous_mlo,
+            "current_image_id_cc": cur[key_cc]["filename"],
+            "current_image_id_mlo": cur[key_mlo]["filename"],
+            "previous_image_id_cc": prev[key_cc]["filename"],
+            "previous_image_id_mlo": prev[key_mlo]["filename"],
 
+            "time_gap": torch.tensor(time_gap, dtype=torch.float32),
+            "target": torch.tensor(target, dtype=torch.float32),
+            "y_mask": torch.tensor(mask, dtype=torch.float32),
+            "event_observed": torch.tensor(event_observed, dtype=torch.float32),
+            "event_times": torch.tensor(event_time, dtype=torch.float32),
+
+            "density": density,
+            "cancer_type": cancer_type,
+            "patient_id": patient_id,
         }
 
 
+    def _load_image(self, filename):
+        path = os.path.join(self.data_dir, self.mode, filename)
+
+        with Image.open(path) as img:
+            img = np.array(img).astype(np.float32)
+
+        img = self._normalize_uint16(img)
+
+        tensor = torch.from_numpy(img).float()
+        return tensor.unsqueeze(0)
+
+    @staticmethod
+    def _normalize_uint16(img: np.ndarray):
+        img = img.astype(np.float32)
+        return img / 65535.0
+
+    def _build_survival_target(self, ttc, followup):
+        target = np.zeros(self.n_years, dtype=np.int8)
+
+        event_time = ttc - 1
+        event_observed = int(event_time < self.n_years)
+
+        if event_observed:
+            target[event_time:] = 1
+        else:
+            event_time = min(followup, self.n_years) - 1
+
+        mask = np.zeros(self.n_years, dtype=np.int8)
+        mask[: event_time + 1] = 1
+
+        return target, mask, event_time, event_observed
+
+    @staticmethod
+    def _clean_time(x):
+        if pd.isna(x):
+            return 6
+        x = int(x)
+        return 1 if x == 0 else x
+
+    @staticmethod
+    def _clean_followup(x):
+        if pd.isna(x):
+            return 1
+        x = int(x)
+        return 1 if x == 0 else x
+
+    @staticmethod
+    def _map_density(x):
+        return torch.tensor({"A": 1, "B": 2, "C": 3}.get(x, -1))
+
+    @staticmethod
+    def _map_cancer_type(x):
+        return torch.tensor({1: 1, 2: 2, 3: 3}.get(x, -1))
+    

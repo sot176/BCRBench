@@ -22,8 +22,8 @@ def _csaw_imgfeatalign(**kwargs):
 
 
 def _csaw_lmvnet(**kwargs):
-    from .CSAW.dataset_csaw_LMVNet import BreastCancerRiskDatasetCSAWCC_LMVNet
-    return _build_dataset(BreastCancerRiskDatasetCSAWCC_LMVNet, **kwargs)
+    from .CSAW.dataset_csaw_LMVNet import BreastCancerRiskDatasetCSAWCCLMVNet
+    return _build_dataset(BreastCancerRiskDatasetCSAWCCLMVNet, **kwargs)
 
 
 def _csaw_vmra(**kwargs):
