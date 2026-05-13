@@ -17,8 +17,8 @@ def _csaw_mirai(**kwargs):
 
 
 def _csaw_imgfeatalign(**kwargs):
-    from .CSAW.dataset_csaw_ImgFeatAlign import BreastCancerRiskDatasetCSAWCC_ImgFeatAlign
-    return _build_dataset(BreastCancerRiskDatasetCSAWCC_ImgFeatAlign, **kwargs)
+    from .CSAW.dataset_csaw_ImgFeatAlign import BreastCancerRiskDatasetCSAWCCImgFeatAlign
+    return _build_dataset(BreastCancerRiskDatasetCSAWCCImgFeatAlign, **kwargs)
 
 
 def _csaw_lmvnet(**kwargs):

@@ -18,7 +18,7 @@ class CSAWImageRecord:
     study_date: pd.Timestamp
 
 
-class BreastCancerRiskDatasetCSAWCC_ImgFeatAlign(Dataset):
+class BreastCancerRiskDatasetCSAWCCImgFeatAlign(Dataset):
     """Longitudinal CSAW-CC mammography dataset.
 
     Each sample contains a current mammogram, its previous mammogram from the

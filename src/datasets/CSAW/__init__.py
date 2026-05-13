@@ -1,4 +1,4 @@
 from .dataset_csaw_LMVNet import BreastCancerRiskDatasetCSAWCC_LMVNet
-from .dataset_csaw_ImgFeatAlign import BreastCancerRiskDatasetCSAWCC_ImgFeatAlign
+from .dataset_csaw_ImgFeatAlign import BreastCancerRiskDatasetCSAWCCImgFeatAlign
 from .dataset_csaw_Mirai import BreastCancerRiskDatasetCSAWCC_Mirai
 from .dataset_csaw_VMRA import BreastCancerRiskDatasetCSAWCC_VMRA
