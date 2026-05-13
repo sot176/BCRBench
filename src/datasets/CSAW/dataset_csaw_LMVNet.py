@@ -3,15 +3,11 @@ import torch
 import numpy as np
 import pandas as pd
 from PIL import Image
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset 
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional, Callable
-
-import matplotlib.pyplot as plt
-import kornia.augmentation as K_A
-from kornia.constants import Resample
-import kornia.augmentation.container as K_C
+ 
 
 @dataclass(frozen=True)
 class CSAWImageRecord:
@@ -152,20 +148,14 @@ class BreastCancerRiskDatasetCSAWCCLMVNet(Dataset):
             "current_image_mlo": current_mlo,
             "previous_image_cc": previous_cc,
             "previous_image_mlo": previous_mlo,
-            "current_image_id_cc": cur[key_cc]["filename"],
-            "current_image_id_mlo": cur[key_mlo]["filename"],
-            "previous_image_id_cc": prev[key_cc]["filename"],
-            "previous_image_id_mlo": prev[key_mlo]["filename"],
-
+            "patient_id": patient_id,
             "time_gap": torch.tensor(time_gap, dtype=torch.float32),
             "target": torch.tensor(target, dtype=torch.float32),
             "y_mask": torch.tensor(mask, dtype=torch.float32),
-            "event_observed": torch.tensor(event_observed, dtype=torch.float32),
-            "event_times": torch.tensor(event_time, dtype=torch.float32),
-
+            "event_observed": torch.tensor(event_observed,dtype=torch.float32,),
+            "event_times": torch.tensor(event_time,dtype=torch.float32,),
             "density": density,
-            "cancer_type": cancer_type,
-            "patient_id": patient_id,
+            "cancer_type":cancer_type,
         }
 
 

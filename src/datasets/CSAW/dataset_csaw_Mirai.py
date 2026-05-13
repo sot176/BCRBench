@@ -1,12 +1,20 @@
-
+import os
 import torch
-from torch.utils.data import Dataset, DataLoader
+import numpy as np
 import pandas as pd
 from PIL import Image
-import os
+from torch.utils.data import Dataset 
 from collections import defaultdict
-import random
+from dataclasses import dataclass
+from typing import Optional, Callable
+ 
+
 import numpy as np
+import pandas as pd
+import torch
+from PIL import Image
+from torch.utils.data import Dataset, DataLoader
+
 import matplotlib.pyplot as plt
 import kornia.augmentation as K_A
 from kornia.constants import Resample
@@ -16,158 +24,169 @@ MAX_VIEWS = 2
 MAX_SIDES = 2
 MAX_TIME=20
 
+
+@dataclass(frozen=True)
+class CSAWImageRecord:
+    filename: str
+    patient_id: str
+    laterality: str
+    view: str
+    study_date: pd.Timestamp
+
+
 def pad_to_length(arr, pad_token, max_length):
     arr = arr[-max_length:]
     return  np.array( [pad_token]* (max_length - len(arr)) + arr)
 
+class BreastCancerRiskDatasetCSAW_Mirai(Dataset):
+    """
+    One sample = one exam (4 images only)
+    No longitudinal pairing.
+    """
 
-def imgunit16(img):
-    # mammogram_dicom = img
-    # orig_min = mammogram_dicom.min()
-    # orig_max = mammogram_dicom.max()
-    # target_min = 0.0
-    # target_max = 255.0
-    # mammogram_scaled = (mammogram_dicom-orig_min)*((target_max-target_min)/(orig_max-orig_min))+target_min
-    mammogram_scaled = (img.astype(np.float32) - img.min()) / (img.max() - img.min()) * 65535
-
-    # print(mammogram_uint8_by_function.max(), mammogram_uint8_by_function.min())
-    # mammogram_uint8_by_function = mammogram_uint8_by_function
-    return mammogram_scaled
-
-class BreastCancerRiskDatasetCSAWCC_Mirai(Dataset):
-    def __init__(self, csv_file, image_dir, mode, transforms=None, n_years=5):
-        self.data = pd.read_csv(csv_file, low_memory=False)
-        self.csv_data = self.data.set_index('file_name').to_dict(orient='index')
+    def __init__(
+        self,
+        csv_file,
+        image_dir,
+        mode,
+        transforms: Optional[Callable] = None,
+        n_years: int = 5,
+    ):
         self.image_dir = image_dir
+        self.mode = mode
         self.transforms = transforms
         self.n_years = n_years
-        self.mode = mode
-        self.image_data = self._load_metadata()
-        self.samples = self._create_samples()
 
-    def map_density(self, value):
-        mapping = {'A': 1, 'B': 2, 'C': 3}
-        return torch.tensor(mapping.get(value, -1), dtype=torch.long)
+        self.df = pd.read_csv(csv_file, low_memory=False)
 
-    def map_cancer_type(self, value):
-        mapping = {1: 1, 2: 2, 3: 3}
-        return torch.tensor(mapping.get(value, -1), dtype=torch.long)
+        self.records = self._build_records()
+        self.exams = self._group_into_exams()
 
-    def _load_metadata(self):
-        """
-        Load only metadata (no images) into nested dict:
-        {patient_id -> exam_year -> {view -> metadata}}
-        """
-        image_data = defaultdict(lambda: defaultdict(dict))
-        image_dir_path = os.path.join(self.image_dir, self.mode)
+    def _build_records(self):
+        records = []
 
-        for filename in os.listdir(image_dir_path):
-            if filename not in self.csv_data:
-                continue
+        for _, row in self.df.iterrows():
 
-            meta = self.csv_data[filename]
-            patient_id = str(meta['patient_id'])
-            exam_year = meta['exam_year']
-            laterality = 'L' if meta['laterality'] == 'Left' else 'R' if meta['laterality'] == 'Right' else None
-            view = meta['viewposition']
+            laterality = "L" if row["laterality"] == "Left" else "R"
 
-            if laterality is None:
-                continue
+            records.append(
+                CSAWImageRecord(
+                    filename=row["file_name"],
+                    patient_id=str(row["patient_id"]),
+                    laterality=laterality,
+                    view=row["viewposition"],
+                    study_date=pd.Timestamp(row["exam_year"]),
+                )
+            )
 
-            key = f"{laterality}_{view}"
-            meta_copy = meta.copy()
-            meta_copy['filename'] = filename
-            image_data[patient_id][exam_year][key] = meta_copy
+        return records
 
-        return image_data
+    def _group_into_exams(self):
+        exams = {}
 
-    def _create_samples(self):
-        samples = []
-        required_views = ['L_CC', 'L_MLO', 'R_CC', 'R_MLO']
-        for patient_id, year_dict in self.image_data.items():
-            for year, views in year_dict.items():
-                if all(v in views for v in required_views):
-                    samples.append((patient_id, year, views))
-        print(f"[INFO] Found {len(samples)} exams with 4 views for mode '{self.mode}'.")
-        return samples
+        for r in self.records:
+            key = (r.patient_id, r.study_date)
+
+            exams.setdefault(key, {}).setdefault(
+                f"{r.laterality}_{r.view}", r
+            )
+
+        required = {"L_CC", "L_MLO", "R_CC", "R_MLO"}
+
+        exams = {
+            k: v for k, v in exams.items()
+            if required.issubset(v.keys())
+        }
+
+        self.exam_list = list(exams.items())
+
+        print(f"[INFO] Found {len(self.exam_list)} complete 4-view exams")
+
+        return exams
 
     def __len__(self):
-        return len(self.samples)
+        return len(self.exam_list)
 
-    def __getitem__(self, idx):
-        patient_id, year, views = self.samples[idx]
+def __getitem__(self, index: int) -> dict[str, torch.Tensor | str | int | np.ndarray]:
 
-        def load_image(filename):
-            img_path = os.path.join(self.image_dir, self.mode, filename)
-            img = Image.open(img_path)
-            img = np.array(img, dtype=np.float32) / 65535.0
-            tensor = torch.from_numpy(img)
-            if self.transforms:
-                tensor = self.transforms(tensor).squeeze(0)
-            else:
-                tensor = tensor.unsqueeze(0)
-            if tensor.shape[0] == 1:
-                tensor = tensor.repeat(3, 1, 1)
-            return tensor
+    exam_id, views = self.exam_list[index]
 
-        # Load 4 images lazily
-        l_cc = load_image(views['L_CC']['filename'])
-        l_mlo = load_image(views['L_MLO']['filename'])
-        r_cc = load_image(views['R_CC']['filename'])
-        r_mlo = load_image(views['R_MLO']['filename'])
-        images = torch.stack([l_cc, l_mlo, r_cc, r_mlo])
+    order = ["L_CC", "L_MLO", "R_CC", "R_MLO"]
 
-        # Metadata
-        meta = views['L_CC']
-        years_last_followup = int(meta['years_to_last_followup'])
-        time_to_cancer = int(meta['years_to_cancer'])
-        if time_to_cancer == 0:
-            time_to_cancer = 1
-        if pd.isna(time_to_cancer):  # Check if the value is NaN
-            time_to_cancer = 6
+    # -------------------------
+    # load images
+    # -------------------------
+    def load(record: CSAWImageRecord):
+        path = os.path.join(self.image_dir, self.mode, record.filename)
 
-        time_to_cancer = time_to_cancer - 1
-        any_cancer = time_to_cancer < 5
+        img = np.array(Image.open(path)).astype(np.float32) / 65535.0
+        t = torch.from_numpy(img)
 
-        target = torch.zeros(5, dtype=torch.float32)
-        if any_cancer:
-            time_at_event = int(time_to_cancer)
-            event_observed = 1
-            target[time_at_event:] = 1
+        if self.transforms:
+            t = self.transforms(t).squeeze(0)
         else:
-            # If no cancer, use the last follow-up year
-            if years_last_followup == 0:
-                years_last_followup = 1
-            time_at_event = int(min(years_last_followup, 5) - 1)
-            event_observed = 0
-        y_mask = np.array([1] * (time_at_event + 1) + [0] * (5 - (time_at_event + 1)), dtype=np.int8)
-        y_mask = y_mask[:5]
+            t = t.unsqueeze(0)
 
-        density = self.map_density(meta['density_group'])
-        cancer_type = self.map_cancer_type(meta['x_type'])
+        if t.shape[0] == 1:
+            t = t.repeat(3, 1, 1)
 
-        all_views = [0, 1, 0, 1]
-        all_sides = [0, 0, 1, 1]
-        time_stamps = [0]*len(images)
+        return t
 
-        time_seq = pad_to_length(time_stamps, MAX_TIME, len(images))
-        view_seq = pad_to_length(all_views, MAX_VIEWS, len(images))
-        side_seq = pad_to_length(all_sides, MAX_SIDES, len(images))
-        images = images.permute(1, 0, 2, 3)  # [4, 3, H, W] → [3, 4, H, W]
+    images = torch.stack([load(views[v]) for v in order])  # [4,3,H,W]
 
-        return {
-            'images': images,
-            'target': target,
-            'y_mask': y_mask,
-            'event_observed': event_observed,
-            'event_times': torch.tensor(time_at_event, dtype=torch.float32),
-            'density': density,
-            'cancer_type': cancer_type,
-            'patient_id': patient_id,
-            'time_seq': torch.tensor(time_seq, dtype=torch.long),
-            'view_seq': torch.tensor(view_seq, dtype=torch.long),
-            'side_seq': torch.tensor(side_seq, dtype=torch.long),
-        }
+    # -------------------------
+    # metadata source (any view works, pick CC)
+    # -------------------------
+    meta = views["L_CC"]
+
+    patient_id = meta.patient_id
+
+    # -------------------------
+    # survival labels
+    # -------------------------
+    ttc = self._clean(meta.years_to_cancer)
+    follow = self._clean(meta.years_to_last_followup)
+
+    target, y_mask, event_time, event_observed = self._build_survival(ttc, follow)
+
+    # -------------------------
+    # sequences (MIRAI-style)
+    # NOTE: single exam → static tokens
+    # -------------------------
+    all_views = [0, 1, 0, 1]
+    all_sides = [1, 1, 0, 0]
+    all_times = [0, 0, 0, 0]
+
+    time_seq = pad_to_length(all_times, MAX_TIME, len(all_times))
+    view_seq = pad_to_length(all_views, MAX_VIEWS, len(all_views))
+    side_seq = pad_to_length(all_sides, MAX_SIDES, len(all_sides))
+
+    # -------------------------
+    # RETURN (your EMBED-style format)
+    # -------------------------
+    return {
+        "images": images,  # [4, 3, H, W]
+
+        "exam_id": exam_id,
+        "patient_id": patient_id,
+
+        "target": torch.tensor(target, dtype=torch.float32),
+        "y_mask": torch.tensor(y_mask, dtype=torch.float32),
+        "event_observed": torch.tensor(event_observed, dtype=torch.float32),
+        "event_times": torch.tensor(event_time, dtype=torch.float32),
+
+        "density": self._map_density(meta.density_group),
+        "cancer_type": self._map_cancer_type(meta.x_type),
+
+        "time_seq": torch.tensor(time_seq, dtype=torch.long),
+        "view_seq": torch.tensor(view_seq, dtype=torch.long),
+        "side_seq": torch.tensor(side_seq, dtype=torch.long),
+    }
+    
+
+
+
+
 
 def main():
     path_data_train_val = "C:/UiT_PhD_datasets/csaw_dataset/Risk_dataset_train_val_test_1664_2048_new"

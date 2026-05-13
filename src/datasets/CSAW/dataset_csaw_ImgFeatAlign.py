@@ -134,11 +134,18 @@ class BreastCancerRiskDatasetCSAWCCImgFeatAlign(Dataset):
             "time_gap": time_gap,
             "y_mask": mask,
             "y_mask_prior": mask_prev,
+            "years_to_cancer": time_to_cancer - 1,
+            "years_to_cancer_prior": time_to_cancer_prev - 1,
+            "years_to_last_followup": followup,
+            "years_to_last_followup_prior": followup_prev,
             "target": target,
             "target_prior": target_prev,
-            "density": self._map_density(cur_meta["density_group"]),
-            "cancer_type": self._map_cancer_type(cur_meta["x_type"]),
+            "density": self._map_density(cur_meta["density"]),
+            "cancer_type": self._map_cancer_type(cur_meta["path_severity"]),
+            "race": self._map_race(cur_meta.get("RACE_DESC")),
+            "previous_event_times": event_time_prev,
         }
+
 
 
     def _load_image(self, filename):
