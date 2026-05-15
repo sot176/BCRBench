@@ -58,7 +58,7 @@ DATASET_REGISTRY = {
         "ImgFeatAlign": _csaw_imgfeatalign,
         "LMV-Net": _csaw_lmvnet,
         "VMRA-MaR": _csaw_vmra,
-        "OA-BreaCR": _csaw_imgfeatalign,  # reuse
+        "OA-BreaCR": _csaw_imgfeatalign,   
     },
     "EMBED": {
         "Mirai": _embed_mirai,
