@@ -28,7 +28,7 @@ from .utils import (
 )
 
 try:
-    from BreastCancerRiskBenchmark.src.datasets.EMBED.utils import RACE_TO_ID
+    from .utils import RACE_TO_ID
 except ImportError:
     RACE_TO_ID = {"Unknown": 0}
 

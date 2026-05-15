@@ -13,7 +13,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from BreastCancerRiskBenchmark.src.datasets.EMBED.utils import (
+from .utils import (
     load_tabular_data,
     load_image_tensor,
     map_density,
@@ -26,7 +26,7 @@ from BreastCancerRiskBenchmark.src.datasets.EMBED.utils import (
 )
 
 try:
-    from BreastCancerRiskBenchmark.src.datasets.EMBED.utils import RACE_TO_ID
+    from .utils import RACE_TO_ID
 except ImportError:
     RACE_TO_ID = {"Unknown": 0}
 
