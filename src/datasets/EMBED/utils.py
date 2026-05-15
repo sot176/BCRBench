@@ -11,6 +11,10 @@ def load_tabular_data(csv_file: str | Path) -> pd.DataFrame:
     data["study_date_anon"] = pd.to_datetime(data["study_date_anon"], format="%Y-%m-%d")
     return data
 
+def pad_to_length(arr, pad_token, max_length):
+    arr = arr[-max_length:]
+    return  np.array( [pad_token]* (max_length - len(arr)) + arr)
+
 
 def build_row_lookup(data: pd.DataFrame):
     lookup = {}
