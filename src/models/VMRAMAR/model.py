@@ -195,10 +195,14 @@ class VMRAMaR(BaseRiskModel):
             final_dim,
             max_followup=int(getattr(args, "max_followup", 5)),
         )
-
+    @staticmethod
+    def _to_3ch(x):
+        """Convert (B, T, V, C, H, W) → (B, T, V, 3, H, W)"""
+        return x.expand(-1, -1, -1, 3, -1, -1)
+    
     def forward(self, batch):
         images = batch["images"]
-
+        images = self._to_3ch(images)  # (B, T, V, 3, H, W)
         if images.dim() != 6:
             raise ValueError(f"Expected images with 6 dims, got shape {images.shape}")
 

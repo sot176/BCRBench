@@ -52,8 +52,14 @@ class Mirai(nn.Module):
                     self.image_repr_dim,
                 ),
             )
+    @staticmethod
+    def _to_3ch(x):
+        """Convert (B,N, 1,H,W) → (B,N, 3,H,W)"""
+        return x.expand(-1, -1, 3, -1, -1)
+        
     def forward(self, batch):
         x = batch["images"]  # (B, N, C, H, W)
+        x = self._to_3ch(x)  # (B, N, 3, H, W)
         bsz, num_imgs, channels, height, width = x.size()
 
         x = x.contiguous().view(bsz * num_imgs, channels, height, width)
