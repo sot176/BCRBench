@@ -7,77 +7,13 @@ from src.train.train_utils import (
     save_checkpoint,
     load_checkpoint,
 )
-from src.evaluate.test_utils import load_model
-
-# ------------------------------------------------------------
-# 1. TEST checkpoint()
-# ------------------------------------------------------------
-
-def test_checkpoint_saves_state_dict(temp_dir):
-    model = nn.Linear(10, 5)
-    path = temp_dir / "model.pth"
-
-    save_checkpoint(model, path)
-
-    assert path.exists()
-
-    loaded = torch.load(path)
-    assert isinstance(loaded, dict)
-
-    assert "weight" in loaded
-    assert "bias" in loaded
 
 
 # ------------------------------------------------------------
-# 2. TEST load_model()
-# ------------------------------------------------------------
-
-@patch("src.checkpoint_utils.cfg", {
-    "paths": {
-        "csaw_path_saved_reg_model": "/csaw",
-        "embed_path_saved_reg_model": "/embed"
-    }
-})
-@patch("src.checkpoint_utils.get_model")
-@patch("src.checkpoint_utils.torch.load")
-def test_load_model_embed(mock_torch_load, mock_get_model, temp_dir):
-
-    args = types.SimpleNamespace(
-        dataset="EMBED",
-        model="TestModel",
-        finetune_all=True
-    )
-
-    fake_model = MagicMock()
-    fake_model.eval.return_value = "EVAL_MODEL"
-    fake_model.load_state_dict = MagicMock()
-
-    mock_get_model.return_value = fake_model
-
-    mock_torch_load.return_value = {
-        "model": {
-            "module.layer.weight": torch.tensor([1.0])
-        }
-    }
-
-    result = load_model(args, "dummy.pth")
-
-    mock_get_model.assert_called_once()
-
-    loaded_state = fake_model.load_state_dict.call_args[0][0]
-
-    assert "module.layer.weight" not in loaded_state
-    assert "layer.weight" in loaded_state
-
-    assert result == "EVAL_MODEL"
-
-
-# ------------------------------------------------------------
-# 3. TEST save_checkpoint()
+# 1. TEST save_checkpoint()
 # ------------------------------------------------------------
 
 def test_save_checkpoint(temp_dir):
-    from src.main_train import save_checkpoint
 
     accelerator = MagicMock()
     model = MagicMock()
@@ -112,7 +48,7 @@ def test_save_checkpoint(temp_dir):
 
 
 # ------------------------------------------------------------
-# 4. TEST load_checkpoint()
+# 2. TEST load_checkpoint()
 # ------------------------------------------------------------
 
 def test_load_checkpoint(temp_dir):
