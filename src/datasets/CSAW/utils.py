@@ -8,6 +8,9 @@ import torch
 from PIL import Image
 from pathlib import Path
 
+def pad_to_length(values, pad_token: int, max_length: int) -> np.ndarray:
+    values = list(values)[-max_length:]
+    return np.array([pad_token] * (max_length - len(values)) + values)
 
 def normalize_uint16(img: np.ndarray) -> np.ndarray:
     img = img.astype(np.float32)
