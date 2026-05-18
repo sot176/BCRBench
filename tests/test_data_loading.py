@@ -105,7 +105,7 @@ def test_map_density():
     assert map_density(3).item() == 3
 
     # invalid or missing
-    assert map_density("A").item() == -1
+    assert map_density(None).item() == -1
     assert map_density(99).item() == -1
 
 
