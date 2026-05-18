@@ -70,21 +70,24 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def cleanup_logging():
-
     yield
 
+    # clear your app logger
     logger = logging.getLogger("main_train")
+    for h in logger.handlers[:]:
+        h.close()
+        logger.removeHandler(h)
 
-    for handler in logger.handlers[:]:
-        handler.close()
-        logger.removeHandler(handler)
+    # also clear root logger (IMPORTANT for pytest)
+    root = logging.getLogger()
+    for h in root.handlers[:]:
+        h.close()
+        root.removeHandler(h)
 
-        
+
 @pytest.fixture
-def temp_dir():
-    """Create a temporary directory for test files."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        yield Path(tmpdir)
+def temp_dir(tmp_path):
+    return tmp_path
 
 
 @pytest.fixture

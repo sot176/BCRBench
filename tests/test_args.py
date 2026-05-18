@@ -12,7 +12,7 @@ import logging
 import tempfile
 import yaml
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import mock_open, patch, MagicMock
 
 
 @pytest.mark.config
@@ -20,16 +20,19 @@ class TestSetupLogging:
     """Test logging configuration."""
     
     def test_setup_logging_main_process(self, temp_dir):
-        """Test logging setup on main process."""
         from src.main_train import setup_logging
-        
+
         log_path = temp_dir / "test.log"
         logger = setup_logging(str(log_path), is_main_process=True)
-        
+
         assert logger is not None
+
+        for h in logger.handlers:
+            h.flush()
+
         assert log_path.exists()
         assert logger.level == logging.INFO
-    
+        
     def test_setup_logging_non_main_process(self, temp_dir):
         """Test logging setup on non-main process."""
         from src.main_train import setup_logging
@@ -67,30 +70,25 @@ class TestSetupLogging:
 class TestLoadModelConfig:
     """Test model configuration loading."""
     
-    @patch('builtins.open', create=True)
-    def test_load_config_success(self, mock_open, mock_config):
-        """Test successful config loading."""
+    @patch("builtins.open", mock_open(read_data="key: value"))
+    @patch("src.main_train.yaml.safe_load", return_value={"key": "value"})
+    def test_load_config_success(self, mock_yaml):
         from src.main_train import load_model_config
-        
-        mock_open.return_value.__enter__.return_value.read.return_value = yaml.dump(mock_config)
-        
-        # This test uses mocking to avoid file system dependencies
+
         logger = MagicMock()
-        config = load_model_config("Mirai", logger)
-        
-        # Should not raise and should handle YAML parsing
-        assert isinstance(config, dict)
+        config = load_model_config("Mirai", logger, base_path="any/path")
+
+        assert config == {"key": "value"}
     
     def test_load_config_nonexistent_model(self):
-        """Test loading config for non-existent model."""
         from src.main_train import load_model_config
-        
+
         logger = MagicMock()
+
         config = load_model_config("NonExistentModel", logger)
-        
-        # Should return empty dict and log warning
+
         assert config == {}
-        logger.warning.assert_called()
+        logger.warning.assert_called_once()
     
     def test_load_config_model_name_normalization(self):
         """Test that model names are normalized correctly."""
@@ -109,7 +107,15 @@ class TestLoadModelConfig:
 class TestParseCliArgs:
     """Test command-line argument parsing."""
     
-    @patch('sys.argv', ['train.py', '--model', 'Mirai', '--dataset', 'EMBED', '--batch_size', '32'])
+    @patch('sys.argv', [
+    'train.py',
+    '--csv_file', 'a',
+    '--data_root', 'b',
+    '--path_out_dir', 'c',
+    '--model', 'Mirai',
+    '--dataset', 'EMBED',
+    '--batch_size', '32'
+])
     def test_parse_basic_args(self):
         """Test parsing basic command-line arguments."""
         from src.main_train import parse_cli_args
@@ -120,7 +126,16 @@ class TestParseCliArgs:
         assert args.dataset == "EMBED"
         assert args.batch_size == 32
     
-    @patch('sys.argv', ['train.py', '--model', 'Mirai', '--num_epochs', '10', '--learning_rate', '0.001'])
+    @patch('sys.argv', [
+        'train.py',
+        '--csv_file', 'a',
+        '--data_root', 'b',
+        '--path_out_dir', 'c',
+        '--model', 'Mirai',
+        '--dataset', 'EMBED',
+        '--num_epochs', '10',
+        '--learning_rate', '0.001'
+    ])
     def test_parse_training_args(self):
         """Test parsing training-specific arguments."""
         from src.main_train import parse_cli_args
@@ -137,7 +152,15 @@ class TestParseCliArgs:
         # Add test based on your validation logic
         pass
     
-    @patch('sys.argv', ['train.py', '--seed', '42'])
+    @patch('sys.argv', [
+        'train.py',
+        '--csv_file', 'a',
+        '--data_root', 'b',
+        '--path_out_dir', 'c',
+        '--model', 'Mirai',
+        '--dataset', 'EMBED',
+        '--seed', '42'
+    ])
     def test_parse_seed_arg(self):
         """Test parsing random seed argument."""
         from src.main_train import parse_cli_args

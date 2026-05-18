@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Optional, Any
 import warnings
 
+from anyio import Path
 import torch
 import yaml
 import kornia.augmentation as K_A
@@ -28,11 +29,14 @@ def setup_logging(path_logger: str, is_main_process: bool):
     logger.setLevel(logging.INFO)
 
     if is_main_process:
-
+        Path(path_logger).parent.mkdir(parents=True, exist_ok=True)
         # Remove old handlers safely
         for handler in logger.handlers[:]:
-            handler.close()
-            logger.removeHandler(handler)
+            try:
+                handler.flush()
+                handler.close()
+            finally:
+                logger.removeHandler(handler)
 
         try:
             file_handler = logging.FileHandler(path_logger, mode="w")
@@ -57,7 +61,7 @@ def setup_logging(path_logger: str, is_main_process: bool):
 
     return logger if is_main_process else None
 
-def load_model_config(model_name: str, logger: logging.Logger) -> dict:
+def load_model_config(model_name: str, logger, base_path="config/models"):
     """
     Load model-specific configuration from YAML file.
 
@@ -70,15 +74,12 @@ def load_model_config(model_name: str, logger: logging.Logger) -> dict:
     Returns:
         Dictionary containing model configuration, or empty dict if file not found.
     """
-    yaml_path = f"config/models/{model_name.lower().replace('-', '_')}.yaml"
+    yaml_path = f"{base_path}/{model_name.lower().replace('-', '_')}.yaml"
     try:
         with open(yaml_path, "r") as f:
-            config = yaml.safe_load(f)
-        return config if config is not None else {}
+            return yaml.safe_load(f) or {}
     except FileNotFoundError:
-        logger.warning(
-            f"YAML config for {model_name} not found at {yaml_path}. Using CLI/default values."
-        )
+        logger.warning(...)
         return {}
 
 
