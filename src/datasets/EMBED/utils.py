@@ -4,9 +4,10 @@ import torch
 from PIL import Image
 from pathlib import Path
 from datetime import datetime
+from typing import Union
 
 
-def load_tabular_data(csv_file: str | Path) -> pd.DataFrame:
+def load_tabular_data(csv_file: Union[str, Path]) -> pd.DataFrame:
     data = pd.read_csv(csv_file, low_memory=False)
     data["study_date_anon"] = pd.to_datetime(data["study_date_anon"], format="%Y-%m-%d")
     return data

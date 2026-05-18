@@ -7,6 +7,7 @@ import pandas as pd
 import torch
 from PIL import Image
 from pathlib import Path
+from typing import Union
 
 def pad_to_length(values, pad_token: int, max_length: int) -> np.ndarray:
     values = list(values)[-max_length:]
@@ -17,7 +18,7 @@ def normalize_uint16(img: np.ndarray) -> np.ndarray:
     return img / 65535.0
 
 
-def load_image_tensor(path: str | Path) -> torch.Tensor:
+def load_image_tensor(path: Union[str, Path]) -> torch.Tensor:
     with Image.open(path) as img:
         img = np.array(img).astype(np.float32)
 
