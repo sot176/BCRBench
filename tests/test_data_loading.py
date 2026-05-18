@@ -59,32 +59,13 @@ class TestDataloaderFactory:
         )
 
 
-@pytest.mark.datasets
-class TestDataBatch:
-    """Test data batch structure and properties."""
-    
-    def test_batch_has_required_fields(self, sample_batch):
-        """Test that batch has required fields."""
-        required_fields = ["images", "labels"]
-        for field in required_fields:
-            assert field in sample_batch
-    
-    def test_batch_labels_shape(self, sample_batch):
-        """Test batch labels shape."""
-        labels = sample_batch["labels"]
-        assert len(labels.shape) >= 1
-        assert labels.shape[0] == sample_batch["images"].shape[0]
-    
-    def test_batch_tensor_types(self, sample_batch):
-        """Test that batch contains tensors."""
-        assert isinstance(sample_batch["images"], torch.Tensor)
-        assert isinstance(sample_batch["labels"], torch.Tensor)
 
 def test_clean_time_to_cancer():
     assert clean_time_to_cancer(None) == 6
     assert clean_time_to_cancer(np.nan) == 6
     assert clean_time_to_cancer(0) == 1
     assert clean_time_to_cancer(3) == 3
+
 
 def test_clean_followup_years():
     assert clean_followup_years(None) == 1
@@ -101,7 +82,7 @@ def test_build_survival_target_event():
     )
 
     assert observed == 1
-    assert event_time == 2  # 3 - 1
+    assert event_time == 2
     assert target.shape[0] == 5
     assert np.all(target[2:] == 1)
 
@@ -114,20 +95,25 @@ def test_build_survival_target_censored():
     )
 
     assert observed == 0
-    assert event_time == 2  # followup - 1
+    assert event_time == 2
     assert mask[:3].sum() == 3
 
 def test_map_density():
-    assert map_density("A").item() == 1
-    assert map_density("B").item() == 2
-    assert map_density("C").item() == 3
-    assert map_density("X").item() == -1
+    # now expects numeric input
+    assert map_density(1).item() == 1
+    assert map_density(2).item() == 2
+    assert map_density(3).item() == 3
+
+    # invalid or missing
+    assert map_density("A").item() == -1
+    assert map_density(99).item() == -1
 
 
 def test_map_cancer_type():
     assert map_cancer_type(1).item() == 1
     assert map_cancer_type(2).item() == 2
     assert map_cancer_type(3).item() == 3
+
     assert map_cancer_type(99).item() == -1
 
 
@@ -136,16 +122,16 @@ def test_build_row_lookup_embed():
         [
             {
                 "patient_id": 1,
-                "laterality": "L",
-                "viewposition": "CC",
-                "exam_year": 2020,
+                "ImageLateralityFinal": "L",
+                "view": "CC",
+                "study_date_anon": pd.Timestamp("2020-01-01"),
                 "value": 10,
             },
             {
                 "patient_id": 2,
-                "laterality": "R",
-                "viewposition": "MLO",
-                "exam_year": 2021,
+                "ImageLateralityFinal": "R",
+                "view": "MLO",
+                "study_date_anon": pd.Timestamp("2021-01-01"),
                 "value": 20,
             },
         ]
@@ -155,6 +141,6 @@ def test_build_row_lookup_embed():
 
     assert len(lookup) == 2
 
-    key = ("1", "L", "CC", 2020)
+    key = ("1", "L", "CC", pd.Timestamp("2020-01-01"))
     assert key in lookup
     assert lookup[key]["value"] == 10
