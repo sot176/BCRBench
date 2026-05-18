@@ -1,16 +1,30 @@
 cff-version: 1.2.0
 title: "BreastCancerRiskBenchmark"
-message: "If you use this repository, please cite it as follows:"
+message: "If you use this repository, please cite it using the metadata below."
 type: software
+version: "0.1.0"
+date-released: 2026-05-30
 
 authors:
   - family-names: "Thrun"
     given-names: "Solveig"
-
-year: 2026
+  - family-names: "Wetzer"
+    given-names: "Elisabeth"
+  - family-names: "Wickstrøm"
+    given-names: "Kristoffer"
+  - family-names: "Jenssen"
+    given-names: "Robert"
+  - family-names: "Kampffmeyer"
+    given-names: "Michael"
 
 repository-code: "https://github.com/sot176/BreastCancerRiskBenchmark"
 url: "https://github.com/sot176/BreastCancerRiskBenchmark"
+license: "MIT"
 
-abstract: "Unified repository implementing state-of-the-art image-based breast cancer risk prediction models."
+abstract: >
+  BreastCancerRiskBenchmark is a unified benchmark repository for
+  image-based breast cancer risk prediction, providing implementations
+  of state-of-the-art deep learning models and experimental pipelines
+  for reproducible evaluation across datasets and settings.
 
+ 
