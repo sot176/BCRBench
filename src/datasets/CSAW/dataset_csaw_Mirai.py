@@ -5,20 +5,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
 
-import numpy as np
-import pandas as pd
 import torch
-from PIL import Image
 from torch.utils.data import Dataset
 
 from utils import (
     load_tabular_data,
+    load_image_tensor,
     build_survival_target,
     clean_time_to_cancer,
     clean_followup_years,
     map_density,
     map_cancer_type,
-    pad_to_length
+    pad_to_length,
 )
 
 
@@ -41,7 +39,8 @@ class CSAWExamSample:
     patient_id: str
     exam_year: int
     views: dict[str, CSAWImageRecord]
- 
+
+
 class BreastCancerRiskDatasetCSAWMirai(Dataset):
     """
     Exam-level CSAW dataset for MIRAI-style four-view input.
@@ -80,18 +79,27 @@ class BreastCancerRiskDatasetCSAWMirai(Dataset):
             raise IndexError(f"Index {index} out of range.")
 
         sample = self.samples[index]
+        exam = self.image_data[sample.patient_id][sample.exam_year]
 
-        left_cc = sample.views["L_CC"]
-        left_mlo = sample.views["L_MLO"]
-        right_cc = sample.views["R_CC"]
-        right_mlo = sample.views["R_MLO"]
+        left_cc_record = exam["L_CC"]
+        left_mlo_record = exam["L_MLO"]
+        right_cc_record = exam["R_CC"]
+        right_mlo_record = exam["R_MLO"]
 
-        left_cc_image = self._load_image(left_cc.filename)
-        left_mlo_image = self._load_image(left_mlo.filename)
-        right_cc_image = self._load_image(right_cc.filename)
-        right_mlo_image = self._load_image(right_mlo.filename)
+        left_cc_image = load_image_tensor(
+            self.data_dir / self.mode / left_cc_record.filename
+        )
+        left_mlo_image = load_image_tensor(
+            self.data_dir / self.mode / left_mlo_record.filename
+        )
+        right_cc_image = load_image_tensor(
+            self.data_dir / self.mode / right_cc_record.filename
+        )
+        right_mlo_image = load_image_tensor(
+            self.data_dir / self.mode / right_mlo_record.filename
+        )
 
-        if self.transform is not None:
+        if self.transform:
             left_cc_image = self.transform(left_cc_image).squeeze(0)
             left_mlo_image = self.transform(left_mlo_image).squeeze(0)
             right_cc_image = self.transform(right_cc_image).squeeze(0)
@@ -101,46 +109,41 @@ class BreastCancerRiskDatasetCSAWMirai(Dataset):
             [left_cc_image, left_mlo_image, right_cc_image, right_mlo_image]
         )
 
-        curr_row = self._lookup_row(right_cc)
+        curr_row = self._lookup_row(right_cc_record)
 
-        current_time_to_cancer = clean_time_to_cancer(curr_row["years_to_cancer"])
-        years_last_followup = clean_followup_years(curr_row["years_to_last_followup"])
+        curr_ttc = clean_time_to_cancer(curr_row["years_to_cancer"])
+        curr_fu = clean_followup_years(curr_row["years_to_last_followup"])
 
         target, y_mask, event_time, event_observed = build_survival_target(
             self.n_years,
-            current_time_to_cancer,
-            years_last_followup,
+            curr_ttc,
+            curr_fu,
         )
 
         all_views = [0, 1, 0, 1]
         all_sides = [0, 0, 1, 1]
         all_times = [0, 0, 0, 0]
 
-        time_seq = pad_to_length(all_times, pad_token=MAX_TIME, max_length=len(all_times))
-        view_seq = pad_to_length(all_views, pad_token=MAX_VIEWS, max_length=len(all_views))
-        side_seq = pad_to_length(all_sides, pad_token=MAX_SIDES, max_length=len(all_sides))
+        seq_len = len(all_times)
+        time_seq = pad_to_length(all_times, pad_token=MAX_TIME, max_length=seq_len)
+        view_seq = pad_to_length(all_views, pad_token=MAX_VIEWS, max_length=seq_len)
+        side_seq = pad_to_length(all_sides, pad_token=MAX_SIDES, max_length=seq_len)
 
         return {
             "images": images,
+            "patient_id": sample.patient_id,
+            "exam_year": sample.exam_year,
             "target": target,
             "y_mask": y_mask,
             "event_observed": event_observed,
             "event_times": event_time,
+            "years_to_cancer": curr_ttc - 1,
+            "years_to_last_followup": curr_fu,
             "density": map_density(curr_row["density_group"]),
             "cancer_type": map_cancer_type(curr_row["x_type"]),
-            "patient_id": sample.patient_id,
-            "exam_year": sample.exam_year,
-            "image_ids": [
-                left_cc.filename,
-                left_mlo.filename,
-                right_cc.filename,
-                right_mlo.filename,
-            ],
             "time_seq": torch.tensor(time_seq, dtype=torch.long),
             "view_seq": torch.tensor(view_seq, dtype=torch.long),
             "side_seq": torch.tensor(side_seq, dtype=torch.long),
-            "years_to_cancer": current_time_to_cancer - 1,
-            "years_to_last_followup": years_last_followup,
         }
 
     def _build_row_lookup(self) -> dict[str, dict]:
@@ -148,8 +151,8 @@ class BreastCancerRiskDatasetCSAWMirai(Dataset):
 
     def _load_image_data(
         self,
-    ) -> dict[tuple[str, int], dict[str, CSAWImageRecord]]:
-        image_data: dict[tuple[str, int], dict[str, CSAWImageRecord]] = defaultdict(dict)
+    ) -> dict[str, dict[int, dict[str, CSAWImageRecord]]]:
+        image_data = defaultdict(lambda: defaultdict(dict))
         image_folder = self.data_dir / self.mode
 
         if not image_folder.exists():
@@ -164,8 +167,9 @@ class BreastCancerRiskDatasetCSAWMirai(Dataset):
             exam_year = int(row["exam_year"])
             laterality = "L" if row["laterality"] == "Left" else "R"
             view = row["viewposition"]
+            exam_key = f"{laterality}_{view}"
 
-            record = CSAWImageRecord(
+            image_data[patient_id][exam_year][exam_key] = CSAWImageRecord(
                 filename=image_path.name,
                 patient_id=patient_id,
                 exam_year=exam_year,
@@ -173,34 +177,33 @@ class BreastCancerRiskDatasetCSAWMirai(Dataset):
                 view=view,
             )
 
-            image_data[(patient_id, exam_year)][f"{laterality}_{view}"] = record
-
         return image_data
 
     def _build_samples(self) -> list[CSAWExamSample]:
         required_views = {"L_CC", "L_MLO", "R_CC", "R_MLO"}
         samples: list[CSAWExamSample] = []
 
-        for (patient_id, exam_year), views in self.image_data.items():
-            if not required_views.issubset(views.keys()):
-                continue
+        for patient_id, exams_by_year in self.image_data.items():
+            for exam_year, views in exams_by_year.items():
+                if not required_views.issubset(views.keys()):
+                    continue
 
-            samples.append(
-                CSAWExamSample(
-                    patient_id=patient_id,
-                    exam_year=exam_year,
-                    views=views,
+                samples.append(
+                    CSAWExamSample(
+                        patient_id=patient_id,
+                        exam_year=exam_year,
+                        views=views,
+                    )
                 )
-            )
 
-        print(f"[INFO] Found {len(samples)} complete exams")
+        print(f"[INFO] Found {len(samples)} complete exams in '{self.mode}'")
         return samples
 
     def _lookup_row(self, record: CSAWImageRecord) -> dict:
         try:
             return self.row_lookup[record.filename]
         except KeyError as exc:
-            raise KeyError(f"No CSV row matched image {record.filename}.") from exc
-
-     
+            raise KeyError(
+                f"No CSV row matched image {record.filename}."
+            ) from exc
  
