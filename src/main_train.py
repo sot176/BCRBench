@@ -46,6 +46,7 @@ def setup_logging(path_logger: str, is_main_process: bool) -> Optional[logging.L
     if is_main_process:
         # Clear existing handlers to prevent duplicate logging
         for handler in logger.handlers[:]:
+            handler.close()
             logger.removeHandler(handler)
 
         try:
