@@ -64,7 +64,22 @@ import os
 # Add src directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
+import logging
+import pytest
 
+
+@pytest.fixture(autouse=True)
+def cleanup_logging():
+
+    yield
+
+    logger = logging.getLogger("main_train")
+
+    for handler in logger.handlers[:]:
+        handler.close()
+        logger.removeHandler(handler)
+
+        
 @pytest.fixture
 def temp_dir():
     """Create a temporary directory for test files."""

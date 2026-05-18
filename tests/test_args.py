@@ -42,13 +42,17 @@ class TestSetupLogging:
     def test_setup_logging_handlers(self, temp_dir):
         """Test that both file and console handlers are created."""
         from src.main_train import setup_logging
-        
+
         log_path = temp_dir / "test.log"
         logger = setup_logging(str(log_path), is_main_process=True)
-        
-        # Check handlers exist
+
         assert any(isinstance(h, logging.FileHandler) for h in logger.handlers)
-        assert any(isinstance(h, logging.StreamHandler) for h in logger.handlers)
+
+        assert any(
+            isinstance(h, logging.StreamHandler)
+            and not isinstance(h, logging.FileHandler)
+            for h in logger.handlers
+        )
     
     def test_setup_logging_invalid_path(self):
         """Test logging setup with invalid path."""

@@ -22,50 +22,40 @@ from train import train_val
 from datasets import get_dataset_and_loader
 
 
-def setup_logging(path_logger: str, is_main_process: bool) -> Optional[logging.Logger]:
-    """
-    Configure logging for distributed training.
+def setup_logging(path_logger: str, is_main_process: bool):
 
-    Sets up file and console logging handlers only on the main process to avoid duplicate logs
-    in distributed training scenarios.
-
-    Args:
-        path_logger: Path to save log file.
-        is_main_process: Whether this is the main process in distributed training.
-
-    Returns:
-        Logger instance configured with file and console handlers if is_main_process=True, else None.
-
-    Raises:
-        IOError: If unable to create log directory or file.
-    """
-    logger = logging.getLogger()
+    logger = logging.getLogger("main_train")
     logger.setLevel(logging.INFO)
 
-    # Setup handlers only on the main process to avoid duplicate logs
     if is_main_process:
-        # Clear existing handlers to prevent duplicate logging
+
+        # Remove old handlers safely
         for handler in logger.handlers[:]:
             handler.close()
             logger.removeHandler(handler)
 
         try:
-            # File handler (writes to log file)
             file_handler = logging.FileHandler(path_logger, mode="w")
             file_handler.setFormatter(
-                logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+                logging.Formatter(
+                    "%(asctime)s - %(levelname)s - %(message)s"
+                )
             )
-            logger.addHandler(file_handler)
 
-            # Console handler (prints to stdout)
             console_handler = logging.StreamHandler()
             console_handler.setFormatter(
-                logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+                logging.Formatter(
+                    "%(asctime)s - %(levelname)s - %(message)s"
+                )
             )
+
+            logger.addHandler(file_handler)
             logger.addHandler(console_handler)
+
         except IOError as e:
             raise IOError(f"Failed to setup logging: {e}")
-    return logger
+
+    return logger if is_main_process else None
 
 def load_model_config(model_name: str, logger: logging.Logger) -> dict:
     """
