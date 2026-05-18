@@ -20,7 +20,7 @@ from utils import (
 )
 
 
-MAX_TIME = 20
+MAX_TIME = 10
 MAX_VIEWS = 2
 MAX_SIDES = 2
 
