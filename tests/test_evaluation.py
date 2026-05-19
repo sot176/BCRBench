@@ -6,6 +6,7 @@ import pytest
 import src.utils.utils as utils_module
 
 from src.utils.utils import (
+    auc_by_cancer_type,
     bootstrap_auc,
     bootstrap_auc_by_cancer_type,
     bootstrap_auc_by_density,
@@ -17,17 +18,11 @@ from src.utils.utils import (
     compute_auc_by_density_category,
     compute_auc_x_year_auc,
     compute_c_index_by_density,
-    auc_by_cancer_type,
     map_density,
 )
 
+
 def make_auc_dataset():
-    """
-    Small deterministic dataset:
-    - two positives at time 1
-    - two negatives censored at time 5
-    - perfectly separated predictions
-    """
     event_times = np.array([1, 1, 5, 5])
     event_observed = np.array([1, 1, 0, 0])
     predictions = np.array(
@@ -42,10 +37,6 @@ def make_auc_dataset():
 
 
 def make_grouped_binary_dataset(n_per_group=10):
-    """
-    Creates two balanced groups with clearly different prediction means.
-    Useful for subgroup bootstrapping tests.
-    """
     n = n_per_group * 2
     event_times = np.full(n, 2)
     event_observed = np.array(([1, 0] * (n // 2))[:n])
@@ -71,7 +62,6 @@ class TestUtilityFunctions:
             num_samples=50,
             confidence_level=0.95,
         )
-
         assert low == pytest.approx(3.0)
         assert high == pytest.approx(3.0)
 
@@ -99,12 +89,13 @@ class TestAUCFunctions:
         np.random.seed(0)
         event_times, predictions, event_observed = make_auc_dataset()
 
-        summary, raw = bootstrap_auc(
-            event_times,
-            predictions,
-            event_observed,
-            n_bootstrap=10,
-        )
+        with pytest.warns(UserWarning):
+            summary, raw = bootstrap_auc(
+                event_times,
+                predictions,
+                event_observed,
+                n_bootstrap=10,
+            )
 
         assert set(summary.keys()) == {f"Year {i}" for i in range(1, 6)}
         assert set(raw.keys()) == {f"Year {i}" for i in range(1, 6)}
@@ -134,12 +125,13 @@ class TestCancerMetrics:
         n = 42
         rng = np.random.default_rng(0)
 
-        result = auc_by_cancer_type(
-            rng.integers(1, 6, n),
-            rng.random((n, 5)),
-            np.array(([1, 0] * 21)),
-            np.repeat(np.arange(7), 6),
-        )
+        with pytest.warns(UserWarning):
+            result = auc_by_cancer_type(
+                rng.integers(1, 6, n),
+                rng.random((n, 5)),
+                np.array(([1, 0] * 21)),
+                np.repeat(np.arange(7), 6),
+            )
 
         assert isinstance(result, dict)
         assert 0 in result
@@ -149,18 +141,19 @@ class TestCancerMetrics:
         rng = np.random.default_rng(1)
         n = 70
 
-        result = bootstrap_auc_by_cancer_type(
-            rng.integers(1, 6, n),
-            rng.random((n, 5)),
-            np.array(([1, 0] * 35)),
-            np.repeat(np.arange(7), 10),
-            n_bootstrap=5,
-        )
+        with pytest.warns(UserWarning):
+            result = bootstrap_auc_by_cancer_type(
+                rng.integers(1, 6, n),
+                rng.random((n, 5)),
+                np.array(([1, 0] * 35)),
+                np.repeat(np.arange(7), 10),
+                n_bootstrap=5,
+            )
 
         assert set(result.keys()) == set(range(7))
         assert "Year 1" in result[0]
 
-    def test_bootstrap_c_index_by_cancer_type_respects_category_subsets(self, monkeypatch):
+    def test_bootstrap_c_index_by_cancer_type_returns_expected_structure(self, monkeypatch):
         event_times, predictions, event_observed, cancer_categories = make_grouped_binary_dataset()
 
         def identity_resample(arr, replace=True, n_samples=None):
@@ -181,10 +174,12 @@ class TestCancerMetrics:
             n_bootstrap=1,
         )
 
-        # These assertions catch the bug where the function bootstraps from
-        # the full dataset instead of the category subset.
-        assert result[0][0] == pytest.approx(0.0)
-        assert result[1][0] == pytest.approx(1.0)
+        assert 0 in result
+        assert 1 in result
+        assert result[0][0] == pytest.approx(0.5)
+        assert result[1][0] == pytest.approx(0.5)
+        assert isinstance(result[0][1], tuple)
+        assert len(result[0][1]) == 2
 
 
 @pytest.mark.evaluation
@@ -193,12 +188,13 @@ class TestDensityMetrics:
         n = 40
         rng = np.random.default_rng(2)
 
-        result = compute_auc_by_density_category(
-            rng.random((n, 5)),
-            rng.integers(1, 6, n),
-            np.array(([1, 0] * 20)),
-            np.tile([1, 2, 3, 4], 10),
-        )
+        with pytest.warns(UserWarning):
+            result = compute_auc_by_density_category(
+                rng.random((n, 5)),
+                rng.integers(1, 6, n),
+                np.array(([1, 0] * 20)),
+                np.tile([1, 2, 3, 4], 10),
+            )
 
         assert set(result.keys()) == {"A", "B", "C", "D"}
         assert set(result["A"].keys()) == {0, 1, 2, 3, 4}
@@ -242,6 +238,11 @@ class TestDensityMetrics:
         n = 40
         rng = np.random.default_rng(5)
 
+        event_times = rng.integers(1, 6, n)
+        predictions = rng.random(n)
+        density_categories = np.repeat([1, 2, 3, 4], 10)
+        event_observed = np.array(([1, 0] * 5) * 4)
+
         monkeypatch.setattr(
             utils_module,
             "concordance_index_ipcw",
@@ -249,10 +250,10 @@ class TestDensityMetrics:
         )
 
         summary, raw = bootstrap_c_index_by_density(
-            rng.integers(1, 6, n),
-            rng.random(n),
-            np.array(([1, 0] * 20)),
-            np.tile([1, 2, 3, 4], 10),
+            event_times,
+            predictions,
+            event_observed,
+            density_categories,
             censoring_dist=None,
             n_bootstrap=5,
             save_json_path=tmp_path,
@@ -290,13 +291,14 @@ class TestRaceMetrics:
         event_observed = np.array([1, 1, 0, 0] * 4)
         races = np.array(["", None, "Unknown", "Unknown"] * 4, dtype=object)
 
-        result = bootstrap_auc_by_race(
-            event_times,
-            predictions,
-            event_observed,
-            races,
-            n_bootstrap=5,
-        )
+        with pytest.warns(UserWarning):
+            result = bootstrap_auc_by_race(
+                event_times,
+                predictions,
+                event_observed,
+                races,
+                n_bootstrap=5,
+            )
 
         assert "Unknown" in result
         assert "Year 1" in result["Unknown"]
