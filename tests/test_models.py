@@ -11,8 +11,14 @@ import pytest
 import torch
 from unittest.mock import MagicMock, patch
 
+pytestmark = [
+    pytest.mark.models,
+    pytest.mark.filterwarnings(
+        "ignore:Importing from timm.models.layers is deprecated.*:FutureWarning"
+    ),
+]
 
-@pytest.mark.models
+
 class TestModelFactory:
     def test_get_model_invalid_name(self):
         from src.models.model_factory import get_model
@@ -57,7 +63,6 @@ class TestModelFactory:
         assert model is mock_instance
 
 
-@pytest.mark.models
 class TestRegistrationModels:
     def test_imgfeatalign_requires_reg_model(self):
         from src.models.model_factory import get_model
@@ -114,7 +119,6 @@ class TestRegistrationModels:
         assert model is mock_model
 
 
-@pytest.mark.models
 class TestBuildMammoRegNet:
     @patch("src.models.model_factory.MammoRegNet")
     @patch("src.models.model_factory.torch.load")
@@ -144,7 +148,6 @@ class TestBuildMammoRegNet:
             build_mammo_reg_net("/nonexistent/path/model.pth")
 
 
-@pytest.mark.models
 class TestModelProperties:
     def test_model_has_forward_method(self, mock_model):
         assert hasattr(mock_model, "forward")
@@ -165,7 +168,6 @@ class TestModelProperties:
         assert model_on_device is not None
 
 
-@pytest.mark.models
 class TestModelKwargs:
     def test_build_model_with_args(self, mock_args):
         from src.models.model_factory import _build_model
@@ -187,7 +189,6 @@ class TestModelKwargs:
         assert model.param1 == "value1"
 
 
-@pytest.mark.models
 class TestModelRegistry:
     @patch("models.Mirai.model.Mirai")
     @patch("models.ImgFeatAlign.model.ImgFeatAlign")
@@ -226,7 +227,6 @@ class TestModelRegistry:
         assert get_model("OA-BreaCR", args=mock_args_oabreacr) is not None
 
 
-@pytest.mark.models
 class TestModelWithSpecificConfigs:
     def test_mirai_training_with_specific_config(self, mock_args_mirai, mock_config_mirai):
         assert mock_args_mirai.model == "Mirai"
