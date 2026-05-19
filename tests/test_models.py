@@ -1,3 +1,12 @@
+"""
+Tests for model creation and factory functions.
+
+Tests the models/model_factory.py functions:
+- get_model()
+- build_mammo_reg_net()
+- _build_model()
+"""
+
 import pytest
 import torch
 from unittest.mock import MagicMock, patch
@@ -11,7 +20,7 @@ class TestModelFactory:
         with pytest.raises(ValueError, match="Unknown model"):
             get_model("InvalidModelName")
 
-    @patch("src.models.model_factory.Mirai")
+    @patch("models.Mirai.model.Mirai")
     def test_get_model_mirai(self, mock_mirai, mock_args_mirai):
         from src.models.model_factory import get_model
 
@@ -23,7 +32,7 @@ class TestModelFactory:
         mock_mirai.assert_called_once()
         assert model is mock_instance
 
-    @patch("src.models.model_factory.VMRAMaR")
+    @patch("models.VMRAMAR.model.VMRAMaR")
     def test_get_model_vmra_mar(self, mock_vmramar, mock_args_vmramar):
         from src.models.model_factory import get_model
 
@@ -35,7 +44,7 @@ class TestModelFactory:
         mock_vmramar.assert_called_once()
         assert model is mock_instance
 
-    @patch("src.models.model_factory.OABreaCR")
+    @patch("models.OABreaCR.model.OA_BreaCR")
     def test_get_model_oa_breacr(self, mock_oabreacr, mock_args_oabreacr):
         from src.models.model_factory import get_model
 
@@ -62,7 +71,7 @@ class TestRegistrationModels:
         with pytest.raises(ValueError, match="requires a MammoRegNet checkpoint"):
             get_model("LMV-Net", path_saved_reg_model=None)
 
-    @patch("src.models.model_factory.ImgFeatAlign")
+    @patch("models.ImgFeatAlign.model.ImgFeatAlign")
     @patch("src.models.model_factory.build_mammo_reg_net")
     def test_imgfeatalign_with_reg_model(self, mock_build_reg, mock_imgfeatalign, mock_args_imgfeatalign):
         from src.models.model_factory import get_model
@@ -83,11 +92,32 @@ class TestRegistrationModels:
         mock_imgfeatalign.assert_called_once()
         assert model is mock_model
 
+    @patch("models.LMVNet.model.LMVNet")
+    @patch("src.models.model_factory.build_mammo_reg_net")
+    def test_lmvnet_with_reg_model(self, mock_build_reg, mock_lmvnet, mock_args_lmvnet):
+        from src.models.model_factory import get_model
+
+        mock_reg_net = MagicMock()
+        mock_build_reg.return_value = mock_reg_net
+
+        mock_model = MagicMock()
+        mock_lmvnet.return_value = mock_model
+
+        model = get_model(
+            "LMV-Net",
+            args=mock_args_lmvnet,
+            path_saved_reg_model="/path/to/model.pth",
+        )
+
+        mock_build_reg.assert_called_once_with("/path/to/model.pth")
+        mock_lmvnet.assert_called_once()
+        assert model is mock_model
+
 
 @pytest.mark.models
 class TestBuildMammoRegNet:
     @patch("src.models.model_factory.MammoRegNet")
-    @patch("torch.load")
+    @patch("src.models.model_factory.torch.load")
     def test_build_mammo_reg_net_success(self, mock_load, mock_reg_class, temp_dir):
         from src.models.model_factory import build_mammo_reg_net
 
@@ -101,7 +131,9 @@ class TestBuildMammoRegNet:
 
         mock_load.assert_called_once()
         mock_reg_class.assert_called_once()
-        mock_reg_instance.load_state_dict.assert_called_once()
+        mock_reg_instance.load_state_dict.assert_called_once_with(
+            {"layer1.weight": mock_checkpoint["module.layer1.weight"]}
+        )
         mock_reg_instance.eval.assert_called_once()
         assert reg_model is mock_reg_instance
 
@@ -157,11 +189,11 @@ class TestModelKwargs:
 
 @pytest.mark.models
 class TestModelRegistry:
-    @patch("src.models.model_factory.Mirai")
-    @patch("src.models.model_factory.ImgFeatAlign")
-    @patch("src.models.model_factory.LMVNet")
-    @patch("src.models.model_factory.VMRAMaR")
-    @patch("src.models.model_factory.OABreaCR")
+    @patch("models.Mirai.model.Mirai")
+    @patch("models.ImgFeatAlign.model.ImgFeatAlign")
+    @patch("models.LMVNet.model.LMVNet")
+    @patch("models.VMRAMAR.model.VMRAMaR")
+    @patch("models.OABreaCR.model.OA_BreaCR")
     @patch("src.models.model_factory.build_mammo_reg_net")
     def test_all_supported_models_can_be_accessed(
         self,
