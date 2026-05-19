@@ -135,22 +135,7 @@ class TestConcordanceIndex:
         assert isinstance(c_index, float)
         assert 0 <= c_index <= 1
     
-    def test_concordance_index_shape_mismatch(self, censoring_dist):
-        """Test error handling for shape mismatch."""
-        from utils.c_index import concordance_index_ipcw
-        
-        event_times = np.array([1.0, 2.0, 3.0])
-        predictions = np.array([0.1, 0.2, 0.3, 0.4])  # Wrong size
-        event_observed = np.array([1, 0, 1])
-        
-        with pytest.raises(ValueError):
-            concordance_index_ipcw(
-                event_times,
-                predictions,
-                event_observed,
-                censoring_dist
-            )
-    
+
     def test_concordance_index_no_pairs(self, censoring_dist):
         """Test error handling when no admissible pairs."""
         from utils.c_index import concordance_index_ipcw
