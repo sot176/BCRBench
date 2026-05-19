@@ -3,6 +3,8 @@ import json
 import numpy as np
 import pytest
 
+import src.utils.utils as utils_module
+
 from src.utils.utils import (
     bootstrap_auc,
     bootstrap_auc_by_cancer_type,
@@ -167,8 +169,8 @@ class TestCancerMetrics:
         def fake_c_index(event_times, predictions, event_observed, censoring_dist):
             return float(np.mean(predictions))
 
-        monkeypatch.setattr(uut, "resample", identity_resample)
-        monkeypatch.setattr(uut, "concordance_index_ipcw", fake_c_index)
+        monkeypatch.setattr(utils_module, "resample", identity_resample)
+        monkeypatch.setattr(utils_module, "concordance_index_ipcw", fake_c_index)
 
         result = bootstrap_c_index_by_cancer_type(
             event_times,
@@ -206,7 +208,7 @@ class TestDensityMetrics:
         rng = np.random.default_rng(3)
 
         monkeypatch.setattr(
-            uut,
+            utils_module,
             "concordance_index_ipcw",
             lambda event_times, predictions, event_observed, censoring_dist: 0.75,
         )
@@ -241,7 +243,7 @@ class TestDensityMetrics:
         rng = np.random.default_rng(5)
 
         monkeypatch.setattr(
-            uut,
+            utils_module,
             "concordance_index_ipcw",
             lambda event_times, predictions, event_observed, censoring_dist: 0.6,
         )
@@ -307,7 +309,7 @@ class TestRaceMetrics:
         races = np.array(["Caucasian or White"] * 8 + ["Asian"] * 8, dtype=object)
 
         monkeypatch.setattr(
-            uut,
+            utils_module,
             "concordance_index_ipcw",
             lambda event_times, predictions, event_observed, censoring_dist: 0.7,
         )
