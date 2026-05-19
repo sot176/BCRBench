@@ -107,13 +107,16 @@ Similarly, each model has its own evaluation script:
 
 If you use these implementations in your research, please cite the original papers for the models and this repository.
 
-
 ### Repository 
 ```bibtex
-@software{Thrun_BreastCancerRiskBenchmark,
-author = {Thrun, Solveig},
+@software{Thrun_BreastCancerRiskBenchmark_2026,
+author = {Thrun, Solveig and Wetzer, Elisabeth and Wickstrøm, Kristoffer and Jenssen, Robert and Kampffmeyer, Michael},
+license = {MIT},
+month = may,
 title = {{BreastCancerRiskBenchmark}},
-url = {https://github.com/sot176/BreastCancerRiskBenchmark}
+url = {https://github.com/sot176/BreastCancerRiskBenchmark},
+version = {0.1.0},
+year = {2026}
 }
 ```
 
