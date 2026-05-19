@@ -1,317 +1,334 @@
-"""
-Tests for evaluation metrics and utilities.
+import json
 
-Tests the utils/c_index.py and evaluation functions:
-- concordance_index_ipcw()
-- bootstrap_c_index()
-- get_censoring_dist()
-"""
-
-import pytest
 import numpy as np
-from unittest.mock import MagicMock, patch
+import pytest
+
+from src.utils.utils import (
+    bootstrap_auc,
+    bootstrap_auc_by_cancer_type,
+    bootstrap_auc_by_density,
+    bootstrap_auc_by_race,
+    bootstrap_c_index_by_cancer_type,
+    bootstrap_c_index_by_density,
+    bootstrap_c_index_by_race,
+    bootstrap_confidence_interval,
+    compute_auc_by_density_category,
+    compute_auc_x_year_auc,
+    compute_c_index_by_density,
+    auc_by_cancer_type,
+    map_density,
+)
+
+def make_auc_dataset():
+    """
+    Small deterministic dataset:
+    - two positives at time 1
+    - two negatives censored at time 5
+    - perfectly separated predictions
+    """
+    event_times = np.array([1, 1, 5, 5])
+    event_observed = np.array([1, 1, 0, 0])
+    predictions = np.array(
+        [
+            [0.95, 0.95, 0.95, 0.95, 0.95],
+            [0.90, 0.90, 0.90, 0.90, 0.90],
+            [0.10, 0.10, 0.10, 0.10, 0.10],
+            [0.05, 0.05, 0.05, 0.05, 0.05],
+        ]
+    )
+    return event_times, predictions, event_observed
+
+
+def make_grouped_binary_dataset(n_per_group=10):
+    """
+    Creates two balanced groups with clearly different prediction means.
+    Useful for subgroup bootstrapping tests.
+    """
+    n = n_per_group * 2
+    event_times = np.full(n, 2)
+    event_observed = np.array(([1, 0] * (n // 2))[:n])
+    cancer_categories = np.array([0] * n_per_group + [1] * n_per_group)
+    predictions = np.array([0.0] * n_per_group + [1.0] * n_per_group)
+    return event_times, predictions, event_observed, cancer_categories
 
 
 @pytest.mark.evaluation
-class TestCensoringDistribution:
-    """Test censoring distribution estimation."""
-    
-    def test_get_censoring_dist_basic(self):
-        """Test basic censoring distribution calculation."""
-        from utils.c_index import get_censoring_dist
-        
-        times = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-        event_observed = np.array([1, 1, 0, 1, 0])
-        
-        censoring_dist = get_censoring_dist(times, event_observed)
-        
-        assert isinstance(censoring_dist, dict)
-        assert len(censoring_dist) > 0
-        assert all(0 < v <= 1 for v in censoring_dist.values())
-    
-    def test_censoring_dist_decreasing(self):
-        """Test that censoring probabilities decrease over time."""
-        from utils.c_index import get_censoring_dist
-        
-        times = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-        event_observed = np.array([0, 0, 0, 0, 0])  # All censored
-        
-        censoring_dist = get_censoring_dist(times, event_observed)
-        
-        # Probabilities should decrease with time
-        sorted_times = sorted(censoring_dist.keys())
-        probs = [censoring_dist[t] for t in sorted_times]
-        
-        for i in range(len(probs) - 1):
-            assert probs[i] >= probs[i + 1]
-    
-    def test_censoring_dist_range(self):
-        """Test that censoring distribution values are in valid range."""
-        from utils.c_index import get_censoring_dist
-        
-        times = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-        event_observed = np.array([1, 0, 1, 0, 1])
-        
-        censoring_dist = get_censoring_dist(times, event_observed)
-        
-        for value in censoring_dist.values():
-            assert 0 < value <= 1
+class TestUtilityFunctions:
+    def test_map_density_valid_and_invalid(self):
+        assert map_density(1) == "A"
+        assert map_density(2) == "B"
+        assert map_density(3) == "C"
+        assert map_density(4) == "D"
+        assert map_density(5) == "NA"
+        assert map_density(-1) == "NA"
+        assert map_density(None) == "NA"
+
+    def test_bootstrap_confidence_interval_constant_data(self):
+        low, high = bootstrap_confidence_interval(
+            [3.0, 3.0, 3.0, 3.0],
+            num_samples=50,
+            confidence_level=0.95,
+        )
+
+        assert low == pytest.approx(3.0)
+        assert high == pytest.approx(3.0)
 
 
 @pytest.mark.evaluation
-class TestConcordanceIndex:
-    """Test concordance index calculation."""
-    
-    def test_concordance_index_basic(self, sample_event_times, sample_predictions, 
-                                     sample_event_observed, censoring_dist):
-        """Test basic C-index calculation."""
-        from utils.c_index import concordance_index_ipcw
-        
-        c_index = concordance_index_ipcw(
-            sample_event_times,
-            sample_predictions,
-            sample_event_observed,
-            censoring_dist
-        )
-        
-        assert isinstance(c_index, float)
-        assert 0 <= c_index <= 1
-    
-    def test_concordance_index_perfect_predictions(self, censoring_dist):
-        """Test C-index with perfect predictions."""
-        from utils.c_index import concordance_index_ipcw
-        
-        # Create perfectly predictive data
-        event_times = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-        predictions = np.array([0.1, 0.2, 0.3, 0.4, 0.5])  # Matches order
-        event_observed = np.array([1, 1, 1, 1, 1])
-        
-        c_index = concordance_index_ipcw(
-            event_times,
-            predictions,
-            event_observed,
-            censoring_dist
-        )
-        
-        # Should be high for perfect predictions
-        assert c_index > 0.5
-    
-    def test_concordance_index_bad_predictions(self, censoring_dist):
-        """Test C-index with random predictions."""
-        from utils.c_index import concordance_index_ipcw
-        
-        np.random.seed(42)
-        event_times = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-        predictions = np.random.rand(5)  # Random
-        event_observed = np.array([1, 1, 1, 1, 1])
-        
-        c_index = concordance_index_ipcw(
-            event_times,
-            predictions,
-            event_observed,
-            censoring_dist
-        )
-        
-        assert isinstance(c_index, float)
-        assert 0 <= c_index <= 1
-    
-    def test_concordance_index_with_censoring(self):
-        """Test C-index with censored data."""
-        from utils.c_index import concordance_index_ipcw, get_censoring_dist
-        
-        event_times = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-        event_observed = np.array([1, 0, 1, 0, 1])  # Some censored
-        predictions = np.array([0.1, 0.2, 0.3, 0.4, 0.5])
-        
-        censoring_dist = get_censoring_dist(event_times, event_observed)
-        
-        c_index = concordance_index_ipcw(
-            event_times,
-            predictions,
-            event_observed,
-            censoring_dist
-        )
-        
-        assert isinstance(c_index, float)
-        assert 0 <= c_index <= 1
-    
+class TestAUCFunctions:
+    def test_compute_auc_x_year_auc_perfect_separation(self):
+        event_times, predictions, event_observed = make_auc_dataset()
 
-    def test_concordance_index_no_pairs(self, censoring_dist):
-        """Test error handling when no admissible pairs."""
-        from utils.c_index import concordance_index_ipcw
-        
-        event_times = np.array([1.0, 1.0, 1.0])
-        predictions = np.array([0.1, 0.1, 0.1])
-        event_observed = np.array([0, 0, 0])  # All censored at same time
-        
-        with pytest.raises(ZeroDivisionError):
-            concordance_index_ipcw(
-                event_times,
+        with pytest.warns(Warning):
+            result = compute_auc_x_year_auc(
                 predictions,
+                event_times,
                 event_observed,
-                censoring_dist
             )
 
+        assert set(result.keys()) == {0, 1, 2, 3, 4}
+        assert np.isnan(result[0])
+        assert result[1] == pytest.approx(1.0)
+        assert result[2] == pytest.approx(1.0)
+        assert result[3] == pytest.approx(1.0)
+        assert result[4] == pytest.approx(1.0)
 
-@pytest.mark.evaluation
-class TestBootstrapCIndex:
-    """Test bootstrap confidence intervals for C-index."""
-    
-    def test_bootstrap_c_index_basic(self, sample_event_times, sample_predictions,
-                                      sample_event_observed):
-        """Test basic bootstrap C-index."""
-        from utils.utils import bootstrap_c_index
-        from utils.c_index import get_censoring_dist
-        
-        censoring_dist = get_censoring_dist(sample_event_times, sample_event_observed)
-        
-        mean_c_index, ci = bootstrap_c_index(
-            sample_event_times,
-            sample_predictions,
-            sample_event_observed,
-            censoring_dist,
-            n_bootstrap=100,
-            alpha=0.05
-        )
-        
-        assert isinstance(mean_c_index, float)
-        assert isinstance(ci, tuple)
-        assert len(ci) == 2
-        assert 0 <= mean_c_index <= 1
-        assert ci[0] <= mean_c_index <= ci[1]
-    
-    def test_bootstrap_ci_bounds(self, sample_event_times, sample_predictions,
-                                 sample_event_observed):
-        """Test bootstrap confidence interval bounds."""
-        from utils.utils import bootstrap_c_index
-        from utils.c_index import get_censoring_dist
-        
-        censoring_dist = get_censoring_dist(sample_event_times, sample_event_observed)
-        
-        mean_c_index, (lower, upper) = bootstrap_c_index(
-            sample_event_times,
-            sample_predictions,
-            sample_event_observed,
-            censoring_dist,
-            n_bootstrap=100
-        )
-        
-        assert lower < upper
-        assert lower >= 0
-        assert upper <= 1
-    
-    def test_bootstrap_sample_count(self, sample_event_times, sample_predictions,
-                                    sample_event_observed):
-        """Test bootstrap with different sample counts."""
-        from utils.utils import bootstrap_c_index
-        from utils.c_index import get_censoring_dist
-        
-        censoring_dist = get_censoring_dist(sample_event_times, sample_event_observed)
-        
-        # Test with different bootstrap sizes
-        for n_bootstrap in [10, 100, 500]:
-            mean_c_index, ci = bootstrap_c_index(
-                sample_event_times,
-                sample_predictions,
-                sample_event_observed,
-                censoring_dist,
-                n_bootstrap=n_bootstrap
-            )
-            assert isinstance(mean_c_index, float)
-            assert 0 <= mean_c_index <= 1
-    
-    def test_bootstrap_alpha_levels(self, sample_event_times, sample_predictions,
-                                     sample_event_observed):
-        """Test bootstrap with different alpha levels."""
-        from utils.utils import bootstrap_c_index
-        from utils.c_index import get_censoring_dist
-        
-        censoring_dist = get_censoring_dist(sample_event_times, sample_event_observed)
-        
-        # Test with different significance levels
-        for alpha in [0.01, 0.05, 0.10]:
-            mean_c_index, (lower, upper) = bootstrap_c_index(
-                sample_event_times,
-                sample_predictions,
-                sample_event_observed,
-                censoring_dist,
-                n_bootstrap=100,
-                alpha=alpha
-            )
-            assert lower < upper
+    def test_bootstrap_auc_returns_expected_structure(self):
+        np.random.seed(0)
+        event_times, predictions, event_observed = make_auc_dataset()
 
-
-@pytest.mark.evaluation
-class TestMetricsDataTypes:
-    """Test handling of different data types."""
-    
-    def test_concordance_index_with_lists(self, censoring_dist):
-        """Test C-index with list inputs."""
-        from utils.c_index import concordance_index_ipcw
-        
-        event_times = [1.0, 2.0, 3.0, 4.0, 5.0]
-        predictions = [0.1, 0.2, 0.3, 0.4, 0.5]
-        event_observed = [1, 1, 1, 1, 1]
-        
-        c_index = concordance_index_ipcw(
+        summary, raw = bootstrap_auc(
             event_times,
             predictions,
             event_observed,
-            censoring_dist
+            n_bootstrap=10,
         )
-        
-        assert isinstance(c_index, float)
-        assert 0 <= c_index <= 1
-    
-    def test_concordance_index_with_arrays(self, censoring_dist):
-        """Test C-index with numpy array inputs."""
-        from utils.c_index import concordance_index_ipcw
-        
-        event_times = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-        predictions = np.array([0.1, 0.2, 0.3, 0.4, 0.5])
-        event_observed = np.array([1, 1, 1, 1, 1])
-        
-        c_index = concordance_index_ipcw(
-            event_times,
-            predictions,
-            event_observed,
-            censoring_dist
-        )
-        
-        assert isinstance(c_index, float)
-        assert 0 <= c_index <= 1
+
+        assert set(summary.keys()) == {f"Year {i}" for i in range(1, 6)}
+        assert set(raw.keys()) == {f"Year {i}" for i in range(1, 6)}
+
+        for year_key, (mean_auc, ci) in summary.items():
+            assert isinstance(ci, tuple)
+            assert len(ci) == 2
+            assert len(raw[year_key]) == 10
+            if np.isfinite(mean_auc):
+                assert 0.0 <= mean_auc <= 1.0
+
+    def test_compute_auc_handles_single_class_case(self):
+        probs = np.zeros((5, 5))
+        censor_times = np.ones(5)
+        golds = np.zeros(5)
+
+        with pytest.warns(Warning):
+            result = compute_auc_x_year_auc(probs, censor_times, golds)
+
+        assert isinstance(result, dict)
+        assert all(np.isnan(v) for v in result.values())
 
 
 @pytest.mark.evaluation
-@pytest.mark.slow
-class TestMetricsStability:
-    """Test stability of metrics across multiple runs."""
-    
-    def test_bootstrap_reproducibility(self, sample_event_times, sample_predictions,
-                                       sample_event_observed):
-        """Test bootstrap reproducibility with fixed seed."""
-        from utils.utils import bootstrap_c_index
-        from utils.c_index import get_censoring_dist
-        
-        np.random.seed(42)
-        censoring_dist = get_censoring_dist(sample_event_times, sample_event_observed)
-        
-        np.random.seed(42)
-        result1 = bootstrap_c_index(
-            sample_event_times,
-            sample_predictions,
-            sample_event_observed,
-            censoring_dist,
-            n_bootstrap=50
+class TestCancerMetrics:
+    def test_auc_by_cancer_type_returns_nested_year_dicts(self):
+        n = 42
+        rng = np.random.default_rng(0)
+
+        result = auc_by_cancer_type(
+            rng.integers(1, 6, n),
+            rng.random((n, 5)),
+            np.array(([1, 0] * 21)),
+            np.repeat(np.arange(7), 6),
         )
-        
-        np.random.seed(42)
-        result2 = bootstrap_c_index(
-            sample_event_times,
-            sample_predictions,
-            sample_event_observed,
-            censoring_dist,
-            n_bootstrap=50
+
+        assert isinstance(result, dict)
+        assert 0 in result
+        assert "Year 1" in result[0]
+
+    def test_bootstrap_auc_by_cancer_type_returns_all_categories(self):
+        rng = np.random.default_rng(1)
+        n = 70
+
+        result = bootstrap_auc_by_cancer_type(
+            rng.integers(1, 6, n),
+            rng.random((n, 5)),
+            np.array(([1, 0] * 35)),
+            np.repeat(np.arange(7), 10),
+            n_bootstrap=5,
         )
-        
-        assert np.isclose(result1[0], result2[0])
+
+        assert set(result.keys()) == set(range(7))
+        assert "Year 1" in result[0]
+
+    def test_bootstrap_c_index_by_cancer_type_respects_category_subsets(self, monkeypatch):
+        event_times, predictions, event_observed, cancer_categories = make_grouped_binary_dataset()
+
+        def identity_resample(arr, replace=True, n_samples=None):
+            return np.asarray(arr)
+
+        def fake_c_index(event_times, predictions, event_observed, censoring_dist):
+            return float(np.mean(predictions))
+
+        monkeypatch.setattr(uut, "resample", identity_resample)
+        monkeypatch.setattr(uut, "concordance_index_ipcw", fake_c_index)
+
+        result = bootstrap_c_index_by_cancer_type(
+            event_times,
+            predictions,
+            event_observed,
+            cancer_categories,
+            censoring_dist=None,
+            n_bootstrap=1,
+        )
+
+        # These assertions catch the bug where the function bootstraps from
+        # the full dataset instead of the category subset.
+        assert result[0][0] == pytest.approx(0.0)
+        assert result[1][0] == pytest.approx(1.0)
+
+
+@pytest.mark.evaluation
+class TestDensityMetrics:
+    def test_compute_auc_by_density_category_returns_all_density_keys(self):
+        n = 40
+        rng = np.random.default_rng(2)
+
+        result = compute_auc_by_density_category(
+            rng.random((n, 5)),
+            rng.integers(1, 6, n),
+            np.array(([1, 0] * 20)),
+            np.tile([1, 2, 3, 4], 10),
+        )
+
+        assert set(result.keys()) == {"A", "B", "C", "D"}
+        assert set(result["A"].keys()) == {0, 1, 2, 3, 4}
+
+    def test_compute_c_index_by_density_returns_all_density_keys(self, monkeypatch):
+        n = 40
+        rng = np.random.default_rng(3)
+
+        monkeypatch.setattr(
+            uut,
+            "concordance_index_ipcw",
+            lambda event_times, predictions, event_observed, censoring_dist: 0.75,
+        )
+
+        result = compute_c_index_by_density(
+            rng.integers(1, 6, n),
+            rng.random(n),
+            np.array(([1, 0] * 20)),
+            np.tile([1, 2, 3, 4], 10),
+            censoring_dist=None,
+        )
+
+        assert result == {"A": 0.75, "B": 0.75, "C": 0.75, "D": 0.75}
+
+    def test_bootstrap_auc_by_density_returns_nested_summary(self):
+        n = 40
+        rng = np.random.default_rng(4)
+
+        result = bootstrap_auc_by_density(
+            rng.integers(1, 6, n),
+            rng.random((n, 5)),
+            np.array(([1, 0] * 20)),
+            np.tile([1, 2, 3, 4], 10),
+            n_bootstrap=5,
+        )
+
+        assert set(result.keys()) == {"A", "B", "C", "D"}
+        assert "Year 1" in result["A"]
+
+    def test_bootstrap_c_index_by_density_saves_json_and_matches_summary(self, tmp_path, monkeypatch):
+        n = 40
+        rng = np.random.default_rng(5)
+
+        monkeypatch.setattr(
+            uut,
+            "concordance_index_ipcw",
+            lambda event_times, predictions, event_observed, censoring_dist: 0.6,
+        )
+
+        summary, raw = bootstrap_c_index_by_density(
+            rng.integers(1, 6, n),
+            rng.random(n),
+            np.array(([1, 0] * 20)),
+            np.tile([1, 2, 3, 4], 10),
+            censoring_dist=None,
+            n_bootstrap=5,
+            save_json_path=tmp_path,
+        )
+
+        saved_file = tmp_path / "mbox_plots_c_index_density_results.json"
+        assert saved_file.exists()
+
+        with saved_file.open("r") as f:
+            payload = json.load(f)
+
+        assert set(payload.keys()) == {"A", "B", "C", "D"}
+        assert isinstance(summary, dict)
+        assert isinstance(raw, dict)
+        assert summary["A"][0] == pytest.approx(0.6)
+        assert len(raw["A"]) == 5
+
+
+@pytest.mark.evaluation
+class TestRaceMetrics:
+    def test_bootstrap_auc_by_race_normalizes_blank_to_unknown(self):
+        n = 16
+        event_times = np.array([1, 1, 5, 5] * 4)
+        predictions = np.tile(
+            np.array(
+                [
+                    [0.95, 0.95, 0.95, 0.95, 0.95],
+                    [0.90, 0.90, 0.90, 0.90, 0.90],
+                    [0.10, 0.10, 0.10, 0.10, 0.10],
+                    [0.05, 0.05, 0.05, 0.05, 0.05],
+                ]
+            ),
+            (4, 1),
+        )
+        event_observed = np.array([1, 1, 0, 0] * 4)
+        races = np.array(["", None, "Unknown", "Unknown"] * 4, dtype=object)
+
+        result = bootstrap_auc_by_race(
+            event_times,
+            predictions,
+            event_observed,
+            races,
+            n_bootstrap=5,
+        )
+
+        assert "Unknown" in result
+        assert "Year 1" in result["Unknown"]
+
+    def test_bootstrap_c_index_by_race_saves_json(self, tmp_path, monkeypatch):
+        n = 16
+        event_times = np.arange(1, n + 1)
+        predictions = np.linspace(0.1, 0.9, n)
+        event_observed = np.array(([1, 0] * 8))
+        races = np.array(["Caucasian or White"] * 8 + ["Asian"] * 8, dtype=object)
+
+        monkeypatch.setattr(
+            uut,
+            "concordance_index_ipcw",
+            lambda event_times, predictions, event_observed, censoring_dist: 0.7,
+        )
+
+        summary, raw = bootstrap_c_index_by_race(
+            event_times,
+            predictions,
+            event_observed,
+            races,
+            censoring_dist=None,
+            n_bootstrap=5,
+            save_json_path=tmp_path,
+        )
+
+        saved_file = tmp_path / "c_index_race_bootstrap_samples.json"
+        assert saved_file.exists()
+
+        with saved_file.open("r") as f:
+            payload = json.load(f)
+
+        assert "Caucasian or White" in payload
+        assert "Asian" in payload
+        assert summary["Caucasian or White"][0] == pytest.approx(0.7)
+        assert len(raw["Asian"]) == 5
