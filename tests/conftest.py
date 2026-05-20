@@ -52,6 +52,8 @@ EXAMPLE USAGE:
       assert mock_args_imgfeatalign.path_saved_reg_model is not None
 """
 
+from types import SimpleNamespace
+
 import pytest
 import tempfile
 import numpy as np
@@ -63,6 +65,8 @@ import os
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
+from accelerate import Accelerator
+
 
 # Add src directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -70,6 +74,18 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 import logging
 import pytest
 
+@pytest.fixture
+def accelerator():
+    return Accelerator(cpu=True)
+
+@pytest.fixture
+def args():
+    return SimpleNamespace(
+        lr=1e-3,
+        epochs=1,
+        batch_size=4,
+        device="cpu",
+    )
 
 @pytest.fixture(autouse=True)
 def cleanup_logging():
@@ -81,7 +97,6 @@ def cleanup_logging():
         h.close()
         logger.removeHandler(h)
 
-    # also clear root logger (IMPORTANT for pytest)
     root = logging.getLogger()
     for h in root.handlers[:]:
         h.close()

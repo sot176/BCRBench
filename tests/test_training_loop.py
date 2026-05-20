@@ -17,18 +17,25 @@ import torch
 import torch.nn as nn
 
 
-def _import_training_modules():
+import importlib
+import pytest
+
+
+def _import_module(name):
     try:
-        train_utils = importlib.import_module("src.train.train_utils")
-        risk_pred = importlib.import_module("src.train.train_risk_prediction")
-        return train_utils, risk_pred
+        return importlib.import_module(name)
     except ModuleNotFoundError:
-        pytest.skip("Could not import required training modules.")
+        pytest.skip(f"Could not import {name}")
 
 
 @pytest.fixture
 def train_utils_module():
-    return _import_training_modules()
+    return _import_module("src.train.train_utils")
+
+
+@pytest.fixture
+def risk_prediction_module():
+    return _import_module("src.train.train_risk_prediction")
 
 
 @pytest.fixture
@@ -61,7 +68,7 @@ class TestTrainingLoop:
         mock_model.eval()
 
         with torch.no_grad():
-            predictions = mock_model(sample_batch["images"])
+            predictions = mock_model(sample_batch)
 
         assert predictions.shape[0] == sample_batch["images"].shape[0]
         assert predictions.shape[1] == 1
