@@ -17,23 +17,18 @@ import torch
 import torch.nn as nn
 
 
-def _import_training_utils():
-    candidates = [
-        "train_utils",
-        "training.train_utils",
-        "src.train_utils",
-    ]
-    for name in candidates:
-        try:
-            return importlib.import_module(name)
-        except ModuleNotFoundError:
-            continue
-    pytest.skip("Could not import train_utils module from known locations.")
+def _import_training_modules():
+    try:
+        train_utils = importlib.import_module("src.train.train.utils")
+        risk_pred = importlib.import_module("src.train.train_risk_prediction")
+        return train_utils, risk_pred
+    except ModuleNotFoundError:
+        pytest.skip("Could not import required training modules.")
 
 
 @pytest.fixture
 def train_utils_module():
-    return _import_training_utils()
+    return _import_training_modules()
 
 
 @pytest.fixture
