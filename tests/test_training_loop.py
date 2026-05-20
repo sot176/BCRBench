@@ -19,7 +19,7 @@ import torch.nn as nn
 
 def _import_training_modules():
     try:
-        train_utils = importlib.import_module("src.train.train.utils")
+        train_utils = importlib.import_module("src.train.train_utils")
         risk_pred = importlib.import_module("src.train.train_risk_prediction")
         return train_utils, risk_pred
     except ModuleNotFoundError:
