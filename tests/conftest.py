@@ -60,6 +60,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 import sys
 import os
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, TensorDataset
 
 # Add src directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -332,32 +335,52 @@ def sample_batch():
 
 @pytest.fixture
 def mock_dataloader():
-    """Create a mock dataloader."""
-    mock_loader = MagicMock()
-    # Create sample batches
-    batch = {
-        "images": torch.randn(4, 3, 224, 224),
-        "labels": torch.randint(0, 2, (4,)),
-    }
-    mock_loader.__iter__ = MagicMock(return_value=iter([batch]))
-    mock_loader.__len__ = MagicMock(return_value=1)
-    return mock_loader
+
+    images = torch.randn(8, 3, 224, 224)
+    labels = torch.randint(0, 2, (8,)).float()
+
+    dataset = TensorDataset(images, labels)
+
+    class WrappedDataset(torch.utils.data.Dataset):
+        def __len__(self):
+            return len(dataset)
+
+        def __getitem__(self, idx):
+            image, label = dataset[idx]
+
+            return {
+                "images": image,
+                "labels": label,
+                "time_to_event": torch.tensor(1.0),
+                "event": torch.tensor(1),
+            }
+
+    return DataLoader(WrappedDataset(), batch_size=4)
 
 
 @pytest.fixture
 def mock_model():
-    """Create a mock model."""
-    model = MagicMock()
-    model.eval = MagicMock(return_value=model)
-    model.to = MagicMock(return_value=model)
-    
-    # Mock forward pass
-    def forward_fn(x):
-        return torch.rand(x.shape[0], 1)  # Return predictions
-    
-    model.forward = forward_fn
-    model.__call__ = forward_fn
-    return model
+    class TinyModel(nn.Module):
+        def __init__(self):
+            super().__init__()
+
+            self.net = nn.Sequential(
+                nn.Flatten(),
+                nn.Linear(3 * 224 * 224, 1)
+            )
+
+        def forward(self, batch):
+            if isinstance(batch, dict):
+                x = batch["images"]
+            else:
+                x = batch
+
+            return self.net(x)
+
+        def get_primary_risk_head(self, outputs):
+            return outputs
+
+    return TinyModel()
 
 
 @pytest.fixture
