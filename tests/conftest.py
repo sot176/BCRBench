@@ -85,6 +85,7 @@ def args():
         epochs=1,
         batch_size=4,
         device="cpu",
+        model="ImgFeatAlign"
     )
 
 @pytest.fixture(autouse=True)
@@ -366,8 +367,8 @@ def mock_dataloader():
             return {
                 "images": image,
                 "labels": label,
-                "time_to_event": torch.tensor(1.0),
-                "event": torch.tensor(1),
+                "event_times": torch.tensor(1.0),
+                "events": torch.tensor(1),
             }
 
     return DataLoader(WrappedDataset(), batch_size=4)
