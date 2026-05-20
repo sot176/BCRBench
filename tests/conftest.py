@@ -436,3 +436,32 @@ def sample_batch():
         "event_observed": labels.clone().long(),
         "patient_id": ["patient_1", "patient_2", "patient_3", "patient_4"],
     }
+
+@pytest.fixture
+def test_loader():
+    import torch
+    from torch.utils.data import DataLoader, TensorDataset
+
+    images = torch.randn(8, 3, 224, 224)
+    labels = torch.randint(0, 2, (8,)).float()
+
+    dataset = TensorDataset(images, labels)
+
+    class WrappedDataset(torch.utils.data.Dataset):
+        def __len__(self):
+            return len(dataset)
+
+        def __getitem__(self, idx):
+            image, label = dataset[idx]
+
+            return {
+                "images": image,
+                "labels": label,
+                "event_times": torch.tensor(1.0),
+                "event_observed": torch.tensor(1),
+                "density": torch.tensor(0),
+                "cancer_type": torch.tensor(0),
+                "patient_id": torch.tensor(idx),
+            }
+
+    return DataLoader(WrappedDataset(), batch_size=4)

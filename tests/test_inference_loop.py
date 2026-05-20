@@ -53,24 +53,7 @@ def mock_model():
 
     return MockModel()
 
-
-@pytest.fixture
-def mock_dataloader():
-    from torch.utils.data import DataLoader
-
-    def dataset():
-        for _ in range(2):
-            yield {
-                "images": torch.randn(4, 3, 224, 224),
-                "event_times": torch.rand(4),
-                "event_observed": torch.randint(0, 2, (4,)),
-                "density": torch.randint(0, 3, (4,)),
-                "cancer_type": torch.randint(0, 3, (4,)),
-                "patient_id": torch.arange(4),
-            }
-
-    return DataLoader(list(dataset()), batch_size=2)
-
+ 
 
 @pytest.fixture
 def accelerator():
@@ -125,7 +108,7 @@ def patch_dependencies(monkeypatch):
 
 def test_test_risk_runs_end_to_end(
     args,
-    mock_dataloader,
+    test_loader,
     accelerator,
     tmp_path,
 ):
@@ -135,7 +118,7 @@ def test_test_risk_runs_end_to_end(
 
     test_risk(
         args=args,
-        test_loader=mock_dataloader,
+        test_loader=test_loader,
         path_model="dummy.ckpt",
         out_dir=str(tmp_path),
         path_logger=str(tmp_path / "log.txt"),
