@@ -465,3 +465,12 @@ def test_loader():
             }
 
     return DataLoader(WrappedDataset(), batch_size=4)
+
+import pytest
+
+
+@pytest.fixture
+def path_model(tmp_path):
+    model_path = tmp_path / "dummy_model.pth"
+    model_path.write_text("dummy checkpoint")  # placeholder content
+    return str(model_path)
