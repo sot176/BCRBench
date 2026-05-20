@@ -78,24 +78,28 @@ def accelerator():
 # -------------------------
 
 @pytest.fixture(autouse=True)
-def patch_dependencies(monkeypatch):
+def patch_dependencies(monkeypatch, mock_model):
+
     import src.evaluate.test_risk_prediction as m
-    # skip real model loading
-    monkeypatch.setattr(m, "load_model", lambda args, path: mock_model)
 
-    # skip logger
+    monkeypatch.setattr(
+        m,
+        "load_model",
+        lambda args, path: mock_model
+    )
+
     monkeypatch.setattr(m, "create_logger", lambda *a, **k: None)
-
-    # skip file saving
     monkeypatch.setattr(m, "save_model_results_to_file", lambda *a, **k: None)
 
-    # skip bootstrap metrics (make deterministic)
     monkeypatch.setattr(m, "bootstrap_c_index", lambda *a, **k: (0.75, None, []))
     monkeypatch.setattr(m, "bootstrap_auc", lambda *a, **k: ({"1": (0.8, 0.0)}, {}))
+
     monkeypatch.setattr(m, "bootstrap_auc_by_density", lambda *a, **k: {})
     monkeypatch.setattr(m, "bootstrap_c_index_by_density", lambda *a, **k: ({}, []))
+
     monkeypatch.setattr(m, "bootstrap_auc_by_cancer_type", lambda *a, **k: {})
     monkeypatch.setattr(m, "bootstrap_c_index_by_cancer_type", lambda *a, **k: ({}, []))
+
     monkeypatch.setattr(m, "bootstrap_auc_by_race", lambda *a, **k: {})
     monkeypatch.setattr(m, "bootstrap_c_index_by_race", lambda *a, **k: ({}, []))
 
