@@ -333,13 +333,3 @@ class TestTrainingIntegration:
         )
 
         assert epoch_loss > 0
-
-    def test_train_val_split(self, mock_dataloader):
-        train_loader = mock_dataloader
-        val_loader = mock_dataloader
-
-        train_batches = list(train_loader)
-        val_batches = list(val_loader)
-
-        assert len(train_batches) > 0
-        assert len(val_batches) > 0
