@@ -368,7 +368,7 @@ def mock_dataloader():
                 "images": image,
                 "labels": label,
                 "event_times": torch.tensor(1.0),
-                "events": torch.tensor(1),
+                "event_observed": torch.tensor(1),
             }
 
     return DataLoader(WrappedDataset(), batch_size=4)
