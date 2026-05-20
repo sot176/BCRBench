@@ -106,7 +106,6 @@ def test_test_risk_runs_end_to_end(
         args,
         test_loader=test_loader,
         path_model="dummy.ckpt",
-        path_logger=str(tmp_path / "log.txt"),
         accelerator=accelerator,
     )
  
