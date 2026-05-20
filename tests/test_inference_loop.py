@@ -98,7 +98,7 @@ def accelerator():
 def patch_dependencies(monkeypatch):
     import src.evaluate.test_risk_prediction as m
     # skip real model loading
-    monkeypatch.setattr(m, "load_model", lambda args, path: mock_model())
+    monkeypatch.setattr(m, "load_model", lambda args, path: mock_model)
 
     # skip logger
     monkeypatch.setattr(m, "create_logger", lambda *a, **k: None)
