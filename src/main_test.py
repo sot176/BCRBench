@@ -23,13 +23,13 @@ def parse_test_args():
                         help="Root directory containing the dataset files/images.")
 
     parser.add_argument("--path_out_dir", type=str, required=True,
-                        help="Directory where outputs, logs, and results will be saved.")
+                        help="Path to the folder containing  checkpoints for evaluation.")
 
     parser.add_argument("--id_training", type=int, required=True,
                         help="Training run ID used to identify the experiment.")
 
-    parser.add_argument("--path_test_folder", type=str, required=True,
-                        help="Path to the folder containing test data or checkpoints for evaluation.")
+    parser.add_argument("--path_test_folder", type=str, required=True, 
+                        help= "Directory where outputs, logs, and results will be saved.") 
 
     # ---------------- Basic dataset & model options ----------------
     parser.add_argument("--batch_size", type=int, default=20,
@@ -123,7 +123,6 @@ def main():
         args=args,
         test_loader=test_loader,
         path_model=path_model_risk,
-        out_dir= args.path_out_dir,
         path_logger=path_logger,
         accelerator=accelerator,
     )

@@ -6,25 +6,7 @@ from pathlib import Path
 
 # Adjust this import to your project structure
 from src.evaluate.test_risk_prediction import test_risk
-
-from src.utils.utils import (
-    auc_by_cancer_type,
-    bootstrap_auc,
-    bootstrap_auc_by_cancer_type,
-    bootstrap_auc_by_density,
-    bootstrap_auc_by_race,
-    bootstrap_c_index_by_cancer_type,
-    bootstrap_c_index_by_density,
-    bootstrap_c_index_by_race,
-    bootstrap_confidence_interval,
-    compute_auc_by_density_category,
-    compute_auc_x_year_auc,
-    compute_c_index_by_density,
-    map_density,
-)
-
-from src.utils.logging_utils import save_model_results_to_file, create_logger
-
+ 
 
 # -------------------------
 # Fixtures
@@ -121,10 +103,9 @@ def test_test_risk_runs_end_to_end(
     """
 
     test_risk(
-        args=args,
+        args,
         test_loader=test_loader,
         path_model="dummy.ckpt",
-        out_dir=str(tmp_path),
         path_logger=str(tmp_path / "log.txt"),
         accelerator=accelerator,
     )

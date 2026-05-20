@@ -25,7 +25,6 @@ def test_risk(
     args,
     test_loader,
     path_model,
-    out_dir,
     path_logger,
     accelerator: Accelerator,
 ):
@@ -155,7 +154,7 @@ def test_risk(
             event_observed,
             race_categories,
             censoring_dist,
-            save_json_path=out_dir,
+            save_json_path=args.path_test_folder,
         )
     else:
         auc_by_race, c_index_by_race = None, None
