@@ -17,7 +17,7 @@ def args(tmp_path):
     return SimpleNamespace(
         dataset="CSAW",
         model="dummy_model",
-        finetune_all=False,
+        id_training="1",
         path_test_folder=str(tmp_path),
     )
 
