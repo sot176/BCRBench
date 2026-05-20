@@ -384,3 +384,16 @@ def project_root():
 def device():
     """Get the appropriate device (CPU or CUDA)."""
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+@pytest.fixture
+def sample_batch():
+    """Create a sample batch for training/evaluation tests."""
+    labels = torch.randint(0, 2, (4,))
+    return {
+        "images": torch.randn(4, 3, 224, 224),
+        "labels": labels,
+        "event_times": torch.tensor([1, 2, 3, 4], dtype=torch.long),
+        "event_observed": labels.clone().long(),
+        "patient_id": ["patient_1", "patient_2", "patient_3", "patient_4"],
+    }

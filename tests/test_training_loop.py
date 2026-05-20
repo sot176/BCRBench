@@ -66,7 +66,7 @@ class TestTrainingLoop:
         mock_model.eval()
 
         with torch.no_grad():
-            predictions = mock_model(sample_batch)
+            predictions = mock_model(sample_batch["images"])
 
         assert predictions.shape[0] == sample_batch["images"].shape[0]
         assert predictions.shape[1] == 1
@@ -159,6 +159,25 @@ class TestBatchProcessing:
 
         assert total_loss > 0
 
+
+@pytest.fixture
+def mock_training_model():
+    """Model matching train_one_epoch/evaluate API."""
+    class TinyTrainingModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.net = torch.nn.Sequential(
+                torch.nn.Flatten(),
+                torch.nn.Linear(3 * 224 * 224, 1)
+            )
+
+        def forward(self, batch):
+            return self.net(batch["images"])
+
+        def get_primary_risk_head(self, outputs):
+            return outputs
+
+    return TinyTrainingModel()
 
 @pytest.mark.training
 class TestTrainUtils:
