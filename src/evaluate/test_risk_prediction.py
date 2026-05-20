@@ -25,12 +25,14 @@ def test_risk(
     args,
     test_loader,
     path_model,
-    path_logger,
     accelerator: Accelerator,
 ):
     """Evaluate trained model on test dataset."""
 
     is_main = accelerator.is_main_process
+
+    logg_filename = f"test_risk_prediction_training_id_{args.id_training}.log"
+    path_logger = os.path.join(args.path_test_folder, logg_filename)
     logger = create_logger(path_logger) if is_main else None
 
     if is_main:

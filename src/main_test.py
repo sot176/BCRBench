@@ -110,20 +110,17 @@ def main():
 
 
     path_model_risk = os.path.join(args.path_out_dir, model_filename)
-    logg_filename = f"test_risk_prediction_training_id_{args.id_training}.log"
-    path_logger = os.path.join(args.path_test_folder, logg_filename)
+    
 
     if accelerator.is_main_process:
         os.makedirs(args.path_test_folder, exist_ok=True)
         print("Model path:", path_model_risk)
-        print("Logger path:", path_logger)
 
     # --- Run Evaluation ---
     test_risk(
         args=args,
         test_loader=test_loader,
         path_model=path_model_risk,
-        path_logger=path_logger,
         accelerator=accelerator,
     )
 
