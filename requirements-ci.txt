@@ -1,0 +1,22 @@
+accelerate==1.10.1
+albumentations==2.0.8
+einops==0.8.2
+kornia==0.8.2
+lifelines==0.30.0
+matplotlib==3.10.8
+numpy
+pandas
+Pillow
+scikit_learn
+scipy
+timm==1.0.26
+torch
+torchvision
+tqdm
+wandb
+
+# Testing
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0
+pytest-xdist>=3.0.0
