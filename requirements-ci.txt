@@ -14,6 +14,7 @@ torch
 torchvision
 tqdm
 wandb
+fvcore
 
 # Testing
 pytest>=7.0.0
