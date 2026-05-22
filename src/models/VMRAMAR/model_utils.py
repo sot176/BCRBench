@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 import sys
-
+import json 
 
 
 MAX_FOLLOWUP = 5
@@ -13,6 +13,41 @@ FORMAL_VIEW_SEQUENCE = (
     ("LCC", 0, 1),
     ("LMLO", 1, 1),
 )
+
+
+def str2bool(value):
+    if isinstance(value, bool):
+        return value
+    return str(value).lower() in {"true", "1", "yes", "y"}
+
+
+def parse_params(value):
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        return json.loads(value)
+    return dict(value)
+
+
+def parse_int_list(value, default):
+    if value is None:
+        value = default
+
+    if isinstance(value, str):
+        value = value.strip()
+        if value.startswith("[") or value.startswith("("):
+            value = value.strip("[]()")
+        value = [v.strip() for v in value.split(",") if v.strip()]
+
+    if isinstance(value, int):
+        value = [value]
+
+    if isinstance(value, tuple):
+        value = list(value)
+
+    return [int(v) for v in value]
 
 
 def register_onconet_alias(onconet_module) -> None:

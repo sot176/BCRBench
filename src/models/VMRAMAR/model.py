@@ -12,49 +12,15 @@ from .vmrnn import VMRNN
 from models.common_parts import CumulativeProbabilityLayer
 from models.Mirai import onconet as _onconet
 from models.common_parts import BaseRiskModel
-from models.Mirai.onconet.models.factory import get_model_by_name, load_model
 from .model_utils import (
-    freeze_encoder,
-    get_img_repr_dim,
-    register_onconet_alias,zero_risk_factors_for_args, expand_risk_factors_per_img, model_args
+    freeze_encoder,parse_params,
+    parse_int_list, str2bool,
+    register_onconet_alias
 )
  
 register_onconet_alias(_onconet)
 
 
-def str2bool(value):
-    if isinstance(value, bool):
-        return value
-    return str(value).lower() in {"true", "1", "yes", "y"}
-
-
-def parse_params(value):
-    if value is None:
-        return {}
-    if isinstance(value, dict):
-        return value
-    if isinstance(value, str):
-        return json.loads(value)
-    return dict(value)
-
-
-def parse_int_list(value, default):
-    if value is None:
-        value = default
-
-    if isinstance(value, str):
-        value = value.strip()
-        if value.startswith("[") or value.startswith("("):
-            value = value.strip("[]()")
-        value = [v.strip() for v in value.split(",") if v.strip()]
-
-    if isinstance(value, int):
-        value = [value]
-
-    if isinstance(value, tuple):
-        value = list(value)
-
-    return [int(v) for v in value]
 
 class VMRAMaR(BaseRiskModel):
     def __init__(self, args):

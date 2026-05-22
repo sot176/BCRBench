@@ -90,8 +90,6 @@ class Mirai(nn.Module):
         return logit, transformer_hidden, activ_dict
 
 
-
-
     def get_risk_heads(self, outputs, batch):
         logit, _, _ = outputs
         return {
