@@ -1,4 +1,4 @@
-# Breast Cancer Risk Prediction Models
+# BCRBench: A Breast Cancer Risk Benchmark
 
 📖 **Documentation:**  
 https://sot176.github.io/BCRBench/
