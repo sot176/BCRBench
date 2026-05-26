@@ -1,6 +1,6 @@
 # Overview
 
-This page provides a technical overview of the Breast Cancer Risk Benchmark, including its scope, objectives, and supported modeling paradigms.
+This page provides a technical overview of BCRBench: A breast cancer risk benchmark, including its scope, objectives, and supported modeling paradigms.
 
 ---
 

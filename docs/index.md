@@ -1,6 +1,6 @@
-# Breast Cancer Risk Benchmark
+# BCRBench: A Breast Cancer Risk Benchmark
 
-A unified framework for training and benchmarking deep learning models for breast cancer risk prediction from mammography.
+BCRBench is a unified framework for training and benchmarking deep learning models for breast cancer risk prediction from mammography.
 
 ---
 

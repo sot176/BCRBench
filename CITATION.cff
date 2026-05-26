@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: "BreastCancerRiskBenchmark"
+title: "BCRBench"
 message: "If you use this repository, please cite it using the metadata below."
 type: software
 version: "0.1.0"
@@ -17,12 +17,12 @@ authors:
   - family-names: "Kampffmeyer"
     given-names: "Michael"
 
-repository-code: "https://github.com/sot176/BreastCancerRiskBenchmark"
-url: "https://github.com/sot176/BreastCancerRiskBenchmark"
+repository-code: "https://github.com/sot176/BCRBench"
+url: "https://github.com/sot176/BCRBench"
 license: "MIT"
 
 abstract: >
-  BreastCancerRiskBenchmark is a unified benchmark repository for
+  BCRBench is a unified benchmark repository for
   image-based breast cancer risk prediction, providing implementations
   of state-of-the-art deep learning models and experimental pipelines
   for reproducible evaluation across datasets and settings.

@@ -1,7 +1,7 @@
 # Breast Cancer Risk Prediction Models
 
 📖 **Documentation:**  
-https://sot176.github.io/BreastCancerRiskBenchmark/
+https://sot176.github.io/BCRBench/
 
 ---
 
@@ -109,12 +109,12 @@ If you use these implementations in your research, please cite the original pape
 
 ### Repository 
 ```bibtex
-@software{Thrun_BreastCancerRiskBenchmark_2026,
+@software{Thrun_BCRBench_2026,
 author = {Thrun, Solveig and Wetzer, Elisabeth and Wickstrøm, Kristoffer and Jenssen, Robert and Kampffmeyer, Michael},
 license = {MIT},
 month = may,
-title = {{BreastCancerRiskBenchmark}},
-url = {https://github.com/sot176/BreastCancerRiskBenchmark},
+title = {{BCRBench}},
+url = {https://github.com/sot176/BCRBench},
 version = {0.1.0},
 year = {2026}
 }
