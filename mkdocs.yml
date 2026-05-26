@@ -1,4 +1,4 @@
-site_name: Breast Cancer Risk Benchmark
+site_name: BCRBench
 
 theme:
   name: readthedocs
