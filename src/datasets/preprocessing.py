@@ -239,7 +239,6 @@ def build_output_filename(
     laterality: object,
     view: object,
     study_date: object,
-    image_index: int,
 ) -> str:
     """Build a stable, metadata-rich PNG filename."""
 
@@ -249,7 +248,6 @@ def build_output_filename(
         sanitize_filename_part(laterality, fallback="U"),
         sanitize_filename_part(view),
         normalize_date(study_date),
-        str(image_index),
     ]
     return "_".join(parts) + ".png"
 
@@ -325,17 +323,12 @@ def preprocess_images(config: PreprocessConfig) -> RunSummary:
                 dicom_dataset = pydicom.dcmread(dicom_path, stop_before_pixels=True)
                 laterality = str(getattr(dicom_dataset, "ImageLaterality", "U")).strip() or "U"
                 view = str(getattr(dicom_dataset, "ViewPosition", "Unknown")).strip() or "Unknown"
-                study_date_str = normalize_date(study_date)
-                key = (laterality, view, study_date_str)
-                image_counter[key] += 1
-                image_index = image_counter[key]
                 filename = build_output_filename(
                     patient_id=patient_id,
                     exam_id=exam_id,
                     laterality=laterality,
                     view=view,
                     study_date=study_date,
-                    image_index=image_index,
                 )
 
                 if not config.overwrite and (
