@@ -65,8 +65,8 @@ For using this framework follow the instructions below:
 Clone the repository, create a conda environment, and install the requirements:
 
 ```bash
-git clone https://github.com/sot176/BreastCancerRiskBenchmark.git
-cd BreastCancerRiskBenchmark
+git clone https://github.com/sot176/BCRBench.git
+cd BCRBench
 conda create -n bc_risk python=3.12
 conda activate bc_risk
 pip install -r requirements.txt
