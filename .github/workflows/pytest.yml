@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          repository: sot176/BCRBench
 
       - name: Setup Python
         uses: actions/setup-python@v6
