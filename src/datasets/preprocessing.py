@@ -314,8 +314,6 @@ def preprocess_images(config: PreprocessConfig) -> RunSummary:
             summary.skipped_missing_folder += 1
             continue
 
-        image_counter: defaultdict[tuple[str, str, str], int] = defaultdict(int)
-
         for dicom_path in iter_dicom_files(folder_path):
             try:
                 import pydicom
