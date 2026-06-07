@@ -41,9 +41,9 @@ set -xv  # Print commands for debugging
 # Run the training script using Singularity
 export PYTHONPATH=$WORKING_DIR
 accelerate launch  main_train.py \
-            --csv_file /scratch/project_465002861/thrunsol/embed_datasets/combined_cases_with_follow_up_races_new.csv \
-            --data_root /scratch/project_465002861/thrunsol/embed_datasets/risk_dataset_1664_2048 \
-            --path_out_dir /scratch/project_465002861/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/$SLURM_JOB_NAME-$SLURM_JOB_ID \
+            --csv_file /scratch/project_465002861/thrunsol/csawcc_datasets/metadata_csawcc_dcm_path_density_new.csv \
+            --data_root /scratch/project_465002861/thrunsol/csawcc_datasets/Risk_dataset_train_val_test_1664_2048_new \
+            --path_out_dir /scratch/project_465002861/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/csaw/$SLURM_JOB_NAME-$SLURM_JOB_ID \
             --img_encoder_snapshot /scratch/project_465002861/thrunsol/mirai_pretrained_backbone/snapshots/mgh_mammo_MIRAI_Base_May20_2019.p \
             --id_training 1 \
             --use_scheduler \
@@ -58,7 +58,7 @@ accelerate launch  main_train.py \
             --patience_lr_scheduler 5 \
             --num_epochs 30 \
             --patience 15 \
-            --dataset "EMBED" \
+            --dataset "CSAW" \
             --seed 2023
 
 
