@@ -4,10 +4,9 @@ import random
 import logging
 import time
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional
 import warnings
 
-from anyio import Path
 import torch
 import yaml
 import kornia.augmentation as K_A
@@ -22,44 +21,26 @@ warnings.filterwarnings("ignore", category=SourceChangeWarning)
 from train import train_val
 from datasets import get_dataset_and_loader
 
-
-def setup_logging(path_logger: str, is_main_process: bool):
-
-    logger = logging.getLogger("main_train")
+def setup_logging(path_logger, is_main_process):
+    logger = logging.getLogger()
     logger.setLevel(logging.INFO)
 
+    # Setup handlers only on the main process to avoid duplicate logs
     if is_main_process:
-        Path(path_logger).parent.mkdir(parents=True, exist_ok=True)
-        # Remove old handlers safely
+        # Clear existing handlers to prevent duplicate logging
         for handler in logger.handlers[:]:
-            try:
-                handler.flush()
-                handler.close()
-            finally:
-                logger.removeHandler(handler)
+            logger.removeHandler(handler)
 
-        try:
-            file_handler = logging.FileHandler(path_logger, mode="w")
-            file_handler.setFormatter(
-                logging.Formatter(
-                    "%(asctime)s - %(levelname)s - %(message)s"
-                )
-            )
+        # File handler (writes to log file)
+        file_handler = logging.FileHandler(path_logger, mode="w")
+        file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        logger.addHandler(file_handler)
 
-            console_handler = logging.StreamHandler()
-            console_handler.setFormatter(
-                logging.Formatter(
-                    "%(asctime)s - %(levelname)s - %(message)s"
-                )
-            )
-
-            logger.addHandler(file_handler)
-            logger.addHandler(console_handler)
-
-        except IOError as e:
-            raise IOError(f"Failed to setup logging: {e}")
-
-    return logger if is_main_process else None
+        # Console handler (prints to stdout)
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        logger.addHandler(console_handler)
+    return logger
 
 def load_model_config(model_name: str, logger, base_path="config/models"):
     """
