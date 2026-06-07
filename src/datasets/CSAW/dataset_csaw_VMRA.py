@@ -8,7 +8,7 @@ from typing import Callable, Optional
 import torch
 from torch.utils.data import Dataset
 
-from utils import (
+from .utils import (
     load_tabular_data,
     load_image_tensor,
     build_survival_target,
