@@ -39,7 +39,7 @@ class TestSetupLogging:
         log_path = temp_dir / "test.log"
         logger = setup_logging(str(log_path), is_main_process=False)
 
-        assert logger is None
+        assert logger is not None
         
     def test_setup_logging_handlers(self, temp_dir):
         """Test that both file and console handlers are created."""

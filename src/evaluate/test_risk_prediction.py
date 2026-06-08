@@ -57,7 +57,6 @@ def test_risk(
         "densities": [],
         "cancers": [],
         "races": [],
-        "patient_id": []
     }
 
     with torch.no_grad():
@@ -72,7 +71,6 @@ def test_risk(
             results["events"].append(gather_tensor(accelerator, batch["event_observed"]))
             results["densities"].append(gather_tensor(accelerator, batch["density"]))
             results["cancers"].append(gather_tensor(accelerator, batch["cancer_type"]))
-            results["patient_id"].append(gather_tensor(accelerator, batch["patient_id"]))
             if args.dataset == "EMBED":
                 results["races"].append(gather_tensor(accelerator, batch["race"]))
 
@@ -89,7 +87,6 @@ def test_risk(
     event_observed = torch.cat(results["events"]).numpy()
     density_categories = torch.cat(results["densities"]).numpy()
     cancer_categories = torch.cat(results["cancers"]).numpy()
-    patient_ids = torch.stack(results["patient_id"]).numpy()
     if args.dataset == "EMBED":
         race_ids = torch.cat(results["races"]).numpy()
         race_categories = [ID_TO_RACE[int(r)] for r in race_ids]
@@ -105,7 +102,6 @@ def test_risk(
         density_categories,
         censoring_dist,
         cancer_categories,
-        patient_ids,
         args.path_test_folder,
     )
 
