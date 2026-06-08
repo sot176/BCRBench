@@ -47,7 +47,6 @@ accelerate launch  main_test.py \
   --path_out_dir /scratch/project_465002861/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/csaw/Train_Risk-19092698_Model_OA-BreaCR_lr_5e-05_wd_1e-06_epochs_30_bs_12_2026-06-07-13-01 \
   --path_test_folder  /scratch/project_465002861/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/csaw/OABreaCR \
   --model "OA-BreaCR" \
-  --use_poe \
   --id_training 1 \
   --batch_size 1 \
   --num_workers 7 \
