@@ -16,7 +16,6 @@ def load_model(args, path_model):
         args=args,
         path_saved_reg_model=path_saved_reg_model,
         max_followup=5,
-        finetune_all=args.finetune_all,
     )
 
     checkpoint = torch.load(path_model, map_location="cpu")
