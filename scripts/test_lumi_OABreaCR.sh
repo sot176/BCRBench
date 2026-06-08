@@ -35,23 +35,23 @@ wandb login
 
 # Run the training script using Singularity
 export PYTHONPATH=$WORKING_DIR
-mkdir -p  /scratch/project_465002861/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/embed/OABreaCR
+mkdir -p  /scratch/project_465002861/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/csaw/OABreaCR
 
 # Run the training script using Singularity
 export PYTHONPATH=$WORKING_DIR
 
 
 accelerate launch  main_test.py \
-  --csv_file /scratch/project_465002861/thrunsol/embed_datasets/combined_cases_with_follow_up_races_new.csv \
-  --data_root /scratch/project_465002861/thrunsol/embed_datasets/risk_dataset_1664_2048 \
-  --path_out_dir /scratch/project_465002861/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/embed/Train_Risk-17149804_Model_OA-BreaCR_lr_5e-05_wd_1e-06_epochs_30_bs_12_2026-04-01-20-11 \
-  --path_test_folder  /scratch/project_465002861/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/embed/OABreaCR \
+  --csv_file /scratch/project_465002861/thrunsol/csawcc_datasets/metadata_csawcc_dcm_path_density_new.csv \
+  --data_root /scratch/project_465002861/thrunsol/csawcc_datasets/Risk_dataset_train_val_test_1664_2048_new \
+  --path_out_dir /scratch/project_465002861/thrunsol/LMV_Risk_prediction_training_results_1664_2048_test_unified_github/csaw/Train_Risk-19092698_Model_OA-BreaCR_lr_5e-05_wd_1e-06_epochs_30_bs_12_2026-06-07-13-01 \
+  --path_test_folder  /scratch/project_465002861/thrunsol/LMV_Risk_prediction_test_results_1664_2048_test_unified_github/csaw/OABreaCR \
   --model "OA-BreaCR" \
   --use_poe \
   --id_training 1 \
   --batch_size 1 \
   --num_workers 7 \
-  --dataset "EMBED" \
+  --dataset "CSAW" \
   --seed 2023 \
 
 
