@@ -34,14 +34,13 @@ class TestSetupLogging:
         assert logger.level == logging.INFO
         
     def test_setup_logging_non_main_process(self, temp_dir):
-        """Test logging setup on non-main process."""
         from src.main_train import setup_logging
-        
+
         log_path = temp_dir / "test.log"
         logger = setup_logging(str(log_path), is_main_process=False)
+
+        assert logger is None
         
-        assert logger is None or len(logger.handlers) == 0
-    
     def test_setup_logging_handlers(self, temp_dir):
         """Test that both file and console handlers are created."""
         from src.main_train import setup_logging
