@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>Adding new models - Breast Cancer Risk Benchmark</title>
+    <title>Adding new models - BCRBench</title>
     <link rel="stylesheet" href="../../css/theme.css" />
     <link rel="stylesheet" href="../../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -30,7 +30,7 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
     <div class="wy-side-scroll">
       <div class="wy-side-nav-search">
-          <a href="../.." class="icon icon-home"> Breast Cancer Risk Benchmark
+          <a href="../.." class="icon icon-home"> BCRBench
         </a><div role="search">
   <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
       <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
@@ -75,6 +75,48 @@
                   <li class="toctree-l1"><a class="reference internal" href="../vmramar/">VMRA-MaR</a>
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Adding new models</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#overview">📦 Overview</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#1-create-a-model-folder">📁 1. Create a Model Folder</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#recommended-structure">Recommended structure:</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#2-inherit-from-baseriskmodel">🧩 2. Inherit from BaseRiskModel</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#base-class-interface">Base Class Interface</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#example">Example:</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#3-add-model-configuration">⚙️ 3. Add Model Configuration</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#4-register-the-model-in-model_factorypy">🏭 4. Register the Model in model_factory.py</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#step-1-add-a-builder-function">Step 1: Add a builder function</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#step-2-add-it-to-the-registry">Step 2: Add it to the registry</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#special-case-registration-based-models">⚠️ Special Case: Registration-Based Models</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#1-add-your-model-name-to">1: Add your model name to:</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#2-accept-mammo_reg_net-in-your-constructor">2: Accept mammo_reg_net in your constructor:</a>
+    </li>
+        </ul>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#final-checklist">✅ Final Checklist</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#tips">💡 Tips</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#contributing">🤝 Contributing</a>
+    </li>
+    </ul>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Training</span></p>
@@ -98,7 +140,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
       <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../..">Breast Cancer Risk Benchmark</a>
+          <a href="../..">BCRBench</a>
         
       </nav>
       <div class="wy-nav-content">
@@ -115,7 +157,154 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                
+                <h1 id="adding-a-new-model-to-the-benchmarking-framework">🧠 Adding a New Model to the Benchmarking Framework</h1>
+<p>This repository provides a unified pipeline for training and evaluating deep learning models for risk prediction. To ensure compatibility, all new models must follow a standard structure and interface.</p>
+<p>This guide explains how to integrate a new model into the framework.</p>
+<hr />
+<h2 id="overview">📦 Overview</h2>
+<p>To add a new model, you need to:<br>
+1. Create a new model module<br />
+2. Inherit from the base model class<br />
+3. Define model-specific configuration<br />
+4. Register the model in the factory  </p>
+<hr />
+<h2 id="1-create-a-model-folder">📁 1. Create a Model Folder</h2>
+<p>Navigate to the <code>models/</code> directory and create a new subfolder for your model:</p>
+<pre><code>models/
+└── your_model_name/
+    ├── model.py
+    └── model_utils.py
+</code></pre>
+<h3 id="recommended-structure">Recommended structure:</h3>
+<ul>
+<li><strong><code>model.py</code></strong> → Main model implementation  </li>
+<li><strong><code>model_utils.py</code></strong> → Helper functions, custom layers, utilities  </li>
+</ul>
+<hr />
+<h2 id="2-inherit-from-baseriskmodel">🧩 2. Inherit from <code>BaseRiskModel</code></h2>
+<p>All models must inherit from the shared base class: <code>models/common_parts/base_models.py</code></p>
+<h3 id="base-class-interface">Base Class Interface</h3>
+<pre><code class="language-python">class BaseRiskModel(nn.Module, ABC):
+
+    def __init__(self, args):
+        super().__init__()
+        self.args = args   
+
+    @abstractmethod
+    def forward(self, batch):
+        &quot;&quot;&quot;Run forward pass. Returns dict of outputs.&quot;&quot;&quot;
+        pass
+
+    @abstractmethod
+    def get_risk_heads(self, outputs, batch):
+        &quot;&quot;&quot;
+        Returns dict of {head_name: (logits, target, mask)}
+        used for loss computation.
+        &quot;&quot;&quot;
+        pass
+
+    @abstractmethod
+    def get_primary_risk_head(self, outputs):
+        &quot;&quot;&quot;
+        Returns main prediction tensor used for evaluation
+        (e.g., AUC, C-index).
+        &quot;&quot;&quot;
+        pass
+</code></pre>
+<h3 id="example">Example:</h3>
+<pre><code>from models.common_parts.base_models import BaseRiskModel
+
+class YourModel(BaseRiskModel):
+    def __init__(self, args):
+        super().__init__(args)
+        # define layers
+
+    def forward(self, batch):
+        # define flow of data through the network
+        outputs = {&quot;logit&quot;: logits, &quot;fcur&quot;: f_cur, &quot;fpri&quot;: f_pri}
+        return outputs
+
+    def get_risk_heads(self, outputs, batch):
+        target = batch[&quot;target&quot;]
+        mask = batch[&quot;y_mask&quot;]
+        return {
+            &quot;main&quot;: (outputs[&quot;logit&quot;], target, mask)
+        }
+
+    def get_primary_risk_head(self, outputs):
+        return torch.sigmoid(outputs[&quot;logit&quot;])
+</code></pre>
+<h2 id="3-add-model-configuration">⚙️ 3. Add Model Configuration</h2>
+<p>Create a YAML configuration file for your model in:</p>
+<p><code>config/models/your_model_name.yaml</code>      </p>
+<p><strong>Purpose:</strong></p>
+<p>Store model-specific hyperparameters that are:<br>
+- fixed by default
+- but configurable by users</p>
+<p><strong>Example:</strong></p>
+<pre><code>model_name: your_model_name
+
+dropout: 0.3
+num_heads: 4
+hidden_dim: 256
+num_layers: 3
+</code></pre>
+<h2 id="4-register-the-model-in-model_factorypy">🏭 4. Register the Model in model_factory.py</h2>
+<p>To make your model available in the pipeline, register it in:</p>
+<p><code>models/model_factory.py</code></p>
+<h3 id="step-1-add-a-builder-function">Step 1: Add a builder function</h3>
+<pre><code>def _build_your_model():
+    from models.your_model_name.model import YourModel
+    return _build_model(YourModel, args=args, **kwargs)
+</code></pre>
+<h3 id="step-2-add-it-to-the-registry">Step 2: Add it to the registry</h3>
+<pre><code>MODEL_REGISTRY = {
+    &quot;Mirai&quot;:        _build_mirai,
+    &quot;ImgFeatAlign&quot;: _build_imgfeatalign,
+    &quot;LMV-Net&quot;:      _build_lmvnet,
+    &quot;VMRA-MaR&quot;:     _build_vmramar,
+    &quot;OA-BreaCR&quot;:    _build_oa_breacr,
+    &quot;YourModel&quot;:    _build_your_model,   # ← add here
+}
+</code></pre>
+<h3 id="special-case-registration-based-models">⚠️ Special Case: Registration-Based Models</h3>
+<p>If your model uses image registration (e.g., MammoRegNet), you must:</p>
+<h4 id="1-add-your-model-name-to">1: Add your model name to:</h4>
+<pre><code>REGISTRATION_MODELS = {&quot;ImgFeatAlign&quot;, &quot;LMV-Net&quot;, &quot;YourModel&quot;}
+</code></pre>
+<h4 id="2-accept-mammo_reg_net-in-your-constructor">2: Accept <code>mammo_reg_net</code> in your constructor:</h4>
+<pre><code>def __init__(self, mammo_reg_net=None, args=None):
+    super().__init__(args)
+    self.mammo_reg_net = mammo_reg_net
+</code></pre>
+<h2 id="final-checklist">✅ Final Checklist</h2>
+<p>Before using your model, ensure:</p>
+<p>✔ Model folder created in <code>models/</code><br>
+ ✔ Inherits from <code>BaseRiskModel</code><br>
+ ✔ Implements required methods:<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; • <code>__init__()</code><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; • <code>forward()</code><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; • <code>get_risk_heads()</code><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; • <code>get_primary_risk_head()</code><br>
+ ✔ YAML config added in <code>config/models/</code><br>
+ ✔ Model registered in <code>model_factory.py</code><br>
+ ✔ (If applicable) Added to <code>REGISTRATION_MODELS</code><br>
+ ✔ Model runs with a small test batch without errors<br>
+ ✔ Output format matches expected pipeline interface</p>
+<h2 id="tips">💡 Tips</h2>
+<ul>
+<li>Keep your model modular and readable<br></li>
+<li>Use model_utils.py for reusable components<br></li>
+<li>Follow naming conventions for consistency<br></li>
+<li>Test your model with a small batch before full training<br></li>
+</ul>
+<h2 id="contributing">🤝 Contributing</h2>
+<p>If you’re adding a new model for benchmarking:</p>
+<ul>
+<li>Ensure it follows this structure</li>
+<li>Provide a short description of the model (add a model page in the Documentation)</li>
+<li>Optionally include references or related papers</li>
+</ul>
               
             </div>
           </div><footer>

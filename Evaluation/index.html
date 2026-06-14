@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>Overview - Breast Cancer Risk Benchmark</title>
+    <title>Overview - BCRBench</title>
     <link rel="stylesheet" href="../css/theme.css" />
     <link rel="stylesheet" href="../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -30,7 +30,7 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
     <div class="wy-side-scroll">
       <div class="wy-side-nav-search">
-          <a href=".." class="icon icon-home"> Breast Cancer Risk Benchmark
+          <a href=".." class="icon icon-home"> BCRBench
         </a><div role="search">
   <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
       <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
@@ -87,6 +87,18 @@
               <p class="caption"><span class="caption-text">Evaluation</span></p>
               <ul class="current">
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Overview</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#overview">📌 Overview</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#supported-models">🤖 Supported Models</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#key-features">🚀 Key Features</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#code-structure">🏗️ Code Structure</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#quick-start">⚡ Quick Start</a>
+    </li>
+    </ul>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="evaluating_a_model/">Evaluating a Model</a>
                   </li>
@@ -98,7 +110,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
       <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="..">Breast Cancer Risk Benchmark</a>
+          <a href="..">BCRBench</a>
         
       </nav>
       <div class="wy-nav-content">
@@ -115,7 +127,92 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                
+                <h1 id="evaluation">🧪 Evaluation</h1>
+<h2 id="overview">📌 Overview</h2>
+<p>This chapter describes the evaluation pipeline for breast cancer risk prediction models. The pipeline supports multi-GPU inference, stratified metric computation, and results logging.</p>
+<p>A unified evaluation framework handles:</p>
+<ul>
+<li>⚙️ Model loading and configuration  </li>
+<li>📂 Test data loading  </li>
+<li>🔍 Model inference and prediction aggregation</li>
+<li>📊 Metric computation with bootstrapped confidence intervals</li>
+<li>💾 Results saving and logging</li>
+</ul>
+<hr />
+<h2 id="supported-models">🤖 Supported Models</h2>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Script</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LMV-Net</strong></td>
+<td><code>scripts/test_lmv_net.sh</code></td>
+</tr>
+<tr>
+<td><strong>ImgFeatAlign</strong></td>
+<td><code>scripts/test_imgfeatalign.sh</code></td>
+</tr>
+<tr>
+<td><strong>VMRA-MaR</strong></td>
+<td><code>scripts/test_vmra_mar.sh</code></td>
+</tr>
+<tr>
+<td><strong>OA-BreaCR</strong></td>
+<td><code>scripts/test_oa_breacr.sh</code></td>
+</tr>
+<tr>
+<td><strong>Mirai</strong></td>
+<td><code>scripts/test_mirai.sh</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="key-features">🚀 Key Features</h2>
+<p><strong>🖥️ Distributed inference</strong><br />
+Built on Hugging Face Accelerate, supporting multi-GPU evaluation with automatic tensor gathering across processes.</p>
+<p><strong>📦 Flexible model loading</strong><br />
+Supports loading either the best checkpoint or the final epoch model, selected via the <code>--best_model</code> flag.</p>
+<p><strong>📊 Comprehensive metrics</strong><br />
+All metrics are computed with <strong>bootstrapped 95% confidence intervals</strong>:</p>
+<ul>
+<li>Overall <strong>C-index</strong> and <strong>yearly AUC</strong> (years 1–5)</li>
+<li>Stratified by <strong>breast density</strong>, <strong>cancer type</strong>, and <strong>race</strong> (EMBED dataset)</li>
+</ul>
+<hr />
+<h2 id="code-structure">🏗️ Code Structure</h2>
+<pre><code class="language-text">main_test.py
+evaluate/
+  test_risk_prediction.py
+  test_utils.py
+</code></pre>
+<ul>
+<li>
+<p><code>main_test.py</code><br />
+  ▶️ Entry point. Handles argument parsing, initializes the Accelerator, builds the test loader, resolves model checkpoint paths, and launches evaluation.</p>
+</li>
+<li>
+<p><code>evaluate/test_risk_prediction.py</code><br />
+  🔁 Contains the main evaluation logic: model loading, inference loop, result aggregation, metric computation, and logging.</p>
+</li>
+<li>
+<p><code>evaluate/test_utils.py</code><br />
+  🧰 Utility functions for model loading (<code>load_model</code>) and distributed tensor gathering (<code>gather_tensor</code>).</p>
+</li>
+</ul>
+<hr />
+<h2 id="quick-start">⚡ Quick Start</h2>
+<p>To evaluate a model, run the corresponding script:</p>
+<pre><code class="language-bash">bash scripts/test_lmv_net.sh
+bash scripts/test_imgfeatalign.sh
+bash scripts/test_vmra_mar.sh
+bash scripts/test_oa_breacr.sh
+bash scripts/test_mirai.sh
+</code></pre>
+<p>Each script points to the relevant config under <code>config/models/&lt;model&gt;.yaml</code> and sets the required CLI arguments. For a full description of all arguments, see <strong>Evaluating a Model</strong> (<code>evaluating_a_model.md</code>).</p>
               
             </div>
           </div><footer>

@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>Overview - Breast Cancer Risk Benchmark</title>
+    <title>Overview - BCRBench</title>
     <link rel="stylesheet" href="../css/theme.css" />
     <link rel="stylesheet" href="../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -30,7 +30,7 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
     <div class="wy-side-scroll">
       <div class="wy-side-nav-search">
-          <a href=".." class="icon icon-home"> Breast Cancer Risk Benchmark
+          <a href=".." class="icon icon-home"> BCRBench
         </a><div role="search">
   <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
       <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
@@ -80,6 +80,18 @@
               <p class="caption"><span class="caption-text">Training</span></p>
               <ul class="current">
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Overview</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#overview">📌 Overview</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#supported-models">🤖 Supported Models</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#key-features">🚀 Key Features</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#code-structure">🏗️ Code Structure</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#quick-start">⚡ Quick Start</a>
+    </li>
+    </ul>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="training_a_model/">Training a Model</a>
                   </li>
@@ -98,7 +110,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
       <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="..">Breast Cancer Risk Benchmark</a>
+          <a href="..">BCRBench</a>
         
       </nav>
       <div class="wy-nav-content">
@@ -115,7 +127,111 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                
+                <h1 id="training">🧠 Training</h1>
+<h2 id="overview">📌 Overview</h2>
+<p>This chapter describes the training pipeline for breast cancer risk prediction models. The pipeline is designed to support multiple model architectures, distributed multi-GPU training, and comprehensive experiment tracking via 📊 Weights &amp; Biases.</p>
+<p>A unified training framework handles:</p>
+<ul>
+<li>⚙️ Model initialization  </li>
+<li>📂 Data loading and preprocessing  </li>
+<li>📈 Optimization and learning rate scheduling  </li>
+<li>🧪 Evaluation and metric computation  </li>
+<li>💾 Checkpointing and logging  </li>
+</ul>
+<hr />
+<h2 id="supported-models">🤖 Supported Models</h2>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Script</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LMV-Net</strong></td>
+<td><code>scripts/train_lmv_net.sh</code></td>
+</tr>
+<tr>
+<td><strong>ImgFeatAlign</strong></td>
+<td><code>scripts/train_imgfeatalign.sh</code></td>
+</tr>
+<tr>
+<td><strong>VMRA-MaR</strong></td>
+<td><code>scripts/train_vmra_mar.sh</code></td>
+</tr>
+<tr>
+<td><strong>OA-BreaCR</strong></td>
+<td><code>scripts/train_oa_breacr.sh</code></td>
+</tr>
+<tr>
+<td><strong>Mirai</strong></td>
+<td><code>scripts/train_mirai.sh</code></td>
+</tr>
+</tbody>
+</table>
+<p>Each model is launched via its corresponding shell script in the <code>scripts/</code> directory, where model-specific configurations and arguments are defined.</p>
+<hr />
+<h2 id="key-features">🚀 Key Features</h2>
+<p><strong>🧩 Modular design</strong><br />
+All models integrate into a shared training loop through a common <code>BaseRiskModel</code> interface, enabling easy extensibility and comparison.</p>
+<p><strong>🖥️ Distributed training</strong><br />
+Built on Hugging Face Accelerate, the pipeline supports multi-GPU and multi-node training using <code>DistributedDataParallel</code>. Mixed precision is handled automatically.</p>
+<p><strong>📉 Learning rate scheduling</strong><br />
+Training begins with a linear warmup phase for a configurable number of steps. This can be followed by an optional <code>ReduceLROnPlateau</code> scheduler, which lowers the learning rate when the validation C-index stops improving.</p>
+<p><strong>⚖️ Differential learning rates</strong><br />
+Pretrained encoder parameters are trained with a lower learning rate (typically 10× smaller) than newly initialized layers, helping to prevent catastrophic forgetting during fine-tuning.</p>
+<p><strong>🖼️ Data augmentation</strong><br />
+An optional augmentation pipeline based on Kornia applies transformations such as random cropping, resizing, affine transforms, color jitter, and gamma correction during training.</p>
+<p><strong>💾 Checkpointing and resumption</strong><br />
+Model checkpoints are saved every 10 epochs and whenever a new best validation C-index is achieved. Training can be resumed from any checkpoint, restoring:</p>
+<ul>
+<li>🧠 Model weights  </li>
+<li>🔧 Optimizer state  </li>
+<li>📊 Scheduler state  </li>
+<li>🔢 Global training step  </li>
+</ul>
+<p><strong>⏹️ Early stopping</strong><br />
+Training automatically stops if the validation C-index does not improve for a specified number of epochs. The best-performing model is preserved.</p>
+<p><strong>📊 Experiment tracking</strong><br />
+All training metrics—including loss, C-index, and per-year AUC (years 1–5)—are logged to Weights &amp; Biases. Runs can be resumed using a WandB run ID.</p>
+<hr />
+<h2 id="code-structure">🏗️ Code Structure</h2>
+<p>The training pipeline is organized into three main components:</p>
+<pre><code class="language-text">main_train.py
+train/
+  train_risk_prediction.py
+  train_utils.py
+</code></pre>
+<ul>
+<li>
+<p><code>main_train.py</code><br />
+  ▶️ Entry point for training. Handles argument parsing, initializes the Accelerator, prepares data loaders, and starts the training process.</p>
+</li>
+<li>
+<p><code>train/train_risk_prediction.py</code><br />
+  🔁 Contains the main training loop, including epoch iteration, checkpointing, and early stopping.</p>
+</li>
+<li>
+<p><code>train/train_utils.py</code><br />
+  🧰 Implements core functionality such as:</p>
+</li>
+<li><code>train_one_epoch()</code></li>
+<li><code>evaluate()</code></li>
+<li>learning rate schedulers</li>
+<li>checkpoint utilities</li>
+</ul>
+<p>The <code>main_train.py</code> script delegates execution to <code>train_val()</code> in <code>train_risk_prediction.py</code>, which in turn calls the lower-level training and evaluation functions.</p>
+<hr />
+<h2 id="quick-start">⚡ Quick Start</h2>
+<p>To train a model, run the corresponding script:</p>
+<pre><code class="language-bash">bash scripts/train_lmv_net.sh
+bash scripts/train_imgfeatalign.sh
+bash scripts/train_vmra_mar.sh
+bash scripts/train_oa_breacr.sh
+bash scripts/train_mirai.sh
+</code></pre>
+<p>For a detailed guide on configuration options, arguments, and the full training workflow, refer to <strong>Training a Model</strong> (<code>training_a_model.md</code>).</p>
               
             </div>
           </div><footer>

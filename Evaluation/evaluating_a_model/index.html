@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>Evaluating a Model - Breast Cancer Risk Benchmark</title>
+    <title>Evaluating a Model - BCRBench</title>
     <link rel="stylesheet" href="../../css/theme.css" />
     <link rel="stylesheet" href="../../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -30,7 +30,7 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
     <div class="wy-side-scroll">
       <div class="wy-side-nav-search">
-          <a href="../.." class="icon icon-home"> Breast Cancer Risk Benchmark
+          <a href="../.." class="icon icon-home"> BCRBench
         </a><div role="search">
   <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
       <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
@@ -89,6 +89,44 @@
                   <li class="toctree-l1"><a class="reference internal" href="../">Overview</a>
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Evaluating a Model</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#prerequisites">✅ Prerequisites</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#running-evaluation">🚀 Running Evaluation</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#cli-arguments">🧾 CLI Arguments</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#required">🔴 Required</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#key-optional">🟡 Key Optional</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#configuration-system">⚙️ Configuration System</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#evaluation-pipeline">🔄 Evaluation Pipeline</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#1-argument-parsing-setup">1️⃣ Argument Parsing &amp; Setup</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#2-accelerator-initialisation">2️⃣ Accelerator Initialisation</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#3-reproducibility">3️⃣ 🔁 Reproducibility</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#4-data-loading">4️⃣ 📦 Data Loading</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#5-model-loading">5️⃣ 🧠 Model Loading</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#6-inference-loop">6️⃣ 🔍 Inference Loop</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#7-aggregation-metric-computation">7️⃣ 📊 Aggregation &amp; Metric Computation</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#output-directory">📁 Output Directory</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#final-results">📋 Final Results</a>
+    </li>
+    </ul>
                   </li>
               </ul>
       </div>
@@ -98,7 +136,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
       <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../..">Breast Cancer Risk Benchmark</a>
+          <a href="../..">BCRBench</a>
         
       </nav>
       <div class="wy-nav-content">
@@ -115,7 +153,268 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                
+                <h1 id="evaluating-a-model">🧪 Evaluating a Model</h1>
+<p>This guide walks you through everything needed to run an evaluation job: prerequisites, configuration, launching evaluation, and understanding what happens at each stage.</p>
+<hr />
+<h2 id="prerequisites">✅ Prerequisites</h2>
+<p><strong>🧪 Environment</strong><br />
+Ensure all dependencies are installed. The pipeline requires:</p>
+<ul>
+<li>PyTorch  </li>
+<li>Hugging Face Accelerate  </li>
+</ul>
+<p><strong>📂 Data</strong><br />
+Evaluation expects:</p>
+<ul>
+<li>A CSV file with a predefined <code>test</code> split column  </li>
+<li>A root directory containing the image data  </li>
+</ul>
+<p>The exact CSV schema depends on the dataset (<code>EMBED</code> or <code>CSAW</code>).</p>
+<p><strong>⚙️ Model configuration</strong><br />
+Each model has a YAML configuration file under <code>config/models/</code>. For example, <code>LMV-Net</code> uses:</p>
+<pre><code>config/models/lmv_net.yaml
+</code></pre>
+<p>These files define model-specific hyperparameters that extend the base CLI arguments. If no YAML is found, the pipeline falls back to CLI defaults.</p>
+<p><strong>🧩 Registration model</strong><br />
+<code>ImgFeatAlign</code> and <code>LMV-Net</code> require a pretrained <code>MammoRegNet</code> registration model. The path is defined in:</p>
+<pre><code>config/config.py
+</code></pre>
+<ul>
+<li><code>paths.csaw_path_saved_reg_model</code>  </li>
+<li><code>paths.embed_path_saved_reg_model</code>  </li>
+</ul>
+<p>(depending on the dataset)</p>
+<p><strong>🏋️ Trained model checkpoint</strong><br />
+A trained model checkpoint is required. You can use either:</p>
+<ul>
+<li>The <strong>best</strong> checkpoint: <code>best_model_risk_prediction_id-{id}.pth</code>  </li>
+<li>The <strong>last epoch</strong> checkpoint: <code>model_risk_prediction_training_id_{id}_last_epoch.pth</code>  </li>
+</ul>
+<p>Select between them using <code>--best_model True/False</code>.</p>
+<hr />
+<h2 id="running-evaluation">🚀 Running Evaluation</h2>
+<p>Each model has a dedicated shell script that sets all required arguments:</p>
+<pre><code class="language-bash">bash scripts/test_lmv_net.sh
+bash scripts/test_imgfeatalign.sh
+bash scripts/test_vmra_mar.sh
+bash scripts/test_oa_breacr.sh
+bash scripts/test_mirai.sh
+</code></pre>
+<p>👉 Use <code>accelerate launch</code> (instead of <code>python</code>) to enable multi-GPU evaluation.</p>
+<hr />
+<h2 id="cli-arguments">🧾 CLI Arguments</h2>
+<h3 id="required">🔴 Required</h3>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--model</code></td>
+<td>Model name (e.g. <code>Mirai</code>, <code>OA-BreaCR</code>, <code>VMRA-MaR</code>, <code>ImgFeatAlign</code>, <code>LMV-Net</code>)</td>
+</tr>
+<tr>
+<td><code>--dataset</code></td>
+<td>Dataset name: <code>EMBED</code> or <code>CSAW</code></td>
+</tr>
+<tr>
+<td><code>--csv_file</code></td>
+<td>Path to CSV file containing the test split</td>
+</tr>
+<tr>
+<td><code>--data_root</code></td>
+<td>Root directory of image data</td>
+</tr>
+<tr>
+<td><code>--path_out_dir</code></td>
+<td>Directory where the trained model checkpoint is stored</td>
+</tr>
+<tr>
+<td><code>--path_test_folder</code></td>
+<td>Output directory for evaluation results and logs</td>
+</tr>
+<tr>
+<td><code>--id_training</code></td>
+<td>Training run ID used to resolve the checkpoint filename</td>
+</tr>
+</tbody>
+</table>
+<h3 id="key-optional">🟡 Key Optional</h3>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--batch_size</code></td>
+<td>20</td>
+<td>Batch size per GPU</td>
+</tr>
+<tr>
+<td><code>--num_workers</code></td>
+<td>4</td>
+<td>DataLoader worker processes</td>
+</tr>
+<tr>
+<td><code>--best_model</code></td>
+<td>—</td>
+<td>If <code>True</code>, loads the best checkpoint; otherwise loads the last epoch</td>
+</tr>
+<tr>
+<td><code>--seed</code></td>
+<td>—</td>
+<td>Random seed for reproducibility</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="configuration-system">⚙️ Configuration System</h2>
+<p>Argument loading occurs in two stages:</p>
+<ol>
+<li><strong>CLI arguments</strong> are parsed first (including <code>--model</code>)</li>
+<li><strong>Model YAML config</strong> is loaded from:</li>
+</ol>
+<pre><code>config/models/&lt;model_name&gt;.yaml
+</code></pre>
+<p>YAML values are added as CLI defaults and can always be overridden on the command line.</p>
+<hr />
+<h2 id="evaluation-pipeline">🔄 Evaluation Pipeline</h2>
+<p>When evaluation starts, the following steps occur:</p>
+<h3 id="1-argument-parsing-setup">1️⃣ Argument Parsing &amp; Setup</h3>
+<p><code>main_test.py</code>:</p>
+<ul>
+<li>Parses CLI arguments  </li>
+<li>Loads YAML config  </li>
+<li>Resolves the checkpoint path based on <code>--id_training</code> and <code>--best_model</code>:</li>
+</ul>
+<pre><code>best_model_risk_prediction_id-{id}.pth           # if --best_model True
+model_risk_prediction_training_id_{id}_last_epoch.pth  # otherwise
+</code></pre>
+<hr />
+<h3 id="2-accelerator-initialisation">2️⃣ Accelerator Initialisation</h3>
+<p>A Hugging Face <code>Accelerator</code> is created, enabling:</p>
+<ul>
+<li>Multi-GPU inference  </li>
+<li>Automatic device placement  </li>
+<li>Distributed tensor gathering across processes  </li>
+</ul>
+<hr />
+<h3 id="3-reproducibility">3️⃣ 🔁 Reproducibility</h3>
+<p>If <code>--seed</code> is provided, seeds are set for:</p>
+<ul>
+<li><code>random</code>  </li>
+<li><code>torch</code>  </li>
+<li><code>torch.cuda</code>  </li>
+</ul>
+<hr />
+<h3 id="4-data-loading">4️⃣ 📦 Data Loading</h3>
+<p><code>get_dataset_and_loader()</code> creates a test <code>DataLoader</code> for the <code>test</code> split.</p>
+<p>👉 No augmentation is applied during evaluation.</p>
+<hr />
+<h3 id="5-model-loading">5️⃣ 🧠 Model Loading</h3>
+<p>Handled by <code>load_model()</code> in <code>evaluate/test_utils.py</code>:</p>
+<ol>
+<li>Model is instantiated via <code>models/model_factory.py</code></li>
+<li>Checkpoint is loaded from disk (<code>map_location="cpu"</code>)</li>
+<li>State dict is extracted — supports checkpoints saved as:</li>
+<li>Raw state dict  </li>
+<li>Dict with <code>"model"</code> or <code>"state_dict"</code> key  </li>
+<li><code>module.</code> prefixes are stripped (from <code>DataParallel</code> wrapping)</li>
+<li>Weights are loaded and model is set to <code>eval()</code> mode</li>
+</ol>
+<p>The model and test loader are then wrapped with:</p>
+<pre><code class="language-python">accelerator.prepare()
+</code></pre>
+<hr />
+<h3 id="6-inference-loop">6️⃣ 🔍 Inference Loop</h3>
+<p>Runs under <code>torch.no_grad()</code>. For each batch, the following are collected and gathered across all GPUs:</p>
+<ul>
+<li><code>preds</code> — risk predictions from the primary risk head  </li>
+<li><code>event_times</code> — follow-up times  </li>
+<li><code>event_observed</code> — event indicators  </li>
+<li><code>densities</code> — breast density categories  </li>
+<li><code>cancer_types</code> — cancer type categories  </li>
+<li><code>races</code> — race IDs (EMBED dataset only)  </li>
+</ul>
+<hr />
+<h3 id="7-aggregation-metric-computation">7️⃣ 📊 Aggregation &amp; Metric Computation</h3>
+<p>After inference, the main process:</p>
+<ol>
+<li>Concatenates all gathered tensors  </li>
+<li>Computes the <strong>censoring distribution</strong> from event times and indicators  </li>
+<li>Saves raw predictions and metadata to disk via <code>save_model_results_to_file()</code>  </li>
+<li>Computes all metrics with <strong>bootstrapped 95% confidence intervals</strong>:</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Stratification</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C-index</td>
+<td>Overall</td>
+</tr>
+<tr>
+<td>AUC (years 1–5)</td>
+<td>Overall</td>
+</tr>
+<tr>
+<td>AUC</td>
+<td>By breast density</td>
+</tr>
+<tr>
+<td>C-index</td>
+<td>By breast density</td>
+</tr>
+<tr>
+<td>AUC</td>
+<td>By cancer type</td>
+</tr>
+<tr>
+<td>C-index</td>
+<td>By cancer type</td>
+</tr>
+<tr>
+<td>AUC</td>
+<td>By race (EMBED only)</td>
+</tr>
+<tr>
+<td>C-index</td>
+<td>By race (EMBED only)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="output-directory">📁 Output Directory</h2>
+<pre><code>{path_test_folder}/
+  test_risk_prediction_training_id_{id}.log
+  c_index_by_density.json
+  c_index_by_cancer_type.json
+  c_index_by_race.json        # EMBED only
+</code></pre>
+<p>All per-subgroup C-index results are saved as JSON files for downstream analysis.</p>
+<hr />
+<h2 id="final-results">📋 Final Results</h2>
+<p>At the end of evaluation, a structured results dict is printed and written to the log file:</p>
+<pre><code>C-index:              Mean + 95% CI
+Yearly AUCs:          Years 1–5, Mean + 95% CI
+AUC by density:       Per density category  Mean + 95% CI
+C-index by density:   Per density category  Mean + 95% CI
+AUC by cancer type:   Per cancer type  Mean + 95% CI
+C-index by cancer type: Per cancer type  Mean + 95% CI
+AUC by race:          Per race group (EMBED only)  Mean + 95% CI
+C-index by race:      Per race group (EMBED only)  Mean + 95% CI
+</code></pre>
               
             </div>
           </div><footer>

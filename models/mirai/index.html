@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>Mirai - Breast Cancer Risk Benchmark</title>
+    <title>Mirai - BCRBench</title>
     <link rel="stylesheet" href="../../css/theme.css" />
     <link rel="stylesheet" href="../../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -30,7 +30,7 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
     <div class="wy-side-scroll">
       <div class="wy-side-nav-search">
-          <a href="../.." class="icon icon-home"> Breast Cancer Risk Benchmark
+          <a href="../.." class="icon icon-home"> BCRBench
         </a><div role="search">
   <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
       <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
@@ -90,6 +90,14 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#output">Output</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#helper-methods">Helper Methods</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#get_risk_headsoutputs-batch">get_risk_heads(outputs, batch)</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#get_primary_risk_headoutputs">get_primary_risk_head(outputs)</a>
+    </li>
+        </ul>
+    </li>
         </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#integration-in-this-framework">🧩 Integration in This Framework</a>
@@ -126,7 +134,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
       <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../..">Breast Cancer Risk Benchmark</a>
+          <a href="../..">BCRBench</a>
         
       </nav>
       <div class="wy-nav-content">
@@ -145,8 +153,8 @@
               
                 <h1 id="mirai">Mirai</h1>
 <h2 id="overview">📌 Overview</h2>
-<p><strong>Mirai</strong> is a longitudinal breast cancer risk prediction model that combines a <strong>deep image encoder</strong> with a <strong>transformer-based temporal model</strong> to estimate future cancer risk from a sequence of mammograms.</p>
-<p>The model processes multiple screening exams jointly and learns temporal patterns directly from image-derived representations, enabling it to capture <strong>long-term risk signals across time</strong>.</p>
+<p>Mirai is a longitudinal breast cancer risk prediction model that combines a <strong>deep image encoder</strong> with a <strong>transformer-based temporal model</strong> to estimate future cancer risk from a sequence of mammograms.</p>
+<p>The model processes all screening images from a patient jointly and learns a patient wise breast cancer risk directly from image-derived representations.</p>
 <hr />
 <h2 id="key-idea">🧠 Key Idea</h2>
 <p>Mirai is built around three core ideas:</p>
@@ -184,7 +192,7 @@
 <p>Key details:
 - Can be initialized from a pretrained encoder snapshot<br />
 - Can be initialized from a pretrained transformer snapshot<br />
-- Learns interactions between vies and breasts</p>
+- Learns interactions between views and breasts</p>
 <hr />
 <h2 id="input-output">🔄 Input / Output</h2>
 <h3 id="input">Input</h3>
@@ -206,6 +214,15 @@
 <li><code>activ_dict</code>: Optional intermediate activations  </li>
 </ul>
 <hr />
+<h3 id="helper-methods">Helper Methods</h3>
+<h4 id="get_risk_headsoutputs-batch"><strong><code>get_risk_heads(outputs, batch)</code></strong></h4>
+<p>Returns:  <code>("logit_output", (logit, target, y_mask))</code></p>
+<p>Used for training with survival or multi-horizon loss.</p>
+<hr />
+<h4 id="get_primary_risk_headoutputs"><strong><code>get_primary_risk_head(outputs)</code></strong></h4>
+<p>Returns: <code>sigmoid(logit)</code></p>
+<p>This is the <strong>final risk prediction</strong> used for evaluation.</p>
+<hr />
 <h2 id="integration-in-this-framework">🧩 Integration in This Framework</h2>
 <p>Mirai is implemented as a subclass of <code>BaseRiskModel</code> and:</p>
 <ul>
@@ -217,17 +234,10 @@
 <hr />
 <h2 id="key-components">⚙️ Key Components</h2>
 <ul>
+<li><strong>Image Encoder:</strong> : Extracts feature vectors from  mammograms  </li>
+<li><strong>Transformer Model:</strong> : Learn dependencies across rbeasts and views </li>
 <li>
-<p><strong>Image Encoder:</strong><br />
-  Extracts feature vectors from  mammograms  </p>
-</li>
-<li>
-<p><strong>Transformer Model:</strong><br />
-  Learn dependencies across rbeasts and views </p>
-</li>
-<li>
-<p><strong>Snapshot Loading (<code>load_model</code>):</strong><br />
-  Enables reuse of pretrained encoder and transformer weights  </p>
+<p><strong>Snapshot Loading (<code>load_model</code>):</strong>:   Enables reuse of pretrained encoder and transformer weights  </p>
 </li>
 <li>
 <p><strong>Freezing Mechanism:</strong><br />

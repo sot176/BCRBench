@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>Training a Model - Breast Cancer Risk Benchmark</title>
+    <title>Training a Model - BCRBench</title>
     <link rel="stylesheet" href="../../css/theme.css" />
     <link rel="stylesheet" href="../../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -30,7 +30,7 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
     <div class="wy-side-scroll">
       <div class="wy-side-nav-search">
-          <a href="../.." class="icon icon-home"> Breast Cancer Risk Benchmark
+          <a href="../.." class="icon icon-home"> BCRBench
         </a><div role="search">
   <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
       <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
@@ -82,6 +82,60 @@
                   <li class="toctree-l1"><a class="reference internal" href="../">Overview</a>
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Training a Model</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#prerequisites">✅ Prerequisites</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#running-training">🚀 Running Training</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#cli-arguments">🧾 CLI Arguments</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#required">🔴 Required</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#key-optional">🟡 Key Optional</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#configuration-system">⚙️ Configuration System</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#training-pipeline">🔄 Training Pipeline</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#1-argument-parsing-setup">1️⃣ Argument Parsing &amp; Setup</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#2-accelerator-initialisation">2️⃣ Accelerator Initialisation</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#3-reproducibility">3️⃣ 🔁 Reproducibility</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#4-data-loading">4️⃣ 📦 Data Loading</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#5-model-initialisation">5️⃣ 🧠 Model Initialisation</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#6-optimizer-schedulers">6️⃣ 📉 Optimizer &amp; Schedulers</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#7-epoch-loop">7️⃣ 🔁 Epoch Loop</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#learning-rate-scheduling">📉 Learning Rate Scheduling</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#checkpointing">💾 Checkpointing</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#resume-training">🔄 Resume Training</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#early-stopping">⏹️ Early Stopping</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#output-directory">📁 Output Directory</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#data-augmentation">🖼️ Data Augmentation</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#experiment-tracking-wandb">📊 Experiment Tracking (WandB)</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#resume-logging">🔄 Resume Logging</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Evaluation</span></p>
@@ -98,7 +152,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
       <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../..">Breast Cancer Risk Benchmark</a>
+          <a href="../..">BCRBench</a>
         
       </nav>
       <div class="wy-nav-content">
@@ -115,7 +169,375 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                
+                <h1 id="training-a-model">🧠 Training a Model</h1>
+<p>This guide walks you through everything needed to run a training job: prerequisites, configuration, launching training, and understanding what happens at each stage.</p>
+<hr />
+<h2 id="prerequisites">✅ Prerequisites</h2>
+<p><strong>🧪 Environment</strong><br />
+Ensure all dependencies are installed. The pipeline requires:</p>
+<ul>
+<li>PyTorch  </li>
+<li>Hugging Face Accelerate  </li>
+<li>Kornia  </li>
+<li>Weights &amp; Biases (WandB)  </li>
+</ul>
+<p><strong>📂 Data</strong><br />
+Training expects:</p>
+<ul>
+<li>A CSV file with predefined <code>train</code> / <code>val</code> split columns  </li>
+<li>A root directory containing the image data  </li>
+</ul>
+<p>The exact CSV schema depends on the dataset (<code>EMBED</code> or <code>CSAW</code>).</p>
+<p><strong>⚙️ Model configuration</strong><br />
+Each model has a YAML configuration file under <code>config/models/</code>. For example, <code>LMV-Net</code> uses:</p>
+<pre><code>config/models/lmv_net.yaml
+</code></pre>
+<p>These files define model-specific hyperparameters (e.g. <code>distance</code>, <code>alpha_coeff</code>, <code>margin</code>, <code>dropout</code>, <code>num_attn_blocks</code>, etc.) that extend the base CLI arguments. If no YAML is found, the pipeline falls back to CLI defaults.</p>
+<p><strong>🧩 Registration model</strong><br />
+<code>ImgFeatAlign</code> and <code>LMV-Net</code> require a pretrained <code>MammoRegNet</code> registration model. The path is defined in:</p>
+<pre><code>config/config.py
+</code></pre>
+<ul>
+<li><code>paths.csaw_path_saved_reg_model</code>  </li>
+<li><code>paths.embed_path_saved_reg_model</code>  </li>
+</ul>
+<p>(depending on the dataset)</p>
+<hr />
+<h2 id="running-training">🚀 Running Training</h2>
+<p>Each model has a dedicated shell script that sets all required arguments:</p>
+<pre><code class="language-bash">bash scripts/train_lmv_net.sh
+bash scripts/train_imgfeatalign.sh
+bash scripts/train_vmra_mar.sh
+bash scripts/train_oa_breacr.sh
+bash scripts/train_mirai.sh
+</code></pre>
+<p>👉 Use <code>accelerate launch</code> (instead of <code>python</code>) to enable multi-GPU training.</p>
+<hr />
+<h2 id="cli-arguments">🧾 CLI Arguments</h2>
+<h3 id="required">🔴 Required</h3>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--model</code></td>
+<td>Model name (e.g. <code>Mirai</code>, <code>OA-BreaCR</code>, <code>VMRA-MaR</code>, <code>ImgFeatAlign</code>, <code>LMV-Net</code>)</td>
+</tr>
+<tr>
+<td><code>--dataset</code></td>
+<td>Dataset name: <code>EMBED</code> or <code>CSAW</code></td>
+</tr>
+<tr>
+<td><code>--csv_file</code></td>
+<td>Path to CSV file containing data splits</td>
+</tr>
+<tr>
+<td><code>--data_root</code></td>
+<td>Root directory of image data</td>
+</tr>
+<tr>
+<td><code>--path_out_dir</code></td>
+<td>Base output directory (timestamped subdirectory is created automatically)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="key-optional">🟡 Key Optional</h3>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--num_epochs</code></td>
+<td>100</td>
+<td>Number of training epochs</td>
+</tr>
+<tr>
+<td><code>--batch_size</code></td>
+<td>12</td>
+<td>Batch size per GPU</td>
+</tr>
+<tr>
+<td><code>--learning_rate</code></td>
+<td>5e-5</td>
+<td>Learning rate for newly added modules</td>
+</tr>
+<tr>
+<td><code>--weight_decay</code></td>
+<td>1e-4</td>
+<td>AdamW weight decay</td>
+</tr>
+<tr>
+<td><code>--warmup_steps</code></td>
+<td>5000</td>
+<td>Number of warmup steps</td>
+</tr>
+<tr>
+<td><code>--use_scheduler</code></td>
+<td>True</td>
+<td>Enable <code>ReduceLROnPlateau</code></td>
+</tr>
+<tr>
+<td><code>--patience_lr_scheduler</code></td>
+<td>5</td>
+<td>Epochs before LR reduction</td>
+</tr>
+<tr>
+<td><code>--lr_decay</code></td>
+<td>0.5</td>
+<td>LR reduction factor</td>
+</tr>
+<tr>
+<td><code>--patience</code></td>
+<td>15</td>
+<td>Early stopping patience</td>
+</tr>
+<tr>
+<td><code>--augmentations</code></td>
+<td>True</td>
+<td>Enable data augmentation</td>
+</tr>
+<tr>
+<td><code>--resume_from</code></td>
+<td>None</td>
+<td>Path to checkpoint</td>
+</tr>
+<tr>
+<td><code>--wandb_id</code></td>
+<td>None</td>
+<td>WandB run ID for resuming</td>
+</tr>
+<tr>
+<td><code>--seed</code></td>
+<td>2023</td>
+<td>Random seed</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="configuration-system">⚙️ Configuration System</h2>
+<p>Argument loading occurs in two stages:</p>
+<ol>
+<li><strong>CLI arguments</strong> are parsed first (including <code>--model</code>)</li>
+<li><strong>Model YAML config</strong> is loaded from:</li>
+</ol>
+<pre><code>config/models/&lt;model_name&gt;.yaml
+</code></pre>
+<p>YAML values are added as CLI defaults and can always be overridden.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">--dropout 0.3
+</code></pre>
+<p>overrides:</p>
+<pre><code class="language-yaml">dropout: 0.1
+</code></pre>
+<hr />
+<h2 id="training-pipeline">🔄 Training Pipeline</h2>
+<p>When training starts, the following steps occur:</p>
+<h3 id="1-argument-parsing-setup">1️⃣ Argument Parsing &amp; Setup</h3>
+<p><code>main_train.py</code>:</p>
+<ul>
+<li>Parses CLI arguments  </li>
+<li>Loads YAML config  </li>
+<li>Creates a timestamped output directory:</li>
+</ul>
+<pre><code>{path_out_dir}_Model_{model}_lr_{lr}_wd_{wd}_epochs_{n}_bs_{bs}_{timestamp}/
+</code></pre>
+<hr />
+<h3 id="2-accelerator-initialisation">2️⃣ Accelerator Initialisation</h3>
+<p>A Hugging Face <code>Accelerator</code> is created:</p>
+<p>This enables:</p>
+<ul>
+<li>Multi-GPU training  </li>
+<li>Mixed precision  </li>
+<li>Automatic device placement  </li>
+<li>Gradient synchronisation  </li>
+</ul>
+<hr />
+<h3 id="3-reproducibility">3️⃣ 🔁 Reproducibility</h3>
+<p>Seeds are set for:</p>
+<ul>
+<li><code>random</code>  </li>
+<li><code>torch</code>  </li>
+<li><code>torch.cuda</code>  </li>
+</ul>
+<p>cuDNN runs in deterministic mode.</p>
+<hr />
+<h3 id="4-data-loading">4️⃣ 📦 Data Loading</h3>
+<p><code>get_dataset_and_loader()</code>:</p>
+<ul>
+<li>Creates training and validation <code>DataLoader</code>s  </li>
+<li>Automatically shards training data across GPUs  </li>
+</ul>
+<p>👉 No augmentation is applied to validation data  </p>
+<hr />
+<h3 id="5-model-initialisation">5️⃣ 🧠 Model Initialisation</h3>
+<p>Models are loaded via:</p>
+<pre><code>models/model_factory.py
+</code></pre>
+<p><strong>Differential learning rates:</strong></p>
+<ul>
+<li>🔹 New modules → <code>learning_rate</code>  </li>
+<li>🔹 Encoder → <code>learning_rate × 0.1</code>  (for pretrained Mirai encoder)</li>
+<li>🔹 OA-BreaCR → Encoder trained from scratch (no reduction)  </li>
+</ul>
+<p>This prevents destabilising pretrained encoders.</p>
+<hr />
+<h3 id="6-optimizer-schedulers">6️⃣ 📉 Optimizer &amp; Schedulers</h3>
+<p><strong>Optimizer:</strong><br />
+- AdamW over parameter groups  </p>
+<p><strong>Schedulers:</strong></p>
+<ul>
+<li>
+<p>🔥 <strong>Warmup (LambdaLR)</strong>  </p>
+<ul>
+<li>Linear increase from 0 → base LR  </li>
+<li>Steps every batch  </li>
+</ul>
+</li>
+<li>
+<p>⏳ <strong>Plateau (ReduceLROnPlateau, optional)</strong>  </p>
+<ul>
+<li>Reduces LR when validation C-index plateaus  </li>
+<li>Activates only after warmup  </li>
+</ul>
+</li>
+</ul>
+<p>All components are wrapped with:</p>
+<pre><code class="language-python">accelerator.prepare()
+</code></pre>
+<hr />
+<h3 id="7-epoch-loop">7️⃣ 🔁 Epoch Loop</h3>
+<p>Each epoch consists of:</p>
+<p><strong>🏋️ Training (<code>train_one_epoch</code>)</strong></p>
+<ul>
+<li>Forward pass  </li>
+<li>Loss computation  </li>
+<li><code>accelerator.backward()</code>  </li>
+<li>Optimizer step  </li>
+<li>Warmup scheduler step (per batch)  </li>
+</ul>
+<p>Metrics:</p>
+<ul>
+<li>C-index  </li>
+<li>Per-year AUC  </li>
+</ul>
+<hr />
+<p><strong>🧪 Validation (<code>evaluate</code>)</strong></p>
+<ul>
+<li>Runs under <code>torch.no_grad()</code>  </li>
+<li>Computes:<ul>
+<li>Loss  </li>
+<li>C-index  </li>
+<li>Per-year AUC  </li>
+</ul>
+</li>
+</ul>
+<hr />
+<p><strong>📊 Logging</strong></p>
+<ul>
+<li>Written to log file  </li>
+<li>Logged to WandB (main process only)</li>
+</ul>
+<hr />
+<p><strong>📉 Scheduler Step</strong></p>
+<ul>
+<li>Plateau scheduler updates after warmup  </li>
+<li>Uses validation C-index  </li>
+</ul>
+<hr />
+<p><strong>💾 Checkpointing &amp; Early Stopping</strong></p>
+<ul>
+<li>Handled automatically (see below)</li>
+</ul>
+<hr />
+<h2 id="learning-rate-scheduling">📉 Learning Rate Scheduling</h2>
+<p>Two-phase schedule:</p>
+<pre><code>Steps 0 → warmup_steps     LR increases linearly (per batch)
+Steps &gt; warmup_steps       LR constant or reduced on plateau (per epoch)
+</code></pre>
+<p>The plateau scheduler is disabled during warmup to avoid premature LR decay.</p>
+<hr />
+<h2 id="checkpointing">💾 Checkpointing</h2>
+<p>Checkpoints are saved:</p>
+<ul>
+<li>📌 Every 10 epochs  </li>
+<li>🏆 When a new best validation C-index is achieved  </li>
+</ul>
+<p><strong>Files:</strong></p>
+<pre><code>checkpoint_{epoch:04d}.pth
+best_model_risk_prediction_id-{id}.pth
+</code></pre>
+<p>Each checkpoint includes:</p>
+<ul>
+<li>Model state  </li>
+<li>Optimiser state  </li>
+<li>Scheduler states  </li>
+<li>Epoch  </li>
+<li>Global step  </li>
+<li>Best C-index  </li>
+</ul>
+<hr />
+<h3 id="resume-training">🔄 Resume Training</h3>
+<pre><code class="language-bash">accelerate launch main_train.py \
+  ... \
+  --resume_from /path/to/checkpoint_0050.pth \
+  --wandb_id &lt;run-id&gt;
+</code></pre>
+<p>👉 <code>--wandb_id</code> ensures metrics continue in the same experiment</p>
+<hr />
+<h2 id="early-stopping">⏹️ Early Stopping</h2>
+<p>Triggered if validation C-index does not improve for <code>--patience</code> epochs.</p>
+<p>Saved as:</p>
+<pre><code>early_stopping_risk_prediction_id-{id}.pth
+</code></pre>
+<p>👉 Best model is always saved separately</p>
+<hr />
+<h2 id="output-directory">📁 Output Directory</h2>
+<pre><code>{results_dir}/
+  train_risk_prediction_training_id_{id}.log
+  checkpoint_0010.pth
+  checkpoint_0020.pth
+  ...
+  best_model_risk_prediction_id-{id}.pth
+  early_stopping_risk_prediction_id-{id}.pth
+  model_risk_prediction_training_id_{id}_last_epoch.pth
+</code></pre>
+<hr />
+<h2 id="data-augmentation">🖼️ Data Augmentation</h2>
+<p>Enable with:</p>
+<pre><code class="language-bash">--augmentations
+</code></pre>
+<p>Applied <strong>only to training data</strong>:</p>
+<ul>
+<li>RandomCrop (1946 × 1581), p=0.2  </li>
+<li>Resize (2048 × 1664)  </li>
+<li>RandomAffine (translation ±10%, scale up to 1.1×), p=0.5  </li>
+<li>ColorJitter (±0.4), p=0.5  </li>
+<li>RandomGamma (0.8–1.2), p=0.5  </li>
+</ul>
+<p>👉 No augmentation is applied to validation data</p>
+<hr />
+<h2 id="experiment-tracking-wandb">📊 Experiment Tracking (WandB)</h2>
+<p>Logged per epoch:</p>
+<ul>
+<li>Training &amp; Validation Loss  </li>
+<li>Training &amp; Validation C-index  </li>
+<li>Year 1–5 AUC (train + validation)  </li>
+</ul>
+<p>👉 All metrics use <code>epoch</code> as the step  </p>
+<h3 id="resume-logging">🔄 Resume Logging</h3>
+<pre><code class="language-bash">--wandb_id &lt;run-id&gt;
+</code></pre>
+<p>This appends metrics to an existing run instead of creating a new one.</p>
               
             </div>
           </div><footer>

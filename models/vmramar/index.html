@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>VMRA-MaR - Breast Cancer Risk Benchmark</title>
+    <title>VMRA-MaR - BCRBench</title>
     <link rel="stylesheet" href="../../css/theme.css" />
     <link rel="stylesheet" href="../../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -30,7 +30,7 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
     <div class="wy-side-scroll">
       <div class="wy-side-nav-search">
-          <a href="../.." class="icon icon-home"> Breast Cancer Risk Benchmark
+          <a href="../.." class="icon icon-home"> BCRBench
         </a><div role="search">
   <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
       <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
@@ -79,6 +79,26 @@
     <li class="toctree-l2"><a class="reference internal" href="#key-idea">🧠 Key Idea</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#architecture">🏗️ Architecture</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#1-image-encoder">1. Image Encoder</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#2-view-aggregation-multi-view-fusion">2. View Aggregation (Multi-View Fusion)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#3-temporal-modeling-vmrnn-block">3. Temporal Modeling (VMRNN Block)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#4-asymmetry-branch-optional">4. Asymmetry Branch (Optional)</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#a-spatial-asymmetry-detector-sad">a. Spatial Asymmetry Detector (SAD)</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#b-feature-projection">b. Feature Projection</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#c-longitudinal-asymmetry-tracker-lat">c. Longitudinal Asymmetry Tracker (LAT)</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#5-fusion-risk-prediction">5. Fusion &amp; Risk Prediction</a>
+    </li>
+        </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#input-output">🔄 Input / Output</a>
         <ul>
@@ -86,9 +106,17 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#output">Output</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#helper-methods">Helper Methods</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#get_risk_headsoutputs-batch">get_risk_heads(outputs, batch)</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#get_primary_risk_headoutputs">get_primary_risk_head(outputs)</a>
+    </li>
         </ul>
     </li>
-    <li class="toctree-l2"><a class="reference internal" href="#integration-in-this-framework">🧩 Integration in This Framework</a>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#integration-in-framework">🧩 Integration in Framework</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#key-components">⚙️ Key Components</a>
     </li>
@@ -120,7 +148,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
       <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../..">Breast Cancer Risk Benchmark</a>
+          <a href="../..">BCRBench</a>
         
       </nav>
       <div class="wy-nav-content">
@@ -139,24 +167,147 @@
               
                 <h1 id="vmra-mar">VMRA-MaR</h1>
 <h2 id="overview">📌 Overview</h2>
+<p>VMRAMaR is a longitudinal breast cancer risk prediction model that combines:</p>
+<ul>
+<li>Multi-view mammography encoding</li>
+<li>Temporal sequence modeling using VMRNN</li>
+<li>Optional asymmetry-aware risk modeling</li>
+</ul>
+<p>Image features are extracted independently for each mammography view and aggregated across views using mean pooling. Sequential visit representations are processed using a VMRNN to capture temporal evolution across screening history.</p>
+<p>An optional asymmetry branch compares left and right breast feature maps using a Spatial Asymmetry Detector (SAD), followed by longitudinal aggregation using a Longitudinal Asymmetry Tracker (LAT).</p>
+<p>Temporal and asymmetry features are fused and passed to a cumulative probability prediction layer for multi-year breast cancer risk estimation.</p>
 <hr />
 <h2 id="key-idea">🧠 Key Idea</h2>
+<p>VMRAMaR is built on three central principles:</p>
+<ul>
+<li><strong>Temporal modeling:</strong> Sequential mammography visits are modeled using a <strong>VMRNN</strong>, capturing disease progression over time  </li>
+<li><strong>Cross-view aggregation:</strong> Multiple views (e.g., CC and MLO) are fused using <strong>multi-head self-attention</strong>  </li>
+<li><strong>Asymmetry-aware learning (optional):</strong> Differences between left and right breast representations are explicitly modeled using spatial and longitudinal asymmetry modules  </li>
+</ul>
+<p>This enables the model to capture <strong>temporal trends</strong>, <strong>view consistency</strong>, and <strong>biological asymmetry signals</strong>.</p>
 <hr />
 <h2 id="architecture">🏗️ Architecture</h2>
 <p align="center">
   <img src="../figs/Vmramar.png" alt="VMRA-MaR Architecture" width="700"/>
 </p>
 
+<p>The model consists of five main components:</p>
+<hr />
+<h3 id="1-image-encoder">1. Image Encoder</h3>
+<ul>
+<li>Uses a pretrained CNN encoder (e.g., custom ResNet or snapshot model)  </li>
+<li>Pooling and classification heads are replaced with identity layers to extract feature maps  </li>
+<li>Optionally <strong>frozen during training</strong> for stability  </li>
+</ul>
+<p><strong>Output:</strong>
+- Feature maps per image: <code>[B, T, V, C, H, W]</code></p>
+<hr />
+<h3 id="2-view-aggregation-multi-view-fusion">2. View Aggregation (Multi-View Fusion)</h3>
+<ul>
+<li>Spatially pooled image features are aggregated across mammography views</li>
+<li>Features are averaged across views (e.g., CC and MLO)</li>
+<li>Resulting visit-level representations are projected into the VMRNN embedding space</li>
+</ul>
+<p><strong>Output:</strong>
+- Visit-level embeddings: <code>[B, T, D]</code></p>
+<hr />
+<h3 id="3-temporal-modeling-vmrnn-block">3. Temporal Modeling (VMRNN Block)</h3>
+<ul>
+<li>Sequential visit embeddings processed using <strong>VMRNN</strong>  </li>
+<li>Captures temporal dependencies across screening history  </li>
+<li>Mean pooling over time followed by projection  </li>
+</ul>
+<p><strong>Output:</strong>
+- Temporal feature vector: <code>[B, D]</code></p>
+<hr />
+<h3 id="4-asymmetry-branch-optional">4. Asymmetry Branch (Optional)</h3>
+<p>Activated when <code>use_asymmetry = True</code>.</p>
+<h4 id="a-spatial-asymmetry-detector-sad">a. Spatial Asymmetry Detector (SAD)</h4>
+<ul>
+<li>Compares left vs right breast feature maps  </li>
+<li>Produces:</li>
+<li>Asymmetry heatmaps <code>[B, T, H_lat, W_lat]</code>  </li>
+<li>Asymmetry coordinates  </li>
+</ul>
+<h4 id="b-feature-projection">b. Feature Projection</h4>
+<ul>
+<li>Heatmaps flattened and projected to 512-D space  </li>
+</ul>
+<h4 id="c-longitudinal-asymmetry-tracker-lat">c. Longitudinal Asymmetry Tracker (LAT)</h4>
+<ul>
+<li>Aggregates asymmetry features across time  </li>
+<li>Incorporates spatial coordinates and temporal evolution  </li>
+</ul>
+<p><strong>Output:</strong>
+- Longitudinal asymmetry risk factor: <code>[B, 1]</code></p>
+<hr />
+<h3 id="5-fusion-risk-prediction">5. Fusion &amp; Risk Prediction</h3>
+<ul>
+<li>Concatenates:</li>
+<li>Temporal features  </li>
+<li>(Optional) asymmetry features  </li>
+<li>Passed into <strong>Cumulative Probability Layer (AHL)</strong>  </li>
+</ul>
+<p><strong>Output:</strong>
+- Risk logits: <code>[B, max_followup]</code></p>
 <hr />
 <h2 id="input-output">🔄 Input / Output</h2>
 <h3 id="input">Input</h3>
+<p>The model expects a batch dictionary with:</p>
+<ul>
+<li><code>images</code>: Mammography tensor<br />
+  Shape: <code>[B, T, V, C, H, W]</code>  </li>
+<li><code>B</code>: Batch size  </li>
+<li><code>T</code>: Number of timepoints (visits)  </li>
+<li><code>V</code>: Number of views (e.g., CC, MLO)  </li>
+<li>
+<p><code>C, H, W</code>: Image channels and dimensions  </p>
+</li>
+<li>
+<p><code>target</code>: Risk labels <code>[B, num_years]</code>  </p>
+</li>
+<li><code>y_mask</code>: Valid label mask <code>[B, num_years]</code>  </li>
+</ul>
 <hr />
 <h3 id="output">Output</h3>
+<p>The <code>forward</code> method returns:</p>
+<ul>
+<li><code>logit</code>: Risk logits <code>[B, max_followup]</code></li>
+</ul>
 <hr />
-<h2 id="integration-in-this-framework">🧩 Integration in This Framework</h2>
+<h3 id="helper-methods">Helper Methods</h3>
+<h4 id="get_risk_headsoutputs-batch"><strong><code>get_risk_heads(outputs, batch)</code></strong></h4>
+<p>Returns: <code>("logit_output", (logits, target, mask))</code></p>
+<p>Used for training with survival loss.</p>
+<hr />
+<h4 id="get_primary_risk_headoutputs"><strong><code>get_primary_risk_head(outputs)</code></strong></h4>
+<p>Returns: <code>sigmoid(logit)</code></p>
+<p>This is the <strong>final risk prediction</strong> used for evaluation.</p>
+<hr />
+<h2 id="integration-in-framework">🧩 Integration in Framework</h2>
+<p>VMRAMaR extends <code>BaseRiskModel</code> and:</p>
+<ul>
+<li>Uses a shared batch interface for longitudinal multi-view data  </li>
+<li>Supports optional asymmetry modeling  </li>
+<li>Produces a single primary risk head  </li>
+<li>Integrates seamlessly with survival loss pipelines  </li>
+</ul>
 <hr />
 <h2 id="key-components">⚙️ Key Components</h2>
+<ul>
+<li><strong>Image Encoder</strong>: Pretrained CNN backbone (optionally frozen)  </li>
+<li><strong>Multihead Attention</strong>: Cross-view feature fusion  </li>
+<li><strong>VMRNN</strong>: Temporal sequence modeling  </li>
+<li><strong>SpatialAsymmetryDetector (SAD)</strong>: Extracts asymmetry heatmaps  </li>
+<li><strong>LongitudinalAsymmetryTracker (LAT)</strong>: Tracks asymmetry over time  </li>
+<li><strong>CumulativeProbabilityLayer</strong>: Outputs time-dependent risk  </li>
+</ul>
+<hr />
 <h2 id="risk-prediction">📉 Risk Prediction</h2>
+<ul>
+<li>Risk is modeled as a <strong>cumulative probability distribution over future time horizons</strong>  </li>
+<li>The model outputs logits which are transformed via sigmoid for probability interpretation  </li>
+</ul>
               
             </div>
           </div><footer>
