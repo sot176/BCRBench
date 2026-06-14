@@ -2,7 +2,8 @@ cff-version: 1.2.0
 title: "BCRBench"
 message: "If you use this repository, please cite it using the metadata below."
 type: software
-version: "v1.0.0"
+version: 1.0.0
+doi: 10.5281/zenodo.20691089
 date-released: 2026-06-14
 
 authors:
