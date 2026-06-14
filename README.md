@@ -114,7 +114,7 @@ license = {MIT},
 month = may,
 title = {{BCRBench}},
 url = {https://github.com/sot176/BCRBench},
-version = {0.1.0},
+version = {v1.0.0},
 year = {2026}
 }
 ```
