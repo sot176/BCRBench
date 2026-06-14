@@ -1,7 +1,7 @@
 site_name: BCRBench
 
 theme:
-  name: readthedocs
+  name: mkdocs
 
 nav:
   - Home: index.md
