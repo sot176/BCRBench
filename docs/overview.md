@@ -41,7 +41,7 @@ The benchmark includes the following models:
 
 | Model | Venue | Paper | Input | Key Idea |
 |------|------|------|-----|----------|
-| [LMV-Net](./models/lmvnet.md) | MICCAI 2026 (submitted) | - | Multi-view, longitudinal | Multi-view longitudinal model with dual-stream attention leveraging both views of one breast. |
+| [LMV-Net](./models/lmvnet.md) | MICCAI 2026 | - | Multi-view, longitudinal | Multi-view longitudinal model with dual-stream attention leveraging both views of one breast. |
 | [ImgFeatAlign](./models/imgfeatalign.md) | MICCAI 2025 | [Paper](https://doi.org/10.1007/978-3-032-04937-7_47) | Single-view, longitudinal | Uses image-based deformation (MammoRegNet) applied in feature space for improved longitudinal comparison. |
 | [VMRA-MaR](./models/vmramar.md) | MICCAI 2025 | [Paper](https://doi.org/10.1007/978-3-032-05182-0_64) | Multi-view, longitudinal | Extends Mirai to longitudinal mammograms using Spatial Asymmetry Detector and Longitudinal Asymmetry Tracker. |
 | [OA-BReaCR](./models/oabreacr.md) | MICCAI 2024 | [Paper](https://doi.org/10.1007/978-3-031-72378-0_15) | Single-view, longitudinal | Learns longitudinal changes using feature-based deformation fields for better temporal alignment. |
