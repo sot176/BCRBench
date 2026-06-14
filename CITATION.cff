@@ -3,7 +3,7 @@ title: "BCRBench"
 message: "If you use this repository, please cite it using the metadata below."
 type: software
 version: "v1.0.0"
-date-released: 2026-05-30
+date-released: 2026-06-14
 
 authors:
   - family-names: "Thrun"
