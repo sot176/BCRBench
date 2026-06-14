@@ -17,7 +17,7 @@ These datasets provide complementary information and enable benchmarking of mode
 ```bibtex
 @article{embed,
   author = {Jeong, Jiwoong J. and Vey, Brianna L. and Bhimireddy, Ananth and Kim, Thomas and Santos, Thiago and Correa, Ramon and Dutt, Raman and Mosunjac, Marina and Oprea-Ilies, Gabriela and Smith, Geoffrey and Woo, Minjae and McAdams, Christopher R. and Newell, Mary S. and Banerjee, Imon and Gichoya, Judy and Trivedi, Hari},
-  title = {{The EMory BrEast imaging Dataset (EMBED)}: A Racially Diverse, Granular Dataset of 3.4 Million Screening and Diagnostic Mammographic Images},
+  title = {The EMory BrEast imaging Dataset (EMBED): A Racially Diverse, Granular Dataset of 3.4 Million Screening and Diagnostic Mammographic Images},
   journal = {Radiology: Artificial Intelligence},
   volume = {5},
   number = {1},
