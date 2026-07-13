@@ -59,7 +59,7 @@ def test_risk(
         "races": [],
     }
 
-    with torch.no_grad():
+    with torch.inference_mode():
         progress_bar = tqdm(test_loader, disable=not is_main)
 
         for batch in progress_bar:
