@@ -1,11 +1,16 @@
 # BCRBench: A Breast Cancer Risk Benchmark
-[![DOI](https://zenodo.org/badge/1159300346.svg)](https://doi.org/10.5281/zenodo.20691089)
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20691089.svg)](https://doi.org/10.5281/zenodo.20691089)
+[![Documentation](https://img.shields.io/badge/Documentation-BCRBench-blue)](https://sot176.github.io/BCRBench/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/sot176/BCRBench/blob/main/LICENSE)
+
+**BCRBench** is an open-source benchmark for breast cancer risk prediction from mammography. It provides a unified and reproducible framework for evaluating state-of-the-art models under standardized preprocessing, training, inference, and evaluation protocols.
+
+The benchmark supports both **single-timepoint** and **longitudinal** breast cancer risk prediction, enabling fair and reproducible comparison across different approaches.
 
 📖 **Documentation:**    https://sot176.github.io/BCRBench/
 
 ---
-
-Unified repository implementing state-of-the-art image-based breast cancer risk prediction models. This project aims to simplify training and evaluation of multiple models using a single, unified pipeline, supporting both single- and multi-timepoint mammogram analysis. 
 
 We aim to encourage further research by providing a single, unified repository where all image-based breast cancer risk prediction models can be collected, compared, and extended. By centralizing these implementations, we hope to accelerate progress in the field and make it easier for researchers to benchmark and build upon existing methods.
 
