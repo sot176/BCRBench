@@ -1,6 +1,6 @@
 # BCRBench: A Breast Cancer Risk Benchmark
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20691089.svg)](https://doi.org/10.5281/zenodo.20691089)
+[![DOI](https://zenodo.org/badge/1159300346.svg)](https://doi.org/10.5281/zenodo.20691089)
 [![Documentation](https://img.shields.io/badge/Documentation-BCRBench-blue)](https://sot176.github.io/BCRBench/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/sot176/BCRBench/blob/main/LICENSE)
 
