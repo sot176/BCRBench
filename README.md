@@ -41,7 +41,7 @@ This repository provides implementations of several recent breast cancer risk pr
 
 | Model            | Conference/Journal      | Input Views & Timepoints                     | Key Idea                                                           |
 | ---------------- | --------------------- | -------------------------------------------- | ------------------------------------------------------------------ |
-| **[LMV-Net](https://arxiv.org/abs/2607.11343)**      | MICCAI 2026  | Both views of 1 breast, 2 timepoints         | Multi-view longitudinal model with dual-stream attention leveraging both views of one breast. |
+| **[LMV-Net](https://doi.org/10.1007/978-3-032-38470-6_50)**      | MICCAI 2026  | Both views of 1 breast, 2 timepoints         | Multi-view longitudinal model with dual-stream attention leveraging both views of one breast. |
 | **[ImgFeatAlign](https://doi.org/10.1007/978-3-032-04937-7_47)** | MICCAI 2025             | 1 view of 1 breast                           | Uses image-based deformation (MammoRegNet) applied in feature space for improved longitudinal comparison.   |
 | **[VMRA-MaR](https://doi.org/10.1007/978-3-032-05182-0_64)**     | MICCAI 2025             | 4 screening mammograms (multiple timepoints) | Extends Mirai to longitudinal mammograms using Spatial Asymmetry Detector and Longitudinal Asymmetry Tracker.                     |
 | **[OA-BReaCR](https://doi.org/10.1007/978-3-031-72378-0_15)**    | MICCAI 2024             | 1 view of 1 breast, 2 timepoints             | Learns longitudinal changes using feature-based deformation fields for better temporal alignment.             |
@@ -134,7 +134,7 @@ author = {Thrun, Solveig and Sun, Zijun and  Salahuddin, Suaiba A. and Wickstrø
 title={Longitudinal Multi-View Modeling for Breast Cancer Risk Prediction},
 booktitle = {Medical Image Computing and Computer Assisted Intervention -- MICCAI 2026},
 year={2026}
-url={https://arxiv.org/abs/2607.11343}
+doi={https://doi.org/10.1007/978-3-032-38470-6_50}
 }
 ```
 
@@ -145,7 +145,7 @@ author = {Thrun, Solveig and Hansen, Stine and Sun, Zijun and Blum, Nele and Sal
 title = {Reconsidering Explicit Longitudinal Mammography Alignment for Enhanced Breast Cancer Risk Prediction},
 booktitle = {Medical Image Computing and Computer Assisted Intervention -- MICCAI 2025},
 year = {2025},
-doi = {10.1007/978-3-032-04937-7_47}
+doi = {https://doi.org/10.1007/978-3-032-04937-7_47}
 }
 ```
 
@@ -178,7 +178,7 @@ title = {Toward robust mammography-based models for breast cancer risk},
 journal = {Science Translational Medicine},
 year={2021},
 volume={9},
-doi={doi.org/10.1126/scitranslmed.aba4373}
+doi={https://doi.org/10.1126/scitranslmed.aba4373}
 }
 ```
 
