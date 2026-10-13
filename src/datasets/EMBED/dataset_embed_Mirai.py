@@ -17,7 +17,6 @@ from torch.utils.data import Dataset
 
 from .utils import (
     load_tabular_data,
-    load_image_tensor,
     map_density,
     map_cancer_type,
     map_race,
@@ -25,6 +24,7 @@ from .utils import (
     clean_followup_years,
     build_survival_target,
     build_row_lookup,
+    pad_to_length,
 )
 
 try:

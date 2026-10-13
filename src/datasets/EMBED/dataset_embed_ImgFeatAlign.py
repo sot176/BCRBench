@@ -5,31 +5,32 @@ from __future__ import annotations
 import os
 import re
 import random
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
-from collections import defaultdict
 
+import h5py
+import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
 from .utils import (
     load_tabular_data,
-    load_image_tensor,
     map_density,
     map_cancer_type,
     map_race,
     clean_time_to_cancer,
     clean_followup_years,
     build_survival_target,
-    build_row_lookup,
+    build_row_lookup
 )
 
 try:
     from .utils import RACE_TO_ID
-except ImportError:
+except ImportError:  # Keeps the module importable in minimal examples/tests.
     RACE_TO_ID = {"Unknown": 0}
 
 

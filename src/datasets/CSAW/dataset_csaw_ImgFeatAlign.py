@@ -11,21 +11,18 @@ from typing import Callable, Optional
 
 import h5py
 import numpy as np
-import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-try:
-    from .utils import (
-        load_tabular_data, build_survival_target, clean_time_to_cancer,
-        clean_followup_years, map_density, map_cancer_type,
-    )
-except ImportError:
-    from utils import (
-        load_tabular_data, build_survival_target, clean_time_to_cancer,
-        clean_followup_years, map_density, map_cancer_type,
-    )
-
+from .utils import (
+    load_tabular_data,
+    build_survival_target,
+    clean_time_to_cancer,
+    clean_followup_years,
+    map_density,
+    map_cancer_type,
+    pad_to_length,
+)
 
 @dataclass(frozen=True)
 class CSAWImageRecord:
