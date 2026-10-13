@@ -25,7 +25,6 @@ from .utils import (
     build_survival_target,
     build_row_lookup,
 )
-from ..augmentation_utils import grouped_hflip
 
 try:
     from .utils import RACE_TO_ID
@@ -165,25 +164,12 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
             previous_image_cc = self.transform(previous_image_cc).squeeze(0)
             previous_image_mlo = self.transform(previous_image_mlo).squeeze(0)
 
-        # ---- horizontal flip ----
-        # Applied to all views of the sample together (single random decision) so
-        # current/prior and CC/MLO stay geometrically consistent. Kept independent
-        # of `self.transform` because the flips' group-consistency is essential and
-        # must not depend on whether augmentation transforms are supplied.
-        if self.mode == "train":
-            (
-                current_image_cc,
-                current_image_mlo,
-                previous_image_cc,
-                previous_image_mlo,
-            ) = grouped_hflip(
-                [
-                    current_image_cc,
-                    current_image_mlo,
-                    previous_image_cc,
-                    previous_image_mlo,
-                ]
-            )
+        if self.mode == "train" and torch.rand(1).item() < 0.5:
+                    current_image_cc = torch.flip(current_image_cc, dims=[-1])
+                    current_image_mlo = torch.flip(current_image_mlo, dims=[-1])
+        
+                    prior_images_cc = [torch.flip(img, dims=[-1]) for img in prior_images_cc]
+                    prior_images_mlo = [torch.flip(img, dims=[-1]) for img in prior_images_mlo]
 
         # ---- tabular lookup ----
         current_row = self._lookup_row(current_cc)
@@ -337,3 +323,89 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
             record.study_date,
         )
         return self.row_lookup[key]
+
+
+from torch.utils.data import DataLoader
+
+
+def main():
+    # Update these paths to match your setup.
+    DATA_ROOT = "C:/UiT_PhD_datasets/embed_dataset/risk_dataset_1664_2048"
+    CSV_FILE = ("C:/Users/sothr1456/OneDrive - UiT Office 365/Documents/"
+                    "UiT PhD/EMBED/combined_cases_with_followup.csv")
+    
+  
+    mode = "train"
+
+    dataset = BreastCancerRiskDatasetEMBEDLMVNet(
+        csv_file=CSV_FILE,
+        image_dir=DATA_ROOT,  # Expects train.h5 inside this directory
+        mode=mode,
+        transforms=None,      # Test loading before adding transforms
+        n_years=5,
+    )
+
+    print(f"\nDataset size: {len(dataset)}")
+
+    if len(dataset) == 0:
+        print("ERROR: No longitudinal samples found.")
+        return
+
+    # ---- Test a single sample ----
+    sample = dataset[0]
+
+    print("\n--- Single sample ---")
+    for key, value in sample.items():
+        if isinstance(value, torch.Tensor):
+            print(
+                f"{key}: shape={tuple(value.shape)}, "
+                f"dtype={value.dtype}, "
+                f"min={value.min().item():.4f}, "
+                f"max={value.max().item():.4f}"
+                if value.numel() > 0
+                else f"{key}: empty tensor"
+            )
+        else:
+            print(f"{key}: {value}")
+
+    # ---- Validate image tensors ----
+    image_keys = [
+        "current_image_cc",
+        "current_image_mlo",
+        "previous_image_cc",
+        "previous_image_mlo",
+    ]
+
+    for key in image_keys:
+        image = sample[key]
+        assert isinstance(image, torch.Tensor), f"{key} is not a tensor"
+        assert image.ndim == 2, (
+            f"{key}: expected [H, W] after squeeze, "
+            f"got {tuple(image.shape)}"
+        )
+        assert torch.isfinite(image).all(), f"{key} contains NaN/Inf"
+
+    print("\nSingle-sample checks passed.")
+
+    # ---- Test DataLoader batching ----
+    loader = DataLoader(
+        dataset,
+        batch_size=2,
+        shuffle=False,
+        num_workers=0,  # First test with 0 workers
+    )
+
+    batch = next(iter(loader))
+
+    print("\n--- First batch ---")
+    for key, value in batch.items():
+        if isinstance(value, torch.Tensor):
+            print(f"{key}: shape={tuple(value.shape)}, dtype={value.dtype}")
+        else:
+            print(f"{key}: {value}")
+
+    print("\nDataLoader test passed!")
+
+
+if __name__ == "__main__":
+    main()
