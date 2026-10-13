@@ -10,43 +10,26 @@ from pathlib import Path
 from typing import Callable, Optional
 from collections import defaultdict
 
-import h5py
-import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-# Import utilities using the package-relative path.
+from .utils import (
+    load_tabular_data,
+    load_image_tensor,
+    map_density,
+    map_cancer_type,
+    map_race,
+    clean_time_to_cancer,
+    clean_followup_years,
+    build_survival_target,
+    build_row_lookup,
+)
+
 try:
-    from .utils import (
-        load_tabular_data,
-        map_density,
-        map_cancer_type,
-        map_race,
-        clean_time_to_cancer,
-        clean_followup_years,
-        build_survival_target,
-        build_row_lookup,
-        RACE_TO_ID,
-    )
+    from .utils import RACE_TO_ID
 except ImportError:
-    # Fallback for direct execution of this file.
-    from utils import (
-        load_tabular_data,
-        map_density,
-        map_cancer_type,
-        map_race,
-        clean_time_to_cancer,
-        clean_followup_years,
-        build_survival_target,
-        build_row_lookup,
-    )
-
-    try:
-        from utils import RACE_TO_ID
-    except ImportError:
-        RACE_TO_ID = {"Unknown": 0}
-
+    RACE_TO_ID = {"Unknown": 0}
 
 
 """
