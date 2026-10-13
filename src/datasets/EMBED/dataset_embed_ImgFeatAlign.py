@@ -1,78 +1,64 @@
-"""PyTorch dataset utilities for EMBED mammography risk modelling.
 
-This module contains the image-pair dataset used for longitudinal breast
-cancer risk prediction. It intentionally avoids hard-coded local paths so it
-can be imported from training scripts, notebooks, and published repositories.
-"""
+"""HDF5-backed EMBED dataset for longitudinal image feature alignment."""
 
 from __future__ import annotations
 
 import os
 import re
+import random
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
 
+import h5py
 import numpy as np
 import pandas as pd
 import torch
-from PIL import Image
 from torch.utils.data import Dataset
 
-from .utils import (
-    load_tabular_data,
-    load_image_tensor,
-    map_density,
-    map_cancer_type,
-    map_race,
-    clean_time_to_cancer,
-    clean_followup_years,
-    build_survival_target,
-    build_row_lookup
-)
-
 try:
-    from .utils import RACE_TO_ID
-except ImportError:  # Keeps the module importable in minimal examples/tests.
-    RACE_TO_ID = {"Unknown": 0}
+    from .utils import (
+        load_tabular_data,
+        map_density,
+        map_cancer_type,
+        map_race,
+        clean_time_to_cancer,
+        clean_followup_years,
+        build_survival_target,
+        build_row_lookup,
+        RACE_TO_ID,
+    )
+except ImportError:
+    from utils import (
+        load_tabular_data,
+        map_density,
+        map_cancer_type,
+        map_race,
+        clean_time_to_cancer,
+        clean_followup_years,
+        build_survival_target,
+        build_row_lookup,
+    )
+
+    try:
+        from utils import RACE_TO_ID
+    except ImportError:
+        RACE_TO_ID = {"Unknown": 0}
 
 
-"""
- Expected filename format:
-#     <patient_id>_<laterality>_<view>_<YYYY-MM-DD>_<index>.png
-#
-# example:
-     10093833_L_CC_2017-08-03_4505.png
-     10093833_L_MLO_2017-08-03_5642.png
-     10093833_R_MLO_2017-08-03_2678.png
-     10093833_R_CC_2017-08-03_4123.png
-     10093833_R_CC_2014-07-02_7821.png
-     10093833_R_MLO_2014-07-02_4689.png
-     10093833_L_MLO_2014-07-02_7897.png
-     10093833_L_CC_2014-07-02_6798.png
-
-
-CSV FORMAT REQUIREMENT:
-Each row corresponds to exactly ONE IMAGE.
-A full screening exam consists of 4 rows:
-    - L_CC
-    - L_MLO
-    - R_CC
-    - R_MLO
-All rows share the same patient_id and study_date_anon.
-"""
-
+# HDF5 keys have no .png extension:
+# <patient_id>_<laterality>_<view>_<YYYY-MM-DD>_<index>
 IMAGE_FILENAME_RE = re.compile(
-    r"(?P<patient_id>\d+)_(?P<laterality>[A-Z]+)_(?P<view>[A-Z]+)_"
-    r"(?P<date>\d{4}-\d{2}-\d{2})_.*\.png$"
+    r"(?P<patient_id>\d+)_(?P<laterality>[A-Z]+)_"
+    r"(?P<view>[A-Z]+)_(?P<date>\d{4}-\d{2}-\d{2})_.*$"
 )
 
 
 @dataclass(frozen=True)
 class ImageRecord:
-    """Metadata parsed from one mammogram filename."""
+    """Metadata parsed from an HDF5 image key."""
 
     filename: str
     patient_id: str
@@ -81,12 +67,11 @@ class ImageRecord:
     study_date: pd.Timestamp
 
 
-
 class BreastCancerRiskDatasetEMBEDImgFeatAlign(Dataset):
-    """Longitudinal EMBED mammography dataset.
+    """Longitudinal EMBED dataset backed by a split-specific HDF5 file.
 
-    Each sample contains a current mammogram and the previous mammogram
-    for the same patient/laterality/view, along with survival targets.
+    Each sample contains a previous and current image for the same
+    patient, laterality, and view.
     """
 
     def __init__(
@@ -97,54 +82,85 @@ class BreastCancerRiskDatasetEMBEDImgFeatAlign(Dataset):
         transforms: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
         n_years: int = 5,
         race_to_id: Optional[dict[str, int]] = None,
+        h5_file: str | os.PathLike | None = None,
     ) -> None:
-
         self.data_dir = Path(image_dir)
         self.mode = mode
         self.transform = transforms
         self.n_years = n_years
         self.race_to_id = race_to_id or RACE_TO_ID
 
-        # ---- shared utilities ----
+        # HDF5 backend
+        if h5_file is None:
+            h5_file = self.data_dir / f"{self.mode}.h5"
+
+        self.h5_path = Path(h5_file)
+
+        if not self.h5_path.is_file():
+            raise FileNotFoundError(
+                f"HDF5 file for mode '{self.mode}' does not exist: "
+                f"{self.h5_path}"
+            )
+
+        # Each process/DataLoader worker opens its own HDF5 handle.
+        self._h5 = None
+        self._h5_pid = None
+
+        # Shared tabular utilities
         self.data = load_tabular_data(csv_file)
         self.row_lookup = build_row_lookup(self.data)
 
-        # ---- dataset-specific structure ----
+        # Index image metadata and build longitudinal pairs.
         self.image_data = self._load_image_data()
         self.image_pairs = self._build_image_pairs()
+
+        print(
+            f"[dataset] mode={self.mode}: "
+            f"found {len(self.image_pairs)} longitudinal image pairs"
+        )
 
     def __len__(self) -> int:
         return len(self.image_pairs)
 
     def __getitem__(self, index: int):
+        if index < 0 or index >= len(self.image_pairs):
+            raise IndexError(
+                f"Index {index} outside dataset length {len(self)}."
+            )
 
-        if index >= len(self.image_pairs) or index < 0:
-            raise IndexError(f"Index {index} out of range.")
+        previous_record, current_record = self.image_pairs[index]
 
-        prev_record, curr_record = self.image_pairs[index]
+        # Load images from HDF5.
+        current_image = self._read_image_tensor(current_record.filename)
+        previous_image = self._read_image_tensor(previous_record.filename)
 
-        # ---- images ----
-        current_image = load_image_tensor(
-            self.data_dir / self.mode / curr_record.filename
+        # Keep a consistent [C, H, W] shape, with or without transforms.
+        if self.transform is not None:
+            current_image = self.transform(current_image)
+            previous_image = self.transform(previous_image)
+
+        # Apply the same random horizontal flip to both time points.
+        if self.mode == "train" and torch.rand(1).item() < 0.5:
+            current_image = torch.flip(current_image, dims=[-1])
+            previous_image = torch.flip(previous_image, dims=[-1])
+
+        # Tabular metadata.
+        curr_row = self._lookup_row(current_record)
+        prev_row = self._lookup_row(previous_record)
+
+        curr_ttc = clean_time_to_cancer(
+            curr_row["Time_to_Cancer_Years"]
         )
-        previous_image = load_image_tensor(
-            self.data_dir / self.mode / prev_record.filename
+        prev_ttc = clean_time_to_cancer(
+            prev_row["Time_to_Cancer_Years"]
         )
 
-        if self.transform:
-            current_image = self.transform(current_image).squeeze(0)
-            previous_image = self.transform(previous_image).squeeze(0)
-
-        # ---- rows ----
-        curr_row = self._lookup_row(curr_record)
-        prev_row = self._lookup_row(prev_record)
-
-        # ---- survival inputs ----
-        curr_ttc = clean_time_to_cancer(curr_row["Time_to_Cancer_Years"])
-        prev_ttc = clean_time_to_cancer(prev_row["Time_to_Cancer_Years"])
-
-        curr_fu = clean_followup_years(curr_row["years_last_followup"])
-        prev_fu = clean_followup_years(prev_row["years_last_followup"])
+        curr_fu = clean_followup_years(
+            curr_row["years_last_followup"]
+        )
+        prev_fu = clean_followup_years(
+            prev_row["years_last_followup"]
+        )
 
         target, y_mask, event_time, event_observed = build_survival_target(
             self.n_years,
@@ -158,89 +174,175 @@ class BreastCancerRiskDatasetEMBEDImgFeatAlign(Dataset):
             prev_fu,
         )
 
-        # ---- temporal gap ----
         time_gap = min(
-            abs(curr_record.study_date.year - prev_record.study_date.year),
+            abs(
+                current_record.study_date.year
+                - previous_record.study_date.year
+            ),
             self.n_years,
         )
 
         return {
             "current_image": current_image,
             "previous_image": previous_image,
-            "current_image_id": curr_record.filename,
-            "previous_image_id": prev_record.filename,
-            "event_observed": event_observed,
-            "event_times": event_time,
-            "previous_event_times": prev_event_time,
-            "time_gap": time_gap,
-            "y_mask": y_mask,
-            "y_mask_prior": prev_y_mask,
-            "target": target,
-            "target_prior": prev_target,
+            "current_image_id": current_record.filename,
+            "previous_image_id": previous_record.filename,
+            "event_observed": torch.tensor(
+                event_observed, dtype=torch.float32
+            ),
+            "event_times": torch.tensor(
+                event_time, dtype=torch.float32
+            ),
+            "previous_event_times": torch.tensor(
+                prev_event_time, dtype=torch.float32
+            ),
+            "time_gap": torch.tensor(time_gap, dtype=torch.float32),
+            "y_mask": torch.as_tensor(y_mask, dtype=torch.float32),
+            "y_mask_prior": torch.as_tensor(
+                prev_y_mask, dtype=torch.float32
+            ),
+            "target": torch.as_tensor(target, dtype=torch.float32),
+            "target_prior": torch.as_tensor(
+                prev_target, dtype=torch.float32
+            ),
             "years_to_cancer": curr_ttc - 1,
             "years_to_cancer_prior": prev_ttc - 1,
             "years_to_last_followup": curr_fu,
             "years_to_last_followup_prior": prev_fu,
             "density": map_density(curr_row["density"]),
-            "cancer_type": map_cancer_type(curr_row["path_severity"]),
-            "race": map_race(curr_row.get("RACE_DESC"), self.race_to_id),
+            "cancer_type": map_cancer_type(
+                curr_row["path_severity"]
+            ),
+            "race": map_race(
+                curr_row.get("RACE_DESC"), self.race_to_id
+            ),
         }
 
+    def _get_h5(self) -> h5py.File:
+        """Return a read-only HDF5 handle for the current process."""
+        pid = os.getpid()
 
-    @staticmethod
-    def _load_tabular_data(csv_file: str | os.PathLike) -> pd.DataFrame:
-        data = pd.read_csv(csv_file, low_memory=False)
-        data["study_date_anon"] = pd.to_datetime(
-            data["study_date_anon"], format="%Y-%m-%d"
+        if self._h5 is None or self._h5_pid != pid:
+            if self._h5 is not None:
+                try:
+                    self._h5.close()
+                except Exception:
+                    pass
+
+            self._h5 = h5py.File(self.h5_path, "r")
+            self._h5_pid = pid
+
+        return self._h5
+
+    def _read_image_tensor(self, key: str) -> torch.Tensor:
+        """Read a uint16 mammogram and return a float [1, H, W] tensor."""
+        h5 = self._get_h5()
+
+        if key not in h5:
+            raise KeyError(
+                f"Image key '{key}' not found in {self.h5_path}"
+            )
+
+        arr = h5[key][()]
+        arr = np.ascontiguousarray(arr)
+
+        tensor = torch.from_numpy(arr).float() / 65535.0
+
+        # The HDF5 array is expected to be [H, W].
+        if tensor.ndim != 2:
+            raise ValueError(
+                f"Expected a 2D grayscale image for '{key}', "
+                f"got shape {tuple(tensor.shape)}"
+            )
+
+        return tensor.unsqueeze(0)
+
+    def __getstate__(self):
+        """Avoid serializing HDF5 handles when workers use spawn."""
+        state = self.__dict__.copy()
+        state["_h5"] = None
+        state["_h5_pid"] = None
+        return state
+
+    def __del__(self):
+        try:
+            h5 = getattr(self, "_h5", None)
+            if h5 is not None:
+                h5.close()
+        except Exception:
+            pass
+
+    def _load_image_data(self):
+        """Read image-key metadata from the HDF5 file."""
+        image_data = defaultdict(list)
+
+        with h5py.File(self.h5_path, "r") as h5:
+            filenames = list(h5.keys())
+
+        print(
+            f"[dataset] mode={self.mode}: reading {len(filenames)} "
+            f"images from {self.h5_path}"
         )
-        return data
 
+        for filename in filenames:
+            match = IMAGE_FILENAME_RE.match(filename)
 
-    def _load_image_data(self) -> dict[tuple[str, str, str], list[ImageRecord]]:
-        image_data: dict[tuple[str, str, str], list[ImageRecord]] = defaultdict(list)
-        image_folder = self.data_dir / self.mode
-
-        if not image_folder.exists():
-            raise FileNotFoundError(f"Image folder does not exist: {image_folder}")
-
-        for image_path in image_folder.iterdir():
-            match = IMAGE_FILENAME_RE.match(image_path.name)
             if match is None:
                 continue
 
             record = ImageRecord(
-                filename=image_path.name,
+                filename=filename,
                 patient_id=match.group("patient_id"),
                 laterality=match.group("laterality"),
                 view=match.group("view"),
                 study_date=pd.Timestamp(
-                    datetime.strptime(match.group("date"), "%Y-%m-%d")
+                    datetime.strptime(
+                        match.group("date"), "%Y-%m-%d"
+                    )
                 ),
             )
-            image_data[(record.patient_id, record.laterality, record.view)].append(record)
+
+            group_key = (
+                record.patient_id,
+                record.laterality,
+                record.view,
+            )
+            image_data[group_key].append(record)
 
         return image_data
 
-    def _build_image_pairs(self) -> list[tuple[ImageRecord, ImageRecord]]:
-        pairs: list[tuple[ImageRecord, ImageRecord]] = []
+    def _build_image_pairs(self):
+        """Pair consecutive exams for each patient, side, and view."""
+        pairs = []
 
         for records in self.image_data.values():
-            records = sorted(records, key=lambda record: record.study_date)
+            records = sorted(
+                records,
+                key=lambda record: (
+                    record.study_date,
+                    record.filename,
+                ),
+            )
+
             pairs.extend(zip(records[:-1], records[1:]))
+
+        # Preserve the original dataset's randomized sample order.
+        random.shuffle(pairs)
 
         return pairs
 
     def _lookup_row(self, record: ImageRecord) -> pd.Series:
-        key = (record.patient_id, record.laterality, record.view, record.study_date)
+        key = (
+            record.patient_id,
+            record.laterality,
+            record.view,
+            record.study_date,
+        )
 
         try:
             return self.row_lookup[key]
         except KeyError as exc:
             raise KeyError(
-                "No CSV row matched image "
-                f"{record.filename} using key {key}."
+                f"No CSV row matched image '{record.filename}' "
+                f"using key {key}."
             ) from exc
-
-
-  
-
