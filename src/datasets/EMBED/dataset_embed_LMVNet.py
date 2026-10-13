@@ -9,13 +9,14 @@ from pathlib import Path
 from typing import Callable, Optional
 from collections import defaultdict
 
+import h5py
+import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
 from .utils import (
     load_tabular_data,
-    load_image_tensor,
     map_density,
     map_cancer_type,
     map_race,
@@ -24,6 +25,7 @@ from .utils import (
     build_survival_target,
     build_row_lookup,
 )
+from ..augmentation_utils import grouped_hflip
 
 try:
     from .utils import RACE_TO_ID
@@ -32,18 +34,22 @@ except ImportError:
 
 
 """
- Expected filename format:
-#     <patient_id>_<laterality>_<view>_<YYYY-MM-DD>_<index>.png
+ Expected HDF5 key format (PNG filename stem, no extension):
+#     <patient_id>_<laterality>_<view>_<YYYY-MM-DD>_<index>
 #
-# example:
-     10093833_L_CC_2017-08-03_4505.png
-     10093833_L_MLO_2017-08-03_5642.png
-     10093833_R_MLO_2017-08-03_2678.png
-     10093833_R_CC_2017-08-03_4123.png
-     10093833_R_CC_2014-07-02_7821.png
-     10093833_R_MLO_2014-07-02_4689.png
-     10093833_L_MLO_2014-07-02_7897.png
-     10093833_L_CC_2014-07-02_6798.png
+# Images for a split live in a single HDF5 file, ``<image_dir>/<mode>.h5``
+# (e.g. ``train.h5`` / ``val.h5`` / ``test.h5``), where each key is the original
+# PNG filename without the ``.png`` extension.
+#
+# example keys:
+     10093833_L_CC_2017-08-03_4505
+     10093833_L_MLO_2017-08-03_5642
+     10093833_R_MLO_2017-08-03_2678
+     10093833_R_CC_2017-08-03_4123
+     10093833_R_CC_2014-07-02_7821
+     10093833_R_MLO_2014-07-02_4689
+     10093833_L_MLO_2014-07-02_7897
+     10093833_L_CC_2014-07-02_6798
 
 
 CSV FORMAT REQUIREMENT:
@@ -58,8 +64,14 @@ All rows share the same patient_id and study_date_anon.
 
 IMAGE_FILENAME_RE = re.compile(
     r"(?P<patient_id>\d+)_(?P<laterality>[A-Z]+)_"
-    r"(?P<view>[A-Z]+)_(?P<date>\d{4}-\d{2}-\d{2})_.*\.png$"
+    r"(?P<view>[A-Z]+)_(?P<date>\d{4}-\d{2}-\d{2})_.*$"
 )
+
+
+def _new_view_dict():
+    # Module-level factory so the nested defaultdict stays picklable
+    # (required by DataLoader workers using the spawn start method).
+    return defaultdict(dict)
 
 
 @dataclass(frozen=True)
@@ -90,6 +102,7 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
         transforms: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
         n_years: int = 5,
         race_to_id: Optional[dict[str, int]] = None,
+        h5_file: str | os.PathLike | None = None,
     ) -> None:
 
         self.data_dir = Path(image_dir)
@@ -97,6 +110,21 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
         self.transform = transforms
         self.n_years = n_years
         self.race_to_id = race_to_id or RACE_TO_ID
+
+        # ---- HDF5 backend ----
+        # Images for this split live in a single HDF5 file whose keys are the
+        # PNG filename stems, e.g. "10093833_L_CC_2017-08-03_4505".
+        if h5_file is None:
+            h5_file = self.data_dir / f"{self.mode}.h5"
+        self.h5_path = Path(h5_file)
+        if not self.h5_path.is_file():
+            raise FileNotFoundError(
+                f"HDF5 file for mode '{self.mode}' does not exist: "
+                f"{self.h5_path}"
+            )
+        # Per-process HDF5 handle opened lazily inside DataLoader workers.
+        self._h5 = None
+        self._h5_pid = None
 
         # ---- shared utilities ----
         self.data = load_tabular_data(csv_file)
@@ -124,11 +152,11 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
         previous_mlo = self.image_data[sample.patient_id][sample.prior_date][f"{sample.laterality}_MLO"]
 
         # ---- load images ----
-        current_image_cc = load_image_tensor(self.data_dir / self.mode / current_cc.filename)
-        current_image_mlo = load_image_tensor(self.data_dir / self.mode / current_mlo.filename)
+        current_image_cc = self._read_image_tensor(current_cc.filename)
+        current_image_mlo = self._read_image_tensor(current_mlo.filename)
 
-        previous_image_cc = load_image_tensor(self.data_dir / self.mode / previous_cc.filename)
-        previous_image_mlo = load_image_tensor(self.data_dir / self.mode / previous_mlo.filename)
+        previous_image_cc = self._read_image_tensor(previous_cc.filename)
+        previous_image_mlo = self._read_image_tensor(previous_mlo.filename)
 
         # ---- transforms ----
         if self.transform:
@@ -137,8 +165,18 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
             previous_image_cc = self.transform(previous_image_cc).squeeze(0)
             previous_image_mlo = self.transform(previous_image_mlo).squeeze(0)
 
-            # grouped tensor for augmentation consistency
-            images = torch.stack(
+        # ---- horizontal flip ----
+        # Applied to all views of the sample together (single random decision) so
+        # current/prior and CC/MLO stay geometrically consistent. Kept independent
+        # of `self.transform` because the flips' group-consistency is essential and
+        # must not depend on whether augmentation transforms are supplied.
+        if self.mode == "train":
+            (
+                current_image_cc,
+                current_image_mlo,
+                previous_image_cc,
+                previous_image_mlo,
+            ) = grouped_hflip(
                 [
                     current_image_cc,
                     current_image_mlo,
@@ -146,16 +184,6 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
                     previous_image_mlo,
                 ]
             )
-
-            if self.mode == "train" and torch.rand(1).item() < 0.5:
-                images = torch.flip(images, dims=[-1])
-
-            (
-                current_image_cc,
-                current_image_mlo,
-                previous_image_cc,
-                previous_image_mlo,
-            ) = images
 
         # ---- tabular lookup ----
         current_row = self._lookup_row(current_cc)
@@ -190,22 +218,59 @@ class BreastCancerRiskDatasetEMBEDLMVNet(Dataset):
             "race": map_race(current_row.get("RACE_DESC"), self.race_to_id),
         }
 
+    def _get_h5(self) -> h5py.File:
+        """Return a per-process read-only HDF5 handle (reopened per worker)."""
+        pid = os.getpid()
+        if self._h5 is None or self._h5_pid != pid:
+            if self._h5 is not None:
+                try:
+                    self._h5.close()
+                except Exception:
+                    pass
+            self._h5 = h5py.File(self.h5_path, "r")
+            self._h5_pid = pid
+        return self._h5
+
+    def _read_image_tensor(self, key: str) -> torch.Tensor:
+        """Load a single image from the HDF5 file as a float tensor."""
+        arr = self._get_h5()[key][()]
+        tensor = torch.from_numpy(np.ascontiguousarray(arr)).float() / 65535.0
+        return tensor.unsqueeze(0)
+
+    def __getstate__(self):
+        # h5py.File handles are not picklable (e.g. Windows/spawn workers);
+        # drop it and let each worker lazily reopen its own handle.
+        state = self.__dict__.copy()
+        state["_h5"] = None
+        state["_h5_pid"] = None
+        return state
+
+    def __del__(self):
+        try:
+            if getattr(self, "_h5", None) is not None:
+                self._h5.close()
+        except Exception:
+            pass
+
     def _load_image_data(self):
-        image_data = defaultdict(lambda: defaultdict(dict))
+        image_data = defaultdict(_new_view_dict)
 
-        image_folder = self.data_dir / self.mode
+        with h5py.File(self.h5_path, "r") as h5:
+            filenames = list(h5.keys())
 
-        if not image_folder.exists():
-            raise FileNotFoundError(f"Image folder does not exist: {image_folder}")
+        print(
+            f"[dataset] mode={self.mode}: reading {len(filenames)} "
+            f"images from {self.h5_path}"
+        )
 
-        for image_path in image_folder.iterdir():
+        for filename in filenames:
 
-            match = IMAGE_FILENAME_RE.match(image_path.name)
+            match = IMAGE_FILENAME_RE.match(filename)
             if not match:
                 continue
 
             record = ImageRecord(
-                filename=image_path.name,
+                filename=filename,
                 patient_id=match.group("patient_id"),
                 laterality=match.group("laterality"),
                 view=match.group("view"),
