@@ -7,7 +7,7 @@ __pycache__/
 *.so
 
 scripts_lumi/
-
+site/ 
 # Distribution / packaging
 .Python
 build/
