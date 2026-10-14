@@ -26,6 +26,7 @@
     - Mirai
     - VMRA-MaR
     - LMV-Net
+    - FlexLMV-Net
 
 ---
 
@@ -40,6 +41,7 @@
     - OA-BReaCR
     - ImgFeatAlign
     - LMV-Net
+    - FlexLMV-Net
 
 ---
 
@@ -52,3 +54,4 @@
 
 - **Breast-wise modeling:**
     - LMV-Net
+    - FlexLMV-Net
