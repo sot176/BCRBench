@@ -4,7 +4,7 @@
 
 FlexLMV-Net (Longitudinal Multi-View Network) is a deep learning model for breast cancer risk prediction from mammography. It jointly models **multi-view imaging (CC, MLO)** and **longitudinal information (current and prior exams)** to produce risk estimates over multiple future time horizons.
 
-The model integrates temporal alignment, cross-view feature fusion, and multi-head risk prediction within a unified framework.
+The model integrates temporal alignment, feature-Aware Temporal Fusion, cross-view feature fusion, and multi-head risk prediction within a unified framework.
 
 ---
 
@@ -20,19 +20,20 @@ The model integrates temporal alignment, cross-view feature fusion, and multi-he
  
 
 
-The model consists of three main components:
+The model consists of four main components:
 
 ### 1. Explicit Longitudinal Multi-View Alignment
-- Uses a shared encoder to extract feature maps from each view across all time points  
-- Applies a registration network (e.g., MammoRegNet) to align all available prior feature maps with the current feature map  
-- Computes difference features between consecutive examinations by subtracting aligned prior features from current features  
-- The resulting sequences of aligned prior and difference features can contain a variable number of elements depending on the available longitudinal imaging history.
+- Uses a shared encoder to extract feature maps from each mammographic view (CC and MLO) across all available examinations.
+- Applies a registration network (MammoRegNet) to spatially align all prior feature maps with the corresponding current-examination feature map.
+- Difference features are computed between consecutive examinations.
+- Supports a variable number of aligned prior and difference feature maps, accommodating patients with different lengths of imaging history.
 ---
 
 ### 2. Feature-Aware Temporal Fusion
-- Independently aggregate the aligned prior and difference features into compact longitudinal representations.
-- Allowing the model to adaptively determine the contribution of each available examination based on its feature content, temporal distance, and spatial relevance.
-- Concatenates current, the resulting fused aligned prior, and the fused difference features to form a unified longitudinal feature representation for each view  prior, and difference feature to obtain a longitudinal feature vector for each view
+- Aggregates information from a variable number of prior examinations to accommodate different longitudinal imaging histories.
+- Separately aggregates aligned prior features and difference features into compact longitudinal representations, preserving historical appearance and temporal changes.
+- Learns to weight each examination according to its feature content, temporal distance from the current examination, and spatial relevance.
+- Concatenates the current-examination features with the fused aligned-prior and difference representations to construct a comprehensive longitudinal feature representation for each view.
 
 --- 
 
@@ -40,7 +41,6 @@ The model consists of three main components:
 - Performs self-attention and cross-attention within each view 
 - Iteratively exchanges information between CC and MLO features  
 - Enhances view consistency and complementary feature learning  
-
 
 --- 
 
