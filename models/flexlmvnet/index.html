@@ -120,8 +120,13 @@
 <p>The model integrates temporal alignment, feature-Aware Temporal Fusion, cross-view feature fusion, and multi-head risk prediction within a unified framework.</p>
 <hr />
 <h2 id="key-idea">🧠 Key Idea</h2>
-<p>FlexLMV-Net is build around </p>
-<p>TODO</p>
+<p>FlexLMV-Net is built around three core ideas:</p>
+<ul>
+<li><strong>Explicit longitudinal alignment:</strong> Previous mammography feature maps are spatially aligned with the current-examination feature maps using a registration network (MammoRegNet), enabling meaningful temporal comparisons across a variable number of prior examinations.</li>
+<li><strong>Feature-aware temporal fusion:</strong> Aligned prior features and difference features are independently aggregated, allowing the model to adaptively capture historical breast appearance and temporal changes while accounting for examination-specific information and temporal distance.</li>
+<li><strong>Cross-view fusion and multi-level prediction:</strong> CC and MLO views are fused using self-attention and cross-attention mechanisms, with risk predictions generated at both view-specific and fused multi-view levels.</li>
+</ul>
+<p>This design enables FlexLMV-Net to capture <strong>longitudinal changes</strong>, <strong>cross-view consistency</strong>, and <strong>variable-length imaging histories</strong>, adapting to the amount of prior mammography information available for each patient.</p>
 <hr />
 <h2 id="architecture">🏗️ Architecture</h2>
 <p align="center">
