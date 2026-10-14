@@ -105,7 +105,7 @@ Similarly, each model has its own evaluation script:
  scripts/test_oa_breacr.sh
  scripts/test_imgfeatalign.sh
  scripts/test_lmv_net.sh
-scripts/test_flexlmv_net.sh
+ scripts/test_flexlmv_net.sh
 ``` 
 
 ---
