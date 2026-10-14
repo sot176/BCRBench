@@ -2,4 +2,5 @@ from .dataset_embed_LMVNet import BreastCancerRiskDatasetEMBEDLMVNet
 from .dataset_embed_Mirai import BreastCancerRiskDatasetEMBEDMirai
 from .dataset_embed_VMRA import BreastCancerRiskDatasetEMBEDVMRA
 from .dataset_embed_ImgFeatAlign import BreastCancerRiskDatasetEMBEDImgFeatAlign
+from .dataset_embed_FlexLMV_Net import BreastCancerRiskDatasetEMBEDFlexLMVNet
 from .utils import * 

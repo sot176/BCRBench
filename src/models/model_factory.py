@@ -46,7 +46,7 @@ def get_model(model_name: str, args=None,
     """
 
     # ── Models that require a registration network ────────────────
-    REGISTRATION_MODELS = {"ImgFeatAlign", "LMV-Net"}
+    REGISTRATION_MODELS = {"ImgFeatAlign", "LMV-Net", "FlexLMV-Net"}
 
     # ── Lazy imports — only load what is needed ───────────────────
     def _build_mirai():
@@ -72,6 +72,15 @@ def get_model(model_name: str, args=None,
     def _build_oa_breacr():
         from models.OABreaCR.model import OA_BreaCR
         return _build_model(OA_BreaCR, args=args, **kwargs)
+    
+    def _build_flexlmvnet():
+        from models.FlexLMV_Net.model import FlexLMVNet
+        return _build_model(
+            FlexLMVNet,
+            mammo_reg_net=mammo_reg_net,
+            args=args,
+            **kwargs,
+        )
 
     # ── Registry ──────────────────────────────────────────────────
     MODEL_REGISTRY = {
@@ -80,6 +89,7 @@ def get_model(model_name: str, args=None,
         "LMV-Net":      _build_lmvnet,
         "VMRA-MaR":     _build_vmramar,
         "OA-BreaCR":    _build_oa_breacr,
+        "FlexLMV-Net":  _build_flexlmvnet,
     }
 
     if model_name not in MODEL_REGISTRY:

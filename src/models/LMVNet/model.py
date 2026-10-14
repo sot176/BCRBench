@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 
-from .model_utils import CrossAttentionBlock, LongitudinalFeatureProcessor
-from models.common_parts import CumulativeProbabilityLayer, BaseRiskModel
+from .model_utils import LongitudinalFeatureProcessor
+from models.common_parts import CumulativeProbabilityLayer, BaseRiskModel, CrossAttentionBlock
 
 
 class LMVNet(BaseRiskModel):

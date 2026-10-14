@@ -1,3 +1,3 @@
-from .model_utils import CumulativeProbabilityLayer, ContinuousPosEncoding, SpatialTransformerBlock
+from .model_utils import CumulativeProbabilityLayer, ContinuousPosEncoding, SpatialTransformerBlock, CrossAttentionBlock
 from .mirai_localized_dif_head import extract_mirai_backbone
 from .base_models import BaseRiskModel
