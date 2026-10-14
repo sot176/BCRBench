@@ -41,7 +41,7 @@ The benchmark includes the following models:
 
 | Model | Venue | Paper | Input | Key Idea |
 |------|------|------|-----|----------|
-| [FlexLMV-Net](./flexlmvnet.md) | (under review)) |  [Paper](https://arxiv.org/abs/2610.16329) | Multi-view, longitudinal | Multi-view longitudinal model with dual-stream attention leveraging both views of one breast and supports a flexible amount of prior images. |
+| [FlexLMV-Net](./models/flexlmvnet.md) | (under review)) |  [Paper](https://arxiv.org/abs/2610.16329) | Multi-view, longitudinal | Multi-view longitudinal model with dual-stream attention leveraging both views of one breast and supports a flexible amount of prior images. |
 | [LMV-Net](./models/lmvnet.md) | MICCAI 2026 | [Paper](https://doi.org/10.1007/978-3-032-38470-6_50) | Multi-view, longitudinal | Multi-view longitudinal model with dual-stream attention leveraging both views of one breast. |
 | [ImgFeatAlign](./models/imgfeatalign.md) | MICCAI 2025 | [Paper](https://doi.org/10.1007/978-3-032-04937-7_47) | Single-view, longitudinal | Uses image-based deformation (MammoRegNet) applied in feature space for improved longitudinal comparison. |
 | [VMRA-MaR](./models/vmramar.md) | MICCAI 2025 | [Paper](https://doi.org/10.1007/978-3-032-05182-0_64) | Multi-view, longitudinal | Extends Mirai to longitudinal mammograms using Spatial Asymmetry Detector and Longitudinal Asymmetry Tracker. |
