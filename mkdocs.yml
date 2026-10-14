@@ -16,6 +16,7 @@ nav:
       - OA-BreaCR: models/oabreacr.md
       - ImgFeatAlign: models/imgfeatalign.md
       - LMV-Net: models/lmvnet.md
+      - FlexLMV-Net: models/flexlmvnet.md
       - Mirai: models/mirai.md
       - VMRA-MaR: models/vmramar.md
       - Adding new models: models/adding_new_models.md
