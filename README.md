@@ -41,6 +41,7 @@ This repository provides implementations of several recent breast cancer risk pr
 
 | Model            | Conference/Journal      | Input Views & Timepoints                     | Key Idea                                                           |
 | ---------------- | --------------------- | -------------------------------------------- | ------------------------------------------------------------------ |
+| **[FlexLMV-Net](https://arxiv.org/abs/2610.16329)**      | Under review  | Both views of 1 breast, multiple timepoints         | Multi-view longitudinal model with dual-stream attention leveraging both views of one breast. |
 | **[LMV-Net](https://doi.org/10.1007/978-3-032-38470-6_50)**      | MICCAI 2026  | Both views of 1 breast, 2 timepoints         | Multi-view longitudinal model with dual-stream attention leveraging both views of one breast. |
 | **[ImgFeatAlign](https://doi.org/10.1007/978-3-032-04937-7_47)** | MICCAI 2025             | 1 view of 1 breast                           | Uses image-based deformation (MammoRegNet) applied in feature space for improved longitudinal comparison.   |
 | **[VMRA-MaR](https://doi.org/10.1007/978-3-032-05182-0_64)**     | MICCAI 2025             | 4 screening mammograms (multiple timepoints) | Extends Mirai to longitudinal mammograms using Spatial Asymmetry Detector and Longitudinal Asymmetry Tracker.                     |
@@ -93,6 +94,7 @@ Run the model of your choice:
  scripts/train_oa_breacr.sh
  scripts/train_imgfeatalign.sh
  scripts/train_lmv_net.sh
+scripts/train_flexlmv_net.sh
 ``` 
 
 ### 4) Evaluation
@@ -103,6 +105,7 @@ Similarly, each model has its own evaluation script:
  scripts/test_oa_breacr.sh
  scripts/test_imgfeatalign.sh
  scripts/test_lmv_net.sh
+scripts/test_flexlmv_net.sh
 ``` 
 
 ---
@@ -127,6 +130,17 @@ doi={10.5281/zenodo.20691090}
 ```
 
 ### Model Papers
+- **FlexLMV-Net**: 
+```bibtex
+@inproceedings{flexlmv_net_2026,
+author = {Thrun, Solveig and Sun, Zijun and  Salahuddin, Suaiba A. and Wickstrøm, Kristoffer and Wetzer, Elisabeth and Hansen, Stine, and Jenssen, Robert and Kampffmeyer, Michael},
+title={Longitudinal Multi-View Modeling for Breast Cancer Risk Prediction},
+booktitle = {Under review},
+year={2026}
+doi={https://arxiv.org/abs/2610.16329}
+}
+```
+
 - **LMV-Net**: 
 ```bibtex
 @inproceedings{lmv_net_2026,
