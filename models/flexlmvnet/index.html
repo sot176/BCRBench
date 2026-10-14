@@ -117,34 +117,40 @@
                 <h1 id="flexlmv-net">FlexLMV-Net</h1>
 <h2 id="overview">📌 Overview</h2>
 <p>FlexLMV-Net (Longitudinal Multi-View Network) is a deep learning model for breast cancer risk prediction from mammography. It jointly models <strong>multi-view imaging (CC, MLO)</strong> and <strong>longitudinal information (current and prior exams)</strong> to produce risk estimates over multiple future time horizons.</p>
-<p>The model integrates temporal alignment, cross-view feature fusion, and multi-head risk prediction within a unified framework.</p>
+<p>The model integrates temporal alignment, feature-Aware Temporal Fusion, cross-view feature fusion, and multi-head risk prediction within a unified framework.</p>
 <hr />
 <h2 id="key-idea">🧠 Key Idea</h2>
 <hr />
 <h2 id="architecture">🏗️ Architecture</h2>
 <p align="center">
-  <img src="../figs/FlexLMVNet.png" alt="LMV-Net Architecture" width="700"/>
+  <img src="../figs/FlexLMVNet.png" alt="LMV-Net Architecture" width="600"/>
 </p>
 
-<p>The model consists of three main components:</p>
-<h3 id="1-longitudinal-feature-processing">1. Longitudinal Feature Processing</h3>
+<p>The model consists of four main components:</p>
+<h3 id="1-explicit-longitudinal-multi-view-alignment">1. Explicit Longitudinal Multi-View Alignment</h3>
 <ul>
-<li>Uses a shared encoder to extract feature maps from each view across both time points  </li>
-<li>Applies a registration network (e.g., MammoRegNet) to align prior feature maps with current feature maps  </li>
-<li>Computes difference features by subtracting aligned prior features from current features  </li>
-<li>Concatenates current, aligned prior, and difference features to form a unified longitudinal feature representation for each view  prior, and difference feature to obtain a longitudinal feature vector for each view</li>
+<li>Uses a shared encoder to extract feature maps from each mammographic view (CC and MLO) across all available examinations.</li>
+<li>Applies a registration network (MammoRegNet) to spatially align all prior feature maps with the corresponding current-examination feature map.</li>
+<li>Difference features are computed between consecutive examinations.</li>
+<li>Supports a variable number of aligned prior and difference feature maps, accommodating patients with different lengths of imaging history.</li>
 </ul>
 <hr />
-<h3 id="2-multi-view-dual-stream-attention">2. Multi-View Dual Stream-Attention</h3>
+<h3 id="2-feature-aware-temporal-fusion">2. Feature-Aware Temporal Fusion</h3>
 <ul>
-<li>Performs self-attention and corss-attention within each view </li>
+<li>Aggregates information from a variable number of prior examinations to accommodate different longitudinal imaging histories.</li>
+<li>Separately aggregates aligned prior features and difference features into compact longitudinal representations, preserving historical appearance and temporal changes.</li>
+<li>Learns to weight each examination according to its feature content, temporal distance from the current examination, and spatial relevance.</li>
+<li>Concatenates the current-examination features with the fused aligned-prior and difference representations to construct a comprehensive longitudinal feature representation for each view.</li>
+</ul>
+<hr />
+<h3 id="3-multi-view-dual-stream-attention">3. Multi-View Dual Stream-Attention</h3>
+<ul>
+<li>Performs self-attention and cross-attention within each view </li>
 <li>Iteratively exchanges information between CC and MLO features  </li>
 <li>Enhances view consistency and complementary feature learning  </li>
 </ul>
 <hr />
-<h3 id="flexible-longitudinal-images">Flexible longitudinal images</h3>
-<hr />
-<h3 id="3-multi-view-fusion-and-risk-prediction">3. Multi-View Fusion and  Risk Prediction</h3>
+<h3 id="4-multi-view-fusion-and-risk-prediction">4. Multi-View Fusion and  Risk Prediction</h3>
 <ul>
 <li>Global average pooling applied to each view  </li>
 <li>Feature vectors concatenated and passed through a linear layer  </li>
@@ -207,6 +213,7 @@
 <h2 id="key-components">⚙️ Key Components</h2>
 <ul>
 <li><strong>LongitudinalFeatureProcessor</strong>: Handles temporal feature alignment using registration  </li>
+<li><strong>Feature-Aware Temporal Fusion</strong>: Flexibly aggregates longitudinal information from a variable number of prior examinations</li>
 <li><strong>Multi-View Dual Stream-Attention Block</strong>: Performs cross-view feature fusion using self-attention and cross-attention  </li>
 <li><strong>Continuous Positional Encoding:</strong> Injects time-gap information into difference features  </li>
 <li><strong>CumulativeProbabilityLayer</strong>: Outputs risk over time horizons  </li>
