@@ -141,6 +141,7 @@ MODEL_REGISTRY = {
     "LMV-Net":      _build_lmvnet,
     "VMRA-MaR":     _build_vmramar,
     "OA-BreaCR":    _build_oa_breacr,
+    "FlexLMV-Net":  _build_flexlmvnet,
     "YourModel":    _build_your_model,   # ← add here
 }
 ```
