@@ -94,7 +94,7 @@ Run the model of your choice:
  scripts/train_oa_breacr.sh
  scripts/train_imgfeatalign.sh
  scripts/train_lmv_net.sh
-scripts/train_flexlmv_net.sh
+ scripts/train_flexlmv_net.sh
 ``` 
 
 ### 4) Evaluation
