@@ -41,6 +41,7 @@ Each model can be trained using its corresponding script:
     scripts/train_oa_breacr.sh
     scripts/train_imgfeatalign.sh
     scripts/train_lmv_net.sh
+    scripts/train_flexlmv_net.sh
 
 ---
 
@@ -53,6 +54,7 @@ Evaluate trained models using:
     scripts/test_oa_breacr.sh
     scripts/test_imgfeatalign.sh
     scripts/test_lmv_net.sh
+    scripts/test_flexlmv_net.sh
 
 Evaluation scripts compute performance metrics such as AUC.
 

@@ -9,7 +9,12 @@ The model integrates temporal alignment, feature-Aware Temporal Fusion, cross-vi
 ---
 
 ## 🧠 Key Idea
- 
+
+
+FlexLMV-Net is build around 
+
+TODO
+
 ---
 
 ## 🏗️ Architecture
