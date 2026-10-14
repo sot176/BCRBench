@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>FlexLMV-Net - BCRBench</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "FlexLMV-Net";
+        var mkdocs_page_input_path = "models\\flexlmvnet.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> BCRBench
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../overview/">Overview</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../getting-started/">Getting Started</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Datasets</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../datasets/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../datasets/preprocessing/">Preprocessing</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../datasets/csv_file_creation/">CSV-File Creation</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Models</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../oabreacr/">OA-BreaCR</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../imgfeatalign/">ImgFeatAlign</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../lmvnet/">LMV-Net</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../mirai/">Mirai</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../vmramar/">VMRA-MaR</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../adding_new_models/">Adding new models</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Training</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../training/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../training/training_a_model/">Training a Model</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Evaluation</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../evaluating/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../evaluating/evaluating_a_model/">Evaluating a Model</a>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">BCRBench</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">FlexLMV-Net</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="flexlmv-net">FlexLMV-Net</h1>
+<h2 id="overview">📌 Overview</h2>
+<p>FlexLMV-Net (Longitudinal Multi-View Network) is a deep learning model for breast cancer risk prediction from mammography. It jointly models <strong>multi-view imaging (CC, MLO)</strong> and <strong>longitudinal information (current and prior exams)</strong> to produce risk estimates over multiple future time horizons.</p>
+<p>The model integrates temporal alignment, cross-view feature fusion, and multi-head risk prediction within a unified framework.</p>
+<hr />
+<h2 id="key-idea">🧠 Key Idea</h2>
+<hr />
+<h2 id="architecture">🏗️ Architecture</h2>
+<p align="center">
+  <img src="../figs/FlexLMVNet.png" alt="LMV-Net Architecture" width="700"/>
+</p>
+
+<p>The model consists of three main components:</p>
+<h3 id="1-longitudinal-feature-processing">1. Longitudinal Feature Processing</h3>
+<ul>
+<li>Uses a shared encoder to extract feature maps from each view across both time points  </li>
+<li>Applies a registration network (e.g., MammoRegNet) to align prior feature maps with current feature maps  </li>
+<li>Computes difference features by subtracting aligned prior features from current features  </li>
+<li>Concatenates current, aligned prior, and difference features to form a unified longitudinal feature representation for each view  prior, and difference feature to obtain a longitudinal feature vector for each view</li>
+</ul>
+<hr />
+<h3 id="2-multi-view-dual-stream-attention">2. Multi-View Dual Stream-Attention</h3>
+<ul>
+<li>Performs self-attention and corss-attention within each view </li>
+<li>Iteratively exchanges information between CC and MLO features  </li>
+<li>Enhances view consistency and complementary feature learning  </li>
+</ul>
+<hr />
+<h3 id="flexible-longitudinal-images">Flexible longitudinal images</h3>
+<hr />
+<h3 id="3-multi-view-fusion-and-risk-prediction">3. Multi-View Fusion and  Risk Prediction</h3>
+<ul>
+<li>Global average pooling applied to each view  </li>
+<li>Feature vectors concatenated and passed through a linear layer  </li>
+<li>Produces a fused multi-view representation  </li>
+<li>Shared cumulative probability layer  </li>
+<li>Outputs:<ul>
+<li>Multi-view risk prediction  </li>
+<li>CC-only risk prediction  </li>
+<li>MLO-only risk prediction  </li>
+</ul>
+</li>
+</ul>
+<hr />
+<h2 id="input-output">🔄 Input / Output</h2>
+<h3 id="input">Input</h3>
+<p>The model expects a batch dictionary with:</p>
+<ul>
+<li><code>current_image_cc</code>: Current CC view <code>[B, 1, H, W]</code>  </li>
+<li><code>previous_image_cc</code>: Prior CC view <code>[B, 1, H, W]</code>  </li>
+<li><code>current_image_mlo</code>: Current MLO view <code>[B, 1, H, W]</code>  </li>
+<li><code>previous_image_mlo</code>: Prior MLO view <code>[B, 1, H, W]</code>  </li>
+<li><code>time_gap</code>: Time between exams <code>[B, 1]</code>  </li>
+<li><code>target</code>: Risk labels <code>[B, num_years]</code>  </li>
+<li><code>y_mask</code>: Valid label mask <code>[B, num_years]</code>  </li>
+</ul>
+<hr />
+<h3 id="output">Output</h3>
+<p>The <code>forward</code> method returns a dictionary containing:</p>
+<ul>
+<li><code>risk_multi</code>: Multi-view fused risk logits <code>[B, num_years]</code>  </li>
+<li><code>risk_cc</code>: CC-only risk logits <code>[B, num_years]</code>  </li>
+<li><code>risk_mlo</code>: MLO-only risk logits <code>[B, num_years]</code>  </li>
+</ul>
+<p>These outputs are consumed by two helper methods:</p>
+<ul>
+<li><strong><code>get_risk_heads(outputs, batch)</code></strong><br />
+  Uses the outputs from <code>forward</code> to construct <code>(logits, target, mask)</code> tuples for each prediction head:<ul>
+<li><code>multi</code>: Uses <code>risk_multi</code> with <code>target</code> and <code>y_mask</code>  </li>
+<li><code>cc</code>: Uses <code>risk_cc</code> with <code>target</code> and <code>y_mask</code>  </li>
+<li><code>mlo</code>: Uses <code>risk_mlo</code> with <code>target</code> and <code>y_mask</code>  </li>
+</ul>
+</li>
+</ul>
+<p>This enables <strong>multi-head supervision</strong>, encouraging both view-specific learning and improved fused predictions.</p>
+<ul>
+<li><strong><code>get_primary_risk_head(outputs)</code></strong><br />
+  Uses the outputs from <code>forward</code> to return the final prediction for evaluation, defined as: <code>sigmoid(risk_multi)</code></li>
+</ul>
+<p>This represents the model’s <strong>primary risk estimate</strong>, based on fused multi-view information.</p>
+<hr />
+<h2 id="integration-in-this-framework">🧩 Integration in This Framework</h2>
+<p>FlexLMV-Net is implemented as a subclass of <code>BaseRiskModel</code> and:</p>
+<ul>
+<li>Uses the shared data interface  </li>
+<li>Supports longitudinal multi-view inputs  </li>
+<li>Produces multiple risk heads for multi-task training  </li>
+<li>Uses a unified evaluation pipeline via the primary risk head  </li>
+</ul>
+<hr />
+<h2 id="key-components">⚙️ Key Components</h2>
+<ul>
+<li><strong>LongitudinalFeatureProcessor</strong>: Handles temporal feature alignment using registration  </li>
+<li><strong>Multi-View Dual Stream-Attention Block</strong>: Performs cross-view feature fusion using self-attention and cross-attention  </li>
+<li><strong>Continuous Positional Encoding:</strong> Injects time-gap information into difference features  </li>
+<li><strong>CumulativeProbabilityLayer</strong>: Outputs risk over time horizons  </li>
+<li><strong>Freezing Mechanism:</strong> : Allows pretrained encoder to be frozen during training  </li>
+</ul>
+<hr />
+<h2 id="risk-prediction">📉 Risk Prediction</h2>
+<ul>
+<li>Risk is modeled as <strong>cumulative probability over time</strong>  </li>
+<li>Multiple heads allow:<ul>
+<li>View-specific supervision  </li>
+<li>Improved training stability  </li>
+</ul>
+</li>
+</ul>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
