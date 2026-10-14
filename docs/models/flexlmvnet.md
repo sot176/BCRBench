@@ -15,34 +15,36 @@ The model integrates temporal alignment, cross-view feature fusion, and multi-he
 ## 🏗️ Architecture
 
 <p align="center">
-  <img src="../figs/FlexLMVNet.png" alt="LMV-Net Architecture" width="700"/>
+  <img src="../figs/FlexLMVNet.png" alt="LMV-Net Architecture" width="600"/>
 </p>
  
 
 
 The model consists of three main components:
 
-### 1. Longitudinal Feature Processing
-- Uses a shared encoder to extract feature maps from each view across both time points  
-- Applies a registration network (e.g., MammoRegNet) to align prior feature maps with current feature maps  
-- Computes difference features by subtracting aligned prior features from current features  
-- Concatenates current, aligned prior, and difference features to form a unified longitudinal feature representation for each view  prior, and difference feature to obtain a longitudinal feature vector for each view
-
+### 1. Explicit Longitudinal Multi-View Alignment
+- Uses a shared encoder to extract feature maps from each view across all time points  
+- Applies a registration network (e.g., MammoRegNet) to align all available prior feature maps with the current feature map  
+- Computes difference features between consecutive examinations by subtracting aligned prior features from current features  
+- The resulting sequences of aligned prior and difference features can contain a variable number of elements depending on the available longitudinal imaging history.
 ---
 
-### 2. Multi-View Dual Stream-Attention
-- Performs self-attention and corss-attention within each view 
+### 2. Feature-Aware Temporal Fusion
+- Independently aggregate the aligned prior and difference features into compact longitudinal representations.
+- Allowing the model to adaptively determine the contribution of each available examination based on its feature content, temporal distance, and spatial relevance.
+- Concatenates current, the resulting fused aligned prior, and the fused difference features to form a unified longitudinal feature representation for each view  prior, and difference feature to obtain a longitudinal feature vector for each view
+
+--- 
+
+### 3. Multi-View Dual Stream-Attention
+- Performs self-attention and cross-attention within each view 
 - Iteratively exchanges information between CC and MLO features  
 - Enhances view consistency and complementary feature learning  
-
----
-
-### Flexible longitudinal images
 
 
 --- 
 
-### 3. Multi-View Fusion and  Risk Prediction
+### 4. Multi-View Fusion and  Risk Prediction
 - Global average pooling applied to each view  
 - Feature vectors concatenated and passed through a linear layer  
 - Produces a fused multi-view representation  
@@ -109,6 +111,7 @@ FlexLMV-Net is implemented as a subclass of `BaseRiskModel` and:
 ## ⚙️ Key Components
 
 - **LongitudinalFeatureProcessor**: Handles temporal feature alignment using registration  
+- **Feature-Aware Temporal Fusion**: Flexibly aggregates longitudinal information from a variable number of prior examinations
 - **Multi-View Dual Stream-Attention Block**: Performs cross-view feature fusion using self-attention and cross-attention  
 - **Continuous Positional Encoding:** Injects time-gap information into difference features  
 - **CumulativeProbabilityLayer**: Outputs risk over time horizons  
