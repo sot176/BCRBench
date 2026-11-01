@@ -12,7 +12,7 @@ from config.config import cfg
 
 
 # Helpers specific to this multiple-prior model.
-from .model_utils import LongitudinalFeatureProcessorMultiplePriors, CrossAttentionBlock
+from .model_utils import LongitudinalFeatureProcessorMultiplePriors
 from models.common_parts import CrossAttentionBlock
 
 class FlexLMVNet(BaseRiskModel):

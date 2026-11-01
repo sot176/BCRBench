@@ -15,13 +15,13 @@ DropPath.__repr__ = lambda self: f"timm.DropPath({self.drop_prob})"
 
 try:
     from mamba_ssm.ops.selective_scan_interface import selective_scan_ref as selective_scan_fn
-    print("✅ Using GPU selective_scan from mamba_ssm")
+    print("[OK] Using GPU selective_scan from mamba_ssm")
 except ImportError:
     try:
         from selective_scan import selective_scan_ref as selective_scan_fn
-        print("⚙️ Using selective_scan from selective_scan package")
+        print("[INFO] Using selective_scan from selective_scan package")
     except ImportError:
-        print("⚠️ selective_scan not found. Using dummy fallback (no Mamba dynamics).")
+        print("[WARN] selective_scan not found. Using dummy fallback (no Mamba dynamics).")
 
         def selective_scan_fn(x, *args, **kwargs):
             # Fallback: just return input unchanged

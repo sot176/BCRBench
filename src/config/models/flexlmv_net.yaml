@@ -1,0 +1,26 @@
+name: FlexLMV-Net
+
+# Feature width of the frozen MIRAI encoder (per view).
+# The longitudinal processor concatenates current + aggregated prior + difference,
+# so the attention blocks operate on 3 * feature_dim = 1536 channels.
+feature_dim: 512
+
+# Variable-length history: the checkpoint was trained/evaluated with up to two
+# prior examinations (max2/min1 cohort).
+num_prior_img: 2
+max_followup: 5
+
+# Feature-aware temporal aggregation.
+aggregation_mode: gated
+aggregator_hidden_dim: 64
+
+# Cross-view attention.
+num_attn_blocks: 1
+num_heads: 4
+dropout: 0.4
+drop_path: 0.2
+ffn_expansion_factor: 2
+
+# Keep the encoder trainable so Grad-CAM activations require gradients.
+# This only affects requires_grad; evaluation/state_dict are unchanged.
+finetune: true
